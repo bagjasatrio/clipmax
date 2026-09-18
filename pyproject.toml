@@ -1,0 +1,22 @@
+[project]
+name = "clipmax"
+version = "2.4.0"
+description = "Autonomous Desktop AI Video Clipper"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "faster-whisper>=1.0.0",
+    "mediapipe>=0.10.9",
+    "opencv-python>=4.8.0",
+    "openai>=1.12.0",
+    "pydantic>=2.5.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "pyside6>=6.6.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
