@@ -71,6 +71,11 @@ class AppConfig(BaseModel):
     nvenc_preset: str = "p4"
     video_bitrate: str = "6000k"
     audio_bitrate: str = "192k"
+    target_clip_count: int = 3
+    duration_preset: str = "Auto / Optimal (30-60s)"
+    min_duration: float = 30.0
+    max_duration: float = 60.0
+    campaign_rules: str = ""
 
     @classmethod
     def load(cls, path: str = "config.json") -> "AppConfig":

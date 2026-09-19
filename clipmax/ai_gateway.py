@@ -83,7 +83,7 @@ def discover_models(endpoint_url: str, api_key: str = "") -> List[str]:
     return model_ids or ["default"]
 
 SYSTEM_PROMPT = """Anda adalah kurator video viral profesional untuk TikTok, Instagram Reels, dan YouTube Shorts.
-Analisis transkrip berikut dan pilih segmen klip terbaik (durasi 30-60 detik).
+Analisis transkrip dan pilih segmen klip terbaik berdasarkan kriteria dan instruksi khusus.
 Kriteria seleksi:
 1. Memiliki Hook kuat di 3 detik pertama.
 2. Memiliki narasi yang utuh atau poin klimaks yang berbobot.
@@ -106,14 +106,31 @@ def evaluate_viral_clips(
     endpoint_url: str,
     api_key: str = "",
     model: str = "default",
-    max_clips: int = 5
+    target_clip_count: int = 3,
+    min_duration: float = 30.0,
+    max_duration: float = 60.0,
+    campaign_rules: str = ""
 ) -> List[ViralClipCandidate]:
     client = OpenAI(
         base_url=endpoint_url,
         api_key=api_key or "no-key-required"
     )
 
-    prompt = f"Transkrip Video:\n\n{transcript}\n\nPilih maksimal {max_clips} klip terbaik."
+    rules_section = ""
+    if campaign_rules and campaign_rules.strip():
+        rules_section = f"""
+CRITICAL CAMPAIGN RULES (User Guidelines):
+{campaign_rules.strip()}
+Kamu WAJIB memilih dan memotong klip yang memenuhi aturan di atas.
+"""
+
+    prompt = f"""Transkrip Video:
+
+{transcript}
+
+Instruksi Pemilihan Klip:
+- Hasilkan tepat {target_clip_count} klip terbaik.
+- Pastikan durasi setiap klip berada di dalam rentang {int(min_duration)} sampai {int(max_duration)} detik.{rules_section}"""
 
     response = client.chat.completions.create(
         model=model,
@@ -132,23 +149,36 @@ def evaluate_viral_clips(
         items = [items]
 
     results: List[ViralClipCandidate] = []
+    relaxed_results: List[ViralClipCandidate] = []
+
+    lower_bound = max(5.0, min_duration - 5.0)
+    upper_bound = max_duration + 5.0
+
     for item in items:
         if not isinstance(item, dict):
             continue
         start_sec = parse_to_seconds(item.get("start_time", 0))
         end_sec = parse_to_seconds(item.get("end_time", 0))
-        if end_sec <= start_sec or (end_sec - start_sec) < 5.0:
-            continue
-        results.append(
-            ViralClipCandidate(
-                title=str(item.get("title", "Untitled Clip")),
-                hook=str(item.get("hook", "")),
-                start_time=start_sec,
-                end_time=end_sec,
-                virality_score=int(item.get("virality_score", 50)),
-                reasoning=str(item.get("reasoning", ""))
-            )
-        )
+        dur = end_sec - start_sec
 
-    results.sort(key=lambda x: x.virality_score, reverse=True)
-    return results[:max_clips]
+        if end_sec <= start_sec or dur < 5.0:
+            continue
+
+        candidate = ViralClipCandidate(
+            title=str(item.get("title", "Untitled Clip")),
+            hook=str(item.get("hook", "")),
+            start_time=start_sec,
+            end_time=end_sec,
+            virality_score=int(item.get("virality_score", 50)),
+            reasoning=str(item.get("reasoning", ""))
+        )
+        relaxed_results.append(candidate)
+
+        # Enforce duration bounds
+        if lower_bound <= dur <= upper_bound:
+            results.append(candidate)
+
+    # If strict filter eliminated everything, fallback to relaxed results
+    final_list = results if results else relaxed_results
+    final_list.sort(key=lambda x: x.virality_score, reverse=True)
+    return final_list[:target_clip_count]

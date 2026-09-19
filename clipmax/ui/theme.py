@@ -76,7 +76,7 @@ QLabel.BadgeMid {
     border: 1px solid #d97706;
 }
 
-QLineEdit, QComboBox {
+QLineEdit, QComboBox, QSpinBox, QPlainTextEdit {
     background-color: #1a2234;
     border: 1px solid #2d3748;
     border-radius: 7px;
@@ -86,9 +86,20 @@ QLineEdit, QComboBox {
     selection-background-color: #3b82f6;
 }
 
-QLineEdit:focus, QComboBox:focus {
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QPlainTextEdit:focus {
     border: 1px solid #3b82f6;
     background-color: #1e293b;
+}
+
+QSpinBox::up-button, QSpinBox::down-button {
+    background-color: #2d3748;
+    border-radius: 3px;
+    width: 18px;
+    margin: 1px;
+}
+
+QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+    background-color: #3b82f6;
 }
 
 QPushButton {

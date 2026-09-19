@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QComboBox, QProgressBar,
     QFileDialog, QMessageBox, QFrame, QStackedWidget, QTabWidget,
-    QScrollArea, QSlider, QSizePolicy, QSplitter
+    QScrollArea, QSlider, QSizePolicy, QSplitter, QSpinBox,
+    QPlainTextEdit
 )
 from clipmax.config import AppConfig
 from clipmax.ai_gateway import discover_models
@@ -23,17 +24,36 @@ class PipelineWorker(QThread):
     finished = Signal(list)
     failed = Signal(str)
 
-    def __init__(self, orchestrator: PipelineOrchestrator, input_source: str):
+    def __init__(
+        self,
+        orchestrator: PipelineOrchestrator,
+        input_source: str,
+        target_clip_count: int = 3,
+        min_duration: float = 30.0,
+        max_duration: float = 60.0,
+        campaign_rules: str = ""
+    ):
         super().__init__()
         self.orchestrator = orchestrator
         self.input_source = input_source
+        self.target_clip_count = target_clip_count
+        self.min_duration = min_duration
+        self.max_duration = max_duration
+        self.campaign_rules = campaign_rules
 
     def run(self):
         try:
             def on_progress(status: PipelineStatus, pct: int, msg: str):
                 self.progress_changed.emit(status.value, pct, msg)
 
-            clips = self.orchestrator.run(self.input_source, on_progress)
+            clips = self.orchestrator.run(
+                self.input_source,
+                on_progress,
+                target_clip_count=self.target_clip_count,
+                min_duration=self.min_duration,
+                max_duration=self.max_duration,
+                campaign_rules=self.campaign_rules
+            )
             self.finished.emit(clips)
         except Exception as e:
             self.failed.emit(str(e))
@@ -243,7 +263,98 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(video_card)
 
-        # Card 3: Execution & Progress
+        # Card 3: Generation & Campaign Settings
+        gen_card = QFrame()
+        gen_card.setProperty("class", "Card")
+        g_layout = QVBoxLayout(gen_card)
+        g_layout.setSpacing(8)
+
+        g_lbl = QLabel("Generation & Campaign Settings")
+        g_lbl.setStyleSheet("font-weight: bold; color: #93c5fd;")
+        g_layout.addWidget(g_lbl)
+
+        row_params = QHBoxLayout()
+        row_params.setSpacing(12)
+
+        # Target clip count
+        count_box = QVBoxLayout()
+        count_lbl = QLabel("Target Clip Count:")
+        count_lbl.setStyleSheet("color: #d1d5db; font-size: 12px;")
+        self.spn_clip_count = QSpinBox()
+        self.spn_clip_count.setRange(1, 10)
+        self.spn_clip_count.setValue(self.config.target_clip_count or 3)
+        count_box.addWidget(count_lbl)
+        count_box.addWidget(self.spn_clip_count)
+        row_params.addLayout(count_box, 1)
+
+        # Clip Duration Range
+        dur_box = QVBoxLayout()
+        dur_lbl = QLabel("Clip Duration Range:")
+        dur_lbl.setStyleSheet("color: #d1d5db; font-size: 12px;")
+        self.cmb_duration = QComboBox()
+        self.cmb_duration.addItems([
+            "Auto / Optimal (30-60s)",
+            "Short (15-30s)",
+            "Medium (30-60s)",
+            "Long (60-90s)",
+            "Custom"
+        ])
+        preset_idx = self.cmb_duration.findText(self.config.duration_preset)
+        if preset_idx >= 0:
+            self.cmb_duration.setCurrentIndex(preset_idx)
+        self.cmb_duration.currentIndexChanged.connect(self._on_duration_preset_changed)
+
+        dur_box.addWidget(dur_lbl)
+        dur_box.addWidget(self.cmb_duration)
+        row_params.addLayout(dur_box, 2)
+
+        # Custom duration container
+        self.custom_dur_widget = QWidget()
+        custom_layout = QHBoxLayout(self.custom_dur_widget)
+        custom_layout.setContentsMargins(0, 0, 0, 0)
+        custom_layout.setSpacing(6)
+
+        min_layout = QVBoxLayout()
+        min_lbl = QLabel("Min (s):")
+        min_lbl.setStyleSheet("color: #9ca3af; font-size: 11px;")
+        self.spn_min_dur = QSpinBox()
+        self.spn_min_dur.setRange(5, 300)
+        self.spn_min_dur.setValue(int(self.config.min_duration or 30))
+        min_layout.addWidget(min_lbl)
+        min_layout.addWidget(self.spn_min_dur)
+        custom_layout.addLayout(min_layout)
+
+        max_layout = QVBoxLayout()
+        max_lbl = QLabel("Max (s):")
+        max_lbl.setStyleSheet("color: #9ca3af; font-size: 11px;")
+        self.spn_max_dur = QSpinBox()
+        self.spn_max_dur.setRange(10, 600)
+        self.spn_max_dur.setValue(int(self.config.max_duration or 60))
+        max_layout.addWidget(max_lbl)
+        max_layout.addWidget(self.spn_max_dur)
+        custom_layout.addLayout(max_layout)
+
+        row_params.addWidget(self.custom_dur_widget, 2)
+        self.custom_dur_widget.setVisible(self.cmb_duration.currentText() == "Custom")
+
+        g_layout.addLayout(row_params)
+
+        # Campaign Rules
+        rules_lbl = QLabel("Campaign Rules / Custom Guidelines (Opsional):")
+        rules_lbl.setStyleSheet("color: #d1d5db; font-size: 12px;")
+        g_layout.addWidget(rules_lbl)
+
+        self.txt_rules = QPlainTextEdit()
+        self.txt_rules.setPlaceholderText(
+            "Contoh: Fokus pada pembahasan produk X, pastikan klip memiliki call to action di akhir, hindari topik politik..."
+        )
+        self.txt_rules.setPlainText(self.config.campaign_rules or "")
+        self.txt_rules.setFixedHeight(65)
+        g_layout.addWidget(self.txt_rules)
+
+        layout.addWidget(gen_card)
+
+        # Card 4: Execution & Progress
         exec_card = QFrame()
         exec_card.setProperty("class", "Card")
         e_layout = QVBoxLayout(exec_card)
@@ -400,6 +511,21 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Error Discovery", f"Gagal mengambil model: {str(e)}")
 
+    def _on_duration_preset_changed(self):
+        preset = self.cmb_duration.currentText()
+        is_custom = (preset == "Custom")
+        self.custom_dur_widget.setVisible(is_custom)
+        if not is_custom:
+            if "15-30" in preset:
+                self.spn_min_dur.setValue(15)
+                self.spn_max_dur.setValue(30)
+            elif "30-60" in preset:
+                self.spn_min_dur.setValue(30)
+                self.spn_max_dur.setValue(60)
+            elif "60-90" in preset:
+                self.spn_min_dur.setValue(60)
+                self.spn_max_dur.setValue(90)
+
     def _on_browse_video(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Pilih Video", "", "Video Files (*.mp4 *.mkv *.mov *.avi)"
@@ -420,16 +546,47 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Validasi", "Masukkan tautan video valid (http:// atau https://).")
                 return
 
+        target_count = self.spn_clip_count.value()
+        preset = self.cmb_duration.currentText()
+        if preset == "Custom":
+            min_dur = float(self.spn_min_dur.value())
+            max_dur = float(self.spn_max_dur.value())
+            if max_dur <= min_dur:
+                QMessageBox.warning(self, "Validasi", "Durasi Max harus lebih besar daripada Min.")
+                return
+        elif "15-30" in preset:
+            min_dur, max_dur = 15.0, 30.0
+        elif "30-60" in preset:
+            min_dur, max_dur = 30.0, 60.0
+        elif "60-90" in preset:
+            min_dur, max_dur = 60.0, 90.0
+        else:
+            min_dur, max_dur = 30.0, 60.0
+
+        rules = self.txt_rules.toPlainText().strip()
+
         self.config.endpoint_url = self.txt_endpoint.text().strip()
         self.config.api_key = self.txt_key.text().strip()
         self.config.selected_model = self.cmb_models.currentText()
+        self.config.target_clip_count = target_count
+        self.config.duration_preset = preset
+        self.config.min_duration = min_dur
+        self.config.max_duration = max_dur
+        self.config.campaign_rules = rules
         self.config.save()
 
         self.btn_start.setEnabled(False)
         self.btn_cancel.setEnabled(True)
         self.progress_bar.setValue(0)
 
-        self.worker = PipelineWorker(self.orchestrator, source)
+        self.worker = PipelineWorker(
+            self.orchestrator,
+            source,
+            target_clip_count=target_count,
+            min_duration=min_dur,
+            max_duration=max_dur,
+            campaign_rules=rules
+        )
         self.worker.progress_changed.connect(self._on_worker_progress)
         self.worker.finished.connect(self._on_worker_finished)
         self.worker.failed.connect(self._on_worker_failed)

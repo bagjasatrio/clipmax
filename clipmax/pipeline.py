@@ -112,12 +112,21 @@ class PipelineOrchestrator:
     def run(
         self,
         input_source: str,
-        progress_callback: Optional[Callable[[PipelineStatus, int, str], None]] = None
+        progress_callback: Optional[Callable[[PipelineStatus, int, str], None]] = None,
+        target_clip_count: Optional[int] = None,
+        min_duration: Optional[float] = None,
+        max_duration: Optional[float] = None,
+        campaign_rules: Optional[str] = None
     ) -> List[ClipResult]:
         self.cancel_requested.clear()
         self.temp_files.clear()
         self.staging_files.clear()
         results: List[ClipResult] = []
+
+        target_count = target_clip_count if target_clip_count is not None else self.config.target_clip_count
+        min_dur = min_duration if min_duration is not None else self.config.min_duration
+        max_dur = max_duration if max_duration is not None else self.config.max_duration
+        rules = campaign_rules if campaign_rules is not None else self.config.campaign_rules
 
         temp_dir = Path(self.config.temp_dir)
         temp_dir.mkdir(parents=True, exist_ok=True)
@@ -189,7 +198,11 @@ class PipelineOrchestrator:
                 transcript=full_text,
                 endpoint_url=self.config.endpoint_url,
                 api_key=self.config.api_key,
-                model=self.config.selected_model
+                model=self.config.selected_model,
+                target_clip_count=target_count,
+                min_duration=min_dur,
+                max_duration=max_dur,
+                campaign_rules=rules
             )
 
             if not candidates:
