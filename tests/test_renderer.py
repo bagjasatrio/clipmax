@@ -54,7 +54,7 @@ def test_render_clip_command_blurred_background():
         assert "-filter_complex" in args
         fc_idx = args.index("-filter_complex") + 1
         fc_str = args[fc_idx]
-        assert "boxblur=20:5" in fc_str
+        assert "boxblur=25:5" in fc_str
         assert "overlay=(W-w)/2:(H-h)/2" in fc_str
         assert "subtitles='C\\:/temp/sub.ass'" in fc_str
         assert "-c:v" in args

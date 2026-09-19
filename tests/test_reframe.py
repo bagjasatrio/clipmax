@@ -1,6 +1,12 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from clipmax.reframe import calculate_crop_box, smooth_ema_series, ReframeStrategy, detect_face_centers
+from clipmax.reframe import (
+    calculate_crop_box,
+    smooth_ema_series,
+    ReframeStrategy,
+    detect_face_centers,
+    build_dynamic_crop_expression
+)
 
 def test_calculate_crop_box_center():
     x_crop, crop_w, crop_h = calculate_crop_box(
@@ -30,10 +36,25 @@ def test_calculate_crop_box_boundary_clamping():
 
 def test_smooth_ema_series():
     raw_series = [100.0, 100.0, 500.0, 500.0]
-    smoothed = smooth_ema_series(raw_series, alpha=0.15)
+    smoothed = smooth_ema_series(raw_series, alpha=0.1)
     assert len(smoothed) == len(raw_series)
     assert smoothed[0] == 100.0
-    assert smoothed[2] < 500.0
+    # With alpha=0.1, jump from 100 to 500 moves to 140
+    assert abs(smoothed[2] - 140.0) < 1.0
+
+def test_build_dynamic_crop_expression_static():
+    points = [650.0, 652.0, 651.0, 650.0]
+    times = [0.0, 1.0, 2.0, 3.0]
+    expr = build_dynamic_crop_expression(points, times)
+    assert expr == "650"
+
+def test_build_dynamic_crop_expression_moving():
+    points = [200.0, 400.0, 800.0]
+    times = [0.0, 1.0, 2.0]
+    expr = build_dynamic_crop_expression(points, times)
+    assert "if(lt(t,1.00)" in expr
+    assert "if(lt(t,2.00)" in expr
+    assert "max(0,min(1312" in expr
 
 def test_detect_face_centers_file_not_found():
     centers, strategy = detect_face_centers("non_existent_video.mp4", 0.0, 5.0)

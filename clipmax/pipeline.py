@@ -9,7 +9,13 @@ from clipmax.config import AppConfig, get_ffmpeg_bin
 from clipmax.audio import extract_audio
 from clipmax.transcriber import transcribe_audio, cleanup_vram
 from clipmax.ai_gateway import evaluate_viral_clips, ViralClipCandidate
-from clipmax.reframe import detect_face_centers, calculate_crop_box, smooth_ema_series, ReframeStrategy
+from clipmax.reframe import (
+    detect_face_centers,
+    calculate_crop_box,
+    smooth_ema_series,
+    ReframeStrategy,
+    build_dynamic_crop_expression
+)
 from clipmax.subtitle import generate_kinetic_ass
 from clipmax.renderer import render_clip
 from clipmax.downloader import download_video, is_valid_video_url
@@ -222,13 +228,17 @@ class PipelineOrchestrator:
                 # Stage 4: Scene & Content-Aware Tracking (70%)
                 self.status = PipelineStatus.TRACKING_FACES
                 if progress_callback:
-                    progress_callback(self.status, base_pct, f"Analisis konten visual klip {clip_num}/{total_clips}...")
+                    progress_callback(self.status, base_pct, f"Analisis visual & face tracking klip {clip_num}/{total_clips}...")
 
                 centers, strategy = detect_face_centers(video_path, clip.start_time, clip.end_time)
                 if strategy in (ReframeStrategy.CROP_TRACKING, "CROP_TRACKING", "single_speaker") and centers:
-                    smoothed = smooth_ema_series(centers, alpha=0.15)
-                    avg_center = sum(smoothed) / len(smoothed)
-                    crop_x, crop_w, crop_h = calculate_crop_box(1920, 1080, avg_center)
+                    # EMA smoothing with alpha=0.1 for smooth continuous panning
+                    smoothed_centers = smooth_ema_series(centers, alpha=0.1)
+                    crop_positions = [float(calculate_crop_box(1920, 1080, c)[0]) for c in smoothed_centers]
+                    dur = max(0.1, clip.end_time - clip.start_time)
+                    step_dt = dur / max(1, len(crop_positions) - 1)
+                    timestamps = [i * step_dt for i in range(len(crop_positions))]
+                    crop_x = build_dynamic_crop_expression(crop_positions, timestamps, max_x=1312)
                     mode = "CROP_TRACKING"
                 else:
                     crop_x = 0

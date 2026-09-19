@@ -53,7 +53,7 @@ def render_clip(
         # Mode BLURRED_BACKGROUND: Canvas 1080x1920 with blurred background and centered 16:9 foreground
         sub_filter = f",subtitles='{escaped_ass}'" if escaped_ass else ""
         filter_str = (
-            f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:5[bg];"
+            f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg];"
             f"[0:v]scale=1080:-1[fg];"
             f"[bg][fg]overlay=(W-w)/2:(H-h)/2{sub_filter}[outv]"
         )
