@@ -169,12 +169,12 @@ class PipelineOrchestrator:
             # Stage 2: Transcription (30%)
             self.status = PipelineStatus.TRANSCRIBING
             if progress_callback:
-                progress_callback(self.status, 35, "Transkripsi kata via Faster-Whisper...")
+                progress_callback(self.status, 35, "Transkripsi kata via Faster-Whisper (CUDA float16)...")
             words, full_text = transcribe_audio(
                 temp_wav,
                 model_size=self.config.whisper_model,
-                device=self.config.device,
-                compute_type=self.config.compute_type
+                device="cuda",
+                compute_type="float16"
             )
 
             if self.cancel_requested.is_set():
@@ -228,10 +228,10 @@ class PipelineOrchestrator:
                 self.temp_files.append(temp_ass)
                 generate_kinetic_ass(words, clip.start_time, clip.end_time, temp_ass)
 
-                # Stage 6: Video Rendering into Staging Cache (Non-destructive)
+                # Stage 6: Video Rendering into Staging Cache (NVENC Forced)
                 self.status = PipelineStatus.RENDERING
                 if progress_callback:
-                    progress_callback(self.status, min(95, base_pct + 10), f"Rendering klip {clip_num}/{total_clips} ke staging...")
+                    progress_callback(self.status, min(95, base_pct + 10), f"Rendering NVENC klip {clip_num}/{total_clips}...")
 
                 staging_clip_path = str((staging_dir / f"clipmax_{clip_num}_{int(clip.start_time)}.mp4").resolve())
                 self.staging_files.append(staging_clip_path)
@@ -243,7 +243,7 @@ class PipelineOrchestrator:
                     end_time=clip.end_time,
                     crop_x=crop_x,
                     ass_path=temp_ass,
-                    use_gpu=(self.config.device == "cuda"),
+                    use_gpu=True,
                     video_bitrate=self.config.video_bitrate,
                     audio_bitrate=self.config.audio_bitrate,
                     cancel_event=self.cancel_requested,

@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import threading
 from pathlib import Path
@@ -40,8 +41,10 @@ def render_clip(
     out_p = Path(output_clip)
     out_p.parent.mkdir(parents=True, exist_ok=True)
 
-    encoder = "h264_nvenc" if (use_gpu and is_nvenc_supported()) else "libx264"
+    # Force NVENC GPU encoder
+    encoder = "h264_nvenc" if use_gpu else "libx264"
     preset = "p4" if encoder == "h264_nvenc" else "veryfast"
+    print(f"[ClipMax Render] Rendering via FFmpeg using encoder={encoder}, preset={preset}...")
 
     # Filter string: 9:16 crop + scale to 1080x1920 + optional subtitles
     filter_parts = [
@@ -87,6 +90,8 @@ def render_clip(
         raise RuntimeError("Video rendering cancelled by user")
 
     if proc.returncode != 0:
-        raise RuntimeError(f"FFmpeg render failed: {stderr.decode('utf-8', errors='ignore')}")
+        err_msg = stderr.decode('utf-8', errors='ignore')
+        print(f"\n[ClipMax Render ERROR] FFmpeg render failed:\n{err_msg}", file=sys.stderr)
+        raise RuntimeError(f"FFmpeg render failed: {err_msg}")
 
     return str(out_p.resolve())
