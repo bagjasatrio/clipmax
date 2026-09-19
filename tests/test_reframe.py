@@ -5,7 +5,10 @@ from clipmax.reframe import (
     smooth_ema_series,
     ReframeStrategy,
     detect_face_centers,
-    build_dynamic_crop_expression
+    build_dynamic_crop_expression,
+    merge_scene_intervals,
+    segment_clip_scenes,
+    SceneSegment
 )
 
 def test_calculate_crop_box_center():
@@ -56,9 +59,46 @@ def test_build_dynamic_crop_expression_moving():
     assert "if(lt(t,2.00)" in expr
     assert "max(0,min(1312" in expr
 
+def test_merge_scene_intervals():
+    # 0-5s: face
+    # 5-6s: flicker (1s no face)
+    # 6-10s: face
+    # 10-25s: screen share (15s no face)
+    # 25-30s: face
+    samples = []
+    for s in range(31):
+        if 0 <= s < 5:
+            samples.append((float(s), True, 600.0))
+        elif s == 5:
+            samples.append((float(s), False, 960.0))
+        elif 6 <= s < 10:
+            samples.append((float(s), True, 600.0))
+        elif 10 <= s < 25:
+            samples.append((float(s), False, 960.0))
+        else:
+            samples.append((float(s), True, 650.0))
+
+    segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=30.0)
+    assert len(segments) == 3
+    assert segments[0]["mode"] == "CROP_TRACKING"
+    assert segments[0]["start"] == 0.0
+    assert segments[0]["end"] == 10.0  # Absorbed 1s flicker at s=5
+    assert segments[1]["mode"] == "BLURRED_BACKGROUND"
+    assert segments[1]["start"] == 10.0
+    assert segments[1]["end"] == 25.0
+    assert segments[2]["mode"] == "CROP_TRACKING"
+    assert segments[2]["start"] == 25.0
+    assert segments[2]["end"] == 30.0
+
+def test_segment_clip_scenes_file_not_found():
+    scenes = segment_clip_scenes("non_existent_video.mp4", 0.0, 10.0)
+    assert len(scenes) == 1
+    assert scenes[0].mode == "BLURRED_BACKGROUND"
+    assert scenes[0].end_time == 10.0
+
 def test_detect_face_centers_file_not_found():
     centers, strategy = detect_face_centers("non_existent_video.mp4", 0.0, 5.0)
-    assert centers == []
+    assert centers == [960.0]
     assert strategy == ReframeStrategy.BLURRED_BACKGROUND
 
 def test_reframe_strategies_enum():

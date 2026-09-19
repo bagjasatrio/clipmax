@@ -1,8 +1,9 @@
 import cv2
 import numpy as np
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 from enum import Enum
+from pydantic import BaseModel
 
 class ReframeStrategy(str, Enum):
     CROP_TRACKING = "CROP_TRACKING"
@@ -10,6 +11,12 @@ class ReframeStrategy(str, Enum):
     SINGLE_SPEAKER = "CROP_TRACKING"
     STATIC_CENTER = "BLURRED_BACKGROUND"
     SPLIT_SCREEN = "CROP_TRACKING"
+
+class SceneSegment(BaseModel):
+    start_time: float      # relative to clip start in seconds (e.g. 0.0)
+    end_time: float        # relative to clip start in seconds (e.g. 15.0)
+    mode: str              # "CROP_TRACKING" or "BLURRED_BACKGROUND"
+    crop_x: str            # dynamic expression or static number
 
 def calculate_crop_box(
     frame_width: int,
@@ -84,28 +91,97 @@ def get_face_detector_model() -> Optional[str]:
         return str(model_p)
     return None
 
-def detect_face_centers(
+def merge_scene_intervals(
+    raw_samples: List[Tuple[float, bool, float]],
+    min_scene_sec: float = 2.0,
+    clip_duration: float = 0.0
+) -> List[Dict[str, Any]]:
+    if not raw_samples:
+        return []
+
+    # 1. Group contiguous identical states into raw chunks
+    chunks: List[Dict[str, Any]] = []
+    cur_is_face = raw_samples[0][1]
+    cur_start = raw_samples[0][0]
+    cur_faces = [raw_samples[0][2]] if cur_is_face else []
+
+    for t, is_face, fx in raw_samples[1:]:
+        if is_face == cur_is_face:
+            if cur_is_face:
+                cur_faces.append(fx)
+        else:
+            chunks.append({
+                "start": cur_start,
+                "end": t,
+                "mode": "CROP_TRACKING" if cur_is_face else "BLURRED_BACKGROUND",
+                "faces": cur_faces
+            })
+            cur_is_face = is_face
+            cur_start = t
+            cur_faces = [fx] if cur_is_face else []
+
+    final_end = clip_duration if clip_duration > 0 else raw_samples[-1][0]
+    chunks.append({
+        "start": cur_start,
+        "end": final_end,
+        "mode": "CROP_TRACKING" if cur_is_face else "BLURRED_BACKGROUND",
+        "faces": cur_faces
+    })
+
+    # 2. Merge short flickers (< min_scene_sec) into preceding chunk
+    merged: List[Dict[str, Any]] = []
+    for c in chunks:
+        dur = c["end"] - c["start"]
+        if dur < min_scene_sec and merged:
+            merged[-1]["end"] = c["end"]
+            if c["faces"]:
+                merged[-1]["faces"].extend(c["faces"])
+        else:
+            merged.append(c)
+
+    # 3. Merge adjacent chunks that have identical mode
+    final_segments: List[Dict[str, Any]] = []
+    for m in merged:
+        if final_segments and final_segments[-1]["mode"] == m["mode"]:
+            final_segments[-1]["end"] = m["end"]
+            final_segments[-1]["faces"].extend(m["faces"])
+        else:
+            final_segments.append(m)
+
+    return final_segments
+
+def segment_clip_scenes(
     video_path: str,
-    start_time: float,
-    end_time: float,
+    clip_start: float,
+    clip_end: float,
     sample_step: int = 6,
-    detect_width: int = 640
-) -> Tuple[List[float], ReframeStrategy]:
+    detect_width: int = 640,
+    min_scene_sec: float = 2.0
+) -> List[SceneSegment]:
+    clip_dur = max(0.1, clip_end - clip_start)
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        return [], ReframeStrategy.BLURRED_BACKGROUND
+        return [
+            SceneSegment(
+                start_time=0.0,
+                end_time=clip_dur,
+                mode="BLURRED_BACKGROUND",
+                crop_x="0"
+            )
+        ]
 
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1920
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 1080
+    crop_w = int(round(height * (9.0 / 16.0)))
+    max_crop_x = width - crop_w
 
-    start_frame = int(start_time * fps)
-    end_frame = int(end_time * fps)
+    start_frame = int(clip_start * fps)
+    end_frame = int(clip_end * fps)
     if end_frame < start_frame:
         end_frame = start_frame
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
-    # Calculate resized dimensions for ultra-fast CPU face inference (e.g. 640x360)
     detect_w = min(width, detect_width)
     detect_h = int(round(height * (detect_w / float(width)))) if width > 0 else 360
     scale_x = (width / float(detect_w)) if detect_w > 0 else 1.0
@@ -124,29 +200,20 @@ def detect_face_centers(
         except Exception:
             detector = None
 
-    centers: List[float] = []
     default_center = width / 2.0
     last_center = default_center
-    first_face_detected = False
+    raw_samples: List[Tuple[float, bool, float]] = []
+    min_face_area = 0.015 * (detect_w * detect_h)  # >= 1.5% frame area (excludes small corner webcams)
+
     frame_idx = 0
     current_frame = start_frame
 
-    sampled_frames = 0
-    valid_face_frames = 0
-    min_face_area = 0.005 * (detect_w * detect_h)
-    frame_interval_sec = sample_step / fps
-
-    current_no_face_seconds = 0.0
-    max_no_face_gap_seconds = 0.0
-
     while current_frame <= end_frame:
-        # Fast grab packet without full decoding
         if not cap.grab():
             break
 
-        # Only decode and run inference every sample_step frames (e.g. frame_idx % 6 == 0)
         if frame_idx % sample_step == 0:
-            sampled_frames += 1
+            t_rel = (current_frame - start_frame) / fps
             ret, frame = cap.retrieve()
             face_found = False
 
@@ -166,48 +233,91 @@ def detect_face_centers(
 
                             if valid_faces:
                                 face_found = True
-                                valid_face_frames += 1
                                 best_face = max(valid_faces, key=lambda x: x[0])[1]
                                 cx_small = float(best_face[0] + best_face[2] / 2.0)
-                                cx_orig = cx_small * scale_x
-
-                                if not first_face_detected:
-                                    first_face_detected = True
-                                    # Backfill previous centers with first detected face location
-                                    for k in range(len(centers)):
-                                        centers[k] = cx_orig
-
-                                last_center = cx_orig
+                                last_center = cx_small * scale_x
                     except Exception:
                         pass
 
-            if face_found:
-                current_no_face_seconds = 0.0
-            else:
-                current_no_face_seconds += frame_interval_sec
-                if current_no_face_seconds > max_no_face_gap_seconds:
-                    max_no_face_gap_seconds = current_no_face_seconds
+            raw_samples.append((t_rel, face_found, last_center))
 
-        # Use last known face center (sample-and-hold)
-        centers.append(last_center)
         frame_idx += 1
         current_frame += 1
 
     cap.release()
 
-    if current_no_face_seconds > max_no_face_gap_seconds:
-        max_no_face_gap_seconds = current_no_face_seconds
+    if not raw_samples:
+        return [
+            SceneSegment(
+                start_time=0.0,
+                end_time=clip_dur,
+                mode="BLURRED_BACKGROUND",
+                crop_x="0"
+            )
+        ]
 
-    # Smart Fallback for Screen Recording / No Face:
-    # If no face detected, or face missing for > 2.0 seconds (e.g. slide, browser demo), or low face presence:
-    # Fallback to BLURRED_BACKGROUND (Fit Screen with Blurred Background)
-    face_ratio = valid_face_frames / max(1, sampled_frames)
-    has_dominant_face = (
-        first_face_detected
-        and valid_face_frames >= 3
-        and max_no_face_gap_seconds <= 2.0
-        and face_ratio >= 0.60
+    # Merge into stable scene intervals
+    chunks = merge_scene_intervals(raw_samples, min_scene_sec=min_scene_sec, clip_duration=clip_dur)
+    scenes: List[SceneSegment] = []
+
+    for c in chunks:
+        s_start = max(0.0, float(c["start"]))
+        s_end = min(clip_dur, float(c["end"]))
+        if s_end <= s_start:
+            continue
+
+        if c["mode"] == "CROP_TRACKING":
+            faces = c["faces"] if c["faces"] else [default_center]
+            smoothed = smooth_ema_series(faces, alpha=0.1)
+            crop_positions = [float(calculate_crop_box(width, height, fx)[0]) for fx in smoothed]
+            dur_sc = max(0.01, s_end - s_start)
+            dt = dur_sc / max(1, len(crop_positions) - 1)
+            timestamps = [k * dt for k in range(len(crop_positions))]
+            crop_expr = build_dynamic_crop_expression(crop_positions, timestamps, max_x=max_crop_x)
+            scenes.append(
+                SceneSegment(
+                    start_time=s_start,
+                    end_time=s_end,
+                    mode="CROP_TRACKING",
+                    crop_x=crop_expr
+                )
+            )
+        else:
+            scenes.append(
+                SceneSegment(
+                    start_time=s_start,
+                    end_time=s_end,
+                    mode="BLURRED_BACKGROUND",
+                    crop_x="0"
+                )
+            )
+
+    return scenes or [
+        SceneSegment(
+            start_time=0.0,
+            end_time=clip_dur,
+            mode="BLURRED_BACKGROUND",
+            crop_x="0"
+        )
+    ]
+
+def detect_face_centers(
+    video_path: str,
+    start_time: float,
+    end_time: float,
+    sample_step: int = 6,
+    detect_width: int = 640
+) -> Tuple[List[float], ReframeStrategy]:
+    scenes = segment_clip_scenes(
+        video_path,
+        start_time,
+        end_time,
+        sample_step=sample_step,
+        detect_width=detect_width
     )
-    strategy = ReframeStrategy.CROP_TRACKING if has_dominant_face else ReframeStrategy.BLURRED_BACKGROUND
+    has_crop = any(sc.mode == "CROP_TRACKING" for sc in scenes)
+    strategy = ReframeStrategy.CROP_TRACKING if has_crop else ReframeStrategy.BLURRED_BACKGROUND
 
+    # Return default centers list for compatibility with older callers
+    centers = [960.0]
     return centers, strategy

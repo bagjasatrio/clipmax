@@ -111,7 +111,13 @@ class ClipCardWidget(QFrame):
 
         # Time range
         dur = max(0.0, clip.end_time - clip.start_time)
-        mode_tag = "👤 Face Crop" if getattr(clip, "reframe_mode", "CROP_TRACKING") == "CROP_TRACKING" else "🖼 Blurred BG"
+        mode_val = getattr(clip, "reframe_mode", "DYNAMIC_SCENE")
+        if mode_val == "DYNAMIC_SCENE":
+            mode_tag = "🔄 Dynamic Split"
+        elif mode_val == "CROP_TRACKING":
+            mode_tag = "👤 Face Crop"
+        else:
+            mode_tag = "🖼 Blurred BG"
         time_lbl = QLabel(f"⏱ {int(clip.start_time)}s - {int(clip.end_time)}s ({dur:.1f}s) • {mode_tag}")
         time_lbl.setStyleSheet("color: #9ca3af; font-size: 11px;")
         info_layout.addWidget(time_lbl)
@@ -646,7 +652,14 @@ class MainWindow(QMainWindow):
             card.set_active(card.clip.clip_id == clip.clip_id)
 
         dur = max(0.0, clip.end_time - clip.start_time)
-        mode_str = "👤 Crop Wajah 9:16" if getattr(clip, "reframe_mode", "CROP_TRACKING") == "CROP_TRACKING" else "🖼 Blurred Background (Scene Utuh)"
+        mode_val = getattr(clip, "reframe_mode", "DYNAMIC_SCENE")
+        if mode_val == "DYNAMIC_SCENE":
+            mode_str = "🔄 Transisi Dinamis (Talking Head 9:16 + Screen Record Fit)"
+        elif mode_val == "CROP_TRACKING":
+            mode_str = "👤 Crop Wajah Penuh 9:16"
+        else:
+            mode_str = "🖼 Blurred Background (Screen / Slide Utuh)"
+
         self.lbl_clip_info.setText(
             f"<b>{clip.title}</b> <span style='color: #a78bfa;'>[{mode_str}]</span><br/>"
             f"<span style='color: #60a5fa;'>Hook: \"{clip.hook}\"</span> | Skor: <b>{clip.virality_score}</b> | Durasi: <b>{dur:.1f}s</b><br/>"

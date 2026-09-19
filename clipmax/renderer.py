@@ -3,7 +3,7 @@ import sys
 import subprocess
 import threading
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, List, Any, Union
 from clipmax.config import get_ffmpeg_bin, sanitize_ffmpeg_path, is_cuda_available
 
 def is_nvenc_supported() -> bool:
@@ -26,14 +26,15 @@ def render_clip(
     output_clip: str,
     start_time: float,
     end_time: float,
-    crop_x: int,
+    crop_x: Union[int, float, str] = 0,
     ass_path: Optional[str] = None,
     use_gpu: bool = True,
     video_bitrate: str = "6000k",
     audio_bitrate: str = "192k",
     cancel_event: Optional[threading.Event] = None,
     pid_callback: Optional[Callable[[int], None]] = None,
-    reframe_mode: str = "CROP_TRACKING"
+    reframe_mode: str = "CROP_TRACKING",
+    scenes: Optional[List[Any]] = None
 ) -> str:
     in_p = Path(input_video)
     if not os.path.exists(str(in_p)):
@@ -49,7 +50,53 @@ def render_clip(
 
     escaped_ass = sanitize_ffmpeg_path(ass_path) if (ass_path and os.path.exists(ass_path)) else None
 
-    if reframe_mode == "BLURRED_BACKGROUND":
+    # Multi-scene dynamic layout transition inside the same clip
+    if scenes and len(scenes) > 1:
+        v_chains = []
+        for i, sc in enumerate(scenes):
+            t_s = f"{sc.start_time:.3f}"
+            t_e = f"{sc.end_time:.3f}"
+            if sc.mode == "BLURRED_BACKGROUND":
+                chain = (
+                    f"[0:v]trim=start={t_s}:end={t_e},setpts=PTS-STARTPTS,split[bg_in{i}][fg_in{i}];"
+                    f"[bg_in{i}]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg{i}];"
+                    f"[fg_in{i}]scale=1080:-1[fg{i}];"
+                    f"[bg{i}][fg{i}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{i}]"
+                )
+            else:
+                crop_x_val = f"'{sc.crop_x}'" if (isinstance(sc.crop_x, str) and not str(sc.crop_x).isdigit()) else str(sc.crop_x)
+                chain = (
+                    f"[0:v]trim=start={t_s}:end={t_e},setpts=PTS-STARTPTS,"
+                    f"crop=ih*(9/16):ih:{crop_x_val}:0,scale=1080:1920,setsar=1[v{i}]"
+                )
+            v_chains.append(chain)
+
+        concat_inputs = "".join([f"[v{i}]" for i in range(len(scenes))])
+        sub_filter = f",subtitles='{escaped_ass}'" if escaped_ass else ""
+        concat_line = f"{concat_inputs}concat=n={len(scenes)}:v=1:a=0{sub_filter}[outv]"
+        clip_dur = max(0.1, end_time - start_time)
+        audio_line = f"[0:a]atrim=start=0.0:end={clip_dur:.3f},asetpts=PTS-STARTPTS[outa]"
+
+        full_filter = ";".join(v_chains) + ";" + concat_line + ";" + audio_line
+
+        cmd = [
+            get_ffmpeg_bin(),
+            "-y",
+            "-ss", str(start_time),
+            "-to", str(end_time),
+            "-i", str(in_p.resolve()),
+            "-filter_complex", full_filter,
+            "-map", "[outv]",
+            "-map", "[outa]",
+            "-c:v", encoder,
+            "-preset", preset,
+            "-b:v", video_bitrate,
+            "-c:a", "aac",
+            "-b:a", audio_bitrate,
+            str(out_p.resolve())
+        ]
+
+    elif reframe_mode == "BLURRED_BACKGROUND":
         # Mode BLURRED_BACKGROUND: Canvas 1080x1920 with blurred background and centered 16:9 foreground
         sub_filter = f",subtitles='{escaped_ass}'" if escaped_ass else ""
         filter_str = (
@@ -75,8 +122,9 @@ def render_clip(
         ]
     else:
         # Mode CROP_TRACKING: 9:16 crop centered on tracked face
+        crop_x_val = f"'{crop_x}'" if (isinstance(crop_x, str) and not str(crop_x).isdigit()) else str(crop_x)
         filter_parts = [
-            f"crop=ih*(9/16):ih:{crop_x}:0",
+            f"crop=ih*(9/16):ih:{crop_x_val}:0",
             "scale=1080:1920"
         ]
         if escaped_ass:

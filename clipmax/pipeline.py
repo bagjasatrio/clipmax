@@ -14,7 +14,9 @@ from clipmax.reframe import (
     calculate_crop_box,
     smooth_ema_series,
     ReframeStrategy,
-    build_dynamic_crop_expression
+    build_dynamic_crop_expression,
+    segment_clip_scenes,
+    SceneSegment
 )
 from clipmax.subtitle import generate_kinetic_ass
 from clipmax.renderer import render_clip
@@ -225,24 +227,26 @@ class PipelineOrchestrator:
                 clip_num = idx + 1
                 base_pct = 50 + int((idx / total_clips) * 45)
 
-                # Stage 4: Scene & Content-Aware Tracking (70%)
+                # Stage 4: Scene & Content-Aware Dynamic Split (70%)
                 self.status = PipelineStatus.TRACKING_FACES
                 if progress_callback:
-                    progress_callback(self.status, base_pct, f"Analisis visual & face tracking klip {clip_num}/{total_clips}...")
+                    progress_callback(self.status, base_pct, f"Segmentasi visual scene dinamis klip {clip_num}/{total_clips}...")
 
-                centers, strategy = detect_face_centers(video_path, clip.start_time, clip.end_time)
-                if strategy in (ReframeStrategy.CROP_TRACKING, "CROP_TRACKING", "single_speaker") and centers:
-                    # EMA smoothing with alpha=0.1 for smooth continuous panning
-                    smoothed_centers = smooth_ema_series(centers, alpha=0.1)
-                    crop_positions = [float(calculate_crop_box(1920, 1080, c)[0]) for c in smoothed_centers]
-                    dur = max(0.1, clip.end_time - clip.start_time)
-                    step_dt = dur / max(1, len(crop_positions) - 1)
-                    timestamps = [i * step_dt for i in range(len(crop_positions))]
-                    crop_x = build_dynamic_crop_expression(crop_positions, timestamps, max_x=1312)
+                scenes = segment_clip_scenes(video_path, clip.start_time, clip.end_time)
+
+                has_crop = any(sc.mode == "CROP_TRACKING" for sc in scenes)
+                has_blur = any(sc.mode == "BLURRED_BACKGROUND" for sc in scenes)
+                if has_crop and has_blur:
+                    mode = "DYNAMIC_SCENE"
+                    mode_label = f"Dynamic ({len(scenes)} scenes)"
+                elif has_crop:
                     mode = "CROP_TRACKING"
+                    mode_label = "Crop Wajah 9:16"
                 else:
-                    crop_x = 0
                     mode = "BLURRED_BACKGROUND"
+                    mode_label = "Blurred BG (Utuh)"
+
+                default_crop_x = scenes[0].crop_x if scenes else "0"
 
                 if self.cancel_requested.is_set():
                     self.status = PipelineStatus.CANCELLED
@@ -256,7 +260,6 @@ class PipelineOrchestrator:
                 # Stage 6: Video Rendering into Staging Cache (NVENC Forced)
                 self.status = PipelineStatus.RENDERING
                 if progress_callback:
-                    mode_label = "Crop Wajah 9:16" if mode == "CROP_TRACKING" else "Blurred BG (Utuh)"
                     progress_callback(self.status, min(95, base_pct + 10), f"Rendering NVENC ({mode_label}) klip {clip_num}/{total_clips}...")
 
                 staging_clip_path = str((staging_dir / f"clipmax_{clip_num}_{int(clip.start_time)}.mp4").resolve())
@@ -267,14 +270,15 @@ class PipelineOrchestrator:
                     output_clip=staging_clip_path,
                     start_time=clip.start_time,
                     end_time=clip.end_time,
-                    crop_x=crop_x,
+                    crop_x=default_crop_x,
                     ass_path=temp_ass,
                     use_gpu=True,
                     video_bitrate=self.config.video_bitrate,
                     audio_bitrate=self.config.audio_bitrate,
                     cancel_event=self.cancel_requested,
                     pid_callback=self.set_pid,
-                    reframe_mode=mode
+                    reframe_mode=scenes[0].mode if scenes else mode,
+                    scenes=scenes
                 )
                 self.active_pid = None
 

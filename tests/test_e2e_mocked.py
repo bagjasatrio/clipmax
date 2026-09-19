@@ -5,6 +5,7 @@ from clipmax.config import AppConfig
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
 from clipmax.transcriber import WordSegment
 from clipmax.ai_gateway import ViralClipCandidate
+from clipmax.reframe import SceneSegment
 
 def test_full_pipeline_local_mocked(tmp_path):
     video_file = tmp_path / "test_video.mp4"
@@ -16,10 +17,15 @@ def test_full_pipeline_local_mocked(tmp_path):
     )
     orchestrator = PipelineOrchestrator(cfg)
 
+    mock_scenes = [
+        SceneSegment(start_time=0.0, end_time=15.0, mode="CROP_TRACKING", crop_x="650"),
+        SceneSegment(start_time=15.0, end_time=30.0, mode="BLURRED_BACKGROUND", crop_x="0")
+    ]
+
     with patch("clipmax.pipeline.extract_audio") as mock_audio, \
          patch("clipmax.pipeline.transcribe_audio") as mock_transcribe, \
          patch("clipmax.pipeline.evaluate_viral_clips") as mock_llm, \
-         patch("clipmax.pipeline.detect_face_centers") as mock_face, \
+         patch("clipmax.pipeline.segment_clip_scenes", return_value=mock_scenes) as mock_seg, \
          patch("clipmax.pipeline.generate_kinetic_ass") as mock_sub, \
          patch("clipmax.pipeline.render_clip") as mock_render, \
          patch("clipmax.pipeline.generate_thumbnail") as mock_thumb:
@@ -38,7 +44,6 @@ def test_full_pipeline_local_mocked(tmp_path):
                 reasoning="Bagus"
             )
         ]
-        mock_face.return_value = ([960.0, 960.0], "single_speaker")
 
         progress_records = []
         def on_prog(status, pct, msg):
@@ -49,7 +54,7 @@ def test_full_pipeline_local_mocked(tmp_path):
         assert mock_audio.called
         assert mock_transcribe.called
         assert mock_llm.called
-        assert mock_face.called
+        assert mock_seg.called
         assert mock_sub.called
         assert mock_render.called
         assert mock_thumb.called
@@ -57,6 +62,7 @@ def test_full_pipeline_local_mocked(tmp_path):
         assert any(pct == 100 for _, pct in progress_records)
         assert len(results) == 1
         assert isinstance(results[0], ClipResult)
+        assert results[0].reframe_mode == "DYNAMIC_SCENE"
         assert "staging" in results[0].staging_path
 
 def test_full_pipeline_url_ingestion_mocked(tmp_path):
@@ -70,11 +76,15 @@ def test_full_pipeline_url_ingestion_mocked(tmp_path):
     downloaded_video = tmp_path / "downloaded.mp4"
     downloaded_video.touch()
 
+    mock_scenes = [
+        SceneSegment(start_time=0.0, end_time=30.0, mode="CROP_TRACKING", crop_x="650")
+    ]
+
     with patch("clipmax.pipeline.download_video", return_value=str(downloaded_video)) as mock_dl, \
          patch("clipmax.pipeline.extract_audio") as mock_audio, \
          patch("clipmax.pipeline.transcribe_audio") as mock_transcribe, \
          patch("clipmax.pipeline.evaluate_viral_clips") as mock_llm, \
-         patch("clipmax.pipeline.detect_face_centers") as mock_face, \
+         patch("clipmax.pipeline.segment_clip_scenes", return_value=mock_scenes) as mock_seg, \
          patch("clipmax.pipeline.generate_kinetic_ass") as mock_sub, \
          patch("clipmax.pipeline.render_clip") as mock_render, \
          patch("clipmax.pipeline.generate_thumbnail") as mock_thumb:
@@ -93,7 +103,6 @@ def test_full_pipeline_url_ingestion_mocked(tmp_path):
                 reasoning="Viral content"
             )
         ]
-        mock_face.return_value = ([960.0, 960.0], "single_speaker")
 
         progress_records = []
         def on_prog(status, pct, msg):
@@ -103,6 +112,7 @@ def test_full_pipeline_url_ingestion_mocked(tmp_path):
 
         assert mock_dl.called
         assert mock_audio.called
+        assert mock_seg.called
         assert orchestrator.status == PipelineStatus.COMPLETED
         assert any(status == PipelineStatus.DOWNLOADING for status, _ in progress_records)
         assert len(results) == 1
