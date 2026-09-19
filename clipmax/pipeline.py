@@ -9,7 +9,7 @@ from clipmax.config import AppConfig, get_ffmpeg_bin
 from clipmax.audio import extract_audio
 from clipmax.transcriber import transcribe_audio, cleanup_vram
 from clipmax.ai_gateway import evaluate_viral_clips, ViralClipCandidate
-from clipmax.reframe import detect_face_centers, calculate_crop_box, smooth_ema_series
+from clipmax.reframe import detect_face_centers, calculate_crop_box, smooth_ema_series, ReframeStrategy
 from clipmax.subtitle import generate_kinetic_ass
 from clipmax.renderer import render_clip
 from clipmax.downloader import download_video, is_valid_video_url
@@ -36,6 +36,7 @@ class ClipResult(BaseModel):
     end_time: float
     staging_path: str
     thumbnail_path: str
+    reframe_mode: str = "CROP_TRACKING"
 
 def kill_process_tree(pid: int) -> None:
     try:
@@ -218,19 +219,20 @@ class PipelineOrchestrator:
                 clip_num = idx + 1
                 base_pct = 50 + int((idx / total_clips) * 45)
 
-                # Stage 4: Tracking Faces (70%)
+                # Stage 4: Scene & Content-Aware Tracking (70%)
                 self.status = PipelineStatus.TRACKING_FACES
                 if progress_callback:
-                    progress_callback(self.status, base_pct, f"Auto-reframe wajah klip {clip_num}/{total_clips}...")
+                    progress_callback(self.status, base_pct, f"Analisis konten visual klip {clip_num}/{total_clips}...")
 
                 centers, strategy = detect_face_centers(video_path, clip.start_time, clip.end_time)
-                if centers:
+                if strategy in (ReframeStrategy.CROP_TRACKING, "CROP_TRACKING", "single_speaker") and centers:
                     smoothed = smooth_ema_series(centers, alpha=0.15)
                     avg_center = sum(smoothed) / len(smoothed)
+                    crop_x, crop_w, crop_h = calculate_crop_box(1920, 1080, avg_center)
+                    mode = "CROP_TRACKING"
                 else:
-                    avg_center = 960.0
-
-                crop_x, crop_w, crop_h = calculate_crop_box(1920, 1080, avg_center)
+                    crop_x = 0
+                    mode = "BLURRED_BACKGROUND"
 
                 if self.cancel_requested.is_set():
                     self.status = PipelineStatus.CANCELLED
@@ -244,7 +246,8 @@ class PipelineOrchestrator:
                 # Stage 6: Video Rendering into Staging Cache (NVENC Forced)
                 self.status = PipelineStatus.RENDERING
                 if progress_callback:
-                    progress_callback(self.status, min(95, base_pct + 10), f"Rendering NVENC klip {clip_num}/{total_clips}...")
+                    mode_label = "Crop Wajah 9:16" if mode == "CROP_TRACKING" else "Blurred BG (Utuh)"
+                    progress_callback(self.status, min(95, base_pct + 10), f"Rendering NVENC ({mode_label}) klip {clip_num}/{total_clips}...")
 
                 staging_clip_path = str((staging_dir / f"clipmax_{clip_num}_{int(clip.start_time)}.mp4").resolve())
                 self.staging_files.append(staging_clip_path)
@@ -260,7 +263,8 @@ class PipelineOrchestrator:
                     video_bitrate=self.config.video_bitrate,
                     audio_bitrate=self.config.audio_bitrate,
                     cancel_event=self.cancel_requested,
-                    pid_callback=self.set_pid
+                    pid_callback=self.set_pid,
+                    reframe_mode=mode
                 )
                 self.active_pid = None
 
@@ -279,7 +283,8 @@ class PipelineOrchestrator:
                         start_time=clip.start_time,
                         end_time=clip.end_time,
                         staging_path=staging_clip_path,
-                        thumbnail_path=staging_thumb_path
+                        thumbnail_path=staging_thumb_path,
+                        reframe_mode=mode
                     )
                 )
 

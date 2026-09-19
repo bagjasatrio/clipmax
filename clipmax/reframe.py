@@ -5,9 +5,11 @@ from typing import List, Tuple, Optional
 from enum import Enum
 
 class ReframeStrategy(str, Enum):
-    SINGLE_SPEAKER = "single_speaker"
-    SPLIT_SCREEN = "split_screen"
-    STATIC_CENTER = "static_center"
+    CROP_TRACKING = "CROP_TRACKING"
+    BLURRED_BACKGROUND = "BLURRED_BACKGROUND"
+    SINGLE_SPEAKER = "CROP_TRACKING"
+    STATIC_CENTER = "BLURRED_BACKGROUND"
+    SPLIT_SCREEN = "CROP_TRACKING"
 
 def calculate_crop_box(
     frame_width: int,
@@ -55,7 +57,7 @@ def detect_face_centers(
 ) -> Tuple[List[float], ReframeStrategy]:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        return [], ReframeStrategy.STATIC_CENTER
+        return [], ReframeStrategy.BLURRED_BACKGROUND
 
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1920
@@ -87,11 +89,14 @@ def detect_face_centers(
             detector = None
 
     centers: List[float] = []
-    max_faces_seen = 1
     default_center = width / 2.0
     last_center = default_center
     frame_idx = 0
     current_frame = start_frame
+
+    sampled_frames = 0
+    valid_face_frames = 0
+    min_face_area = 0.005 * (detect_w * detect_h)
 
     while current_frame <= end_frame:
         # Fast grab packet without full decoding
@@ -100,6 +105,7 @@ def detect_face_centers(
 
         # Only decode and run inference every sample_step frames (e.g. frame_idx % 6 == 0)
         if frame_idx % sample_step == 0:
+            sampled_frames += 1
             ret, frame = cap.retrieve()
             if ret and frame is not None:
                 small_frame = cv2.resize(frame, (detect_w, detect_h))
@@ -107,19 +113,33 @@ def detect_face_centers(
                     try:
                         _, faces = detector.detect(small_frame)
                         if faces is not None and len(faces) > 0:
-                            max_faces_seen = max(max_faces_seen, len(faces))
-                            best_face = max(faces, key=lambda f: f[2] * f[3])
-                            cx_small = float(best_face[0] + best_face[2] / 2.0)
-                            last_center = cx_small * scale_x
+                            valid_faces = []
+                            for f in faces:
+                                w_f, h_f = float(f[2]), float(f[3])
+                                area = w_f * h_f
+                                score = float(f[14]) if len(f) > 14 else 1.0
+                                if score >= 0.6 and area >= min_face_area:
+                                    valid_faces.append((area, f))
+
+                            if valid_faces:
+                                valid_face_frames += 1
+                                best_face = max(valid_faces, key=lambda x: x[0])[1]
+                                cx_small = float(best_face[0] + best_face[2] / 2.0)
+                                last_center = cx_small * scale_x
                     except Exception:
                         pass
 
-        # Use last known face center (hold / sample-and-hold)
+        # Use last known face center (sample-and-hold)
         centers.append(last_center)
         frame_idx += 1
         current_frame += 1
 
     cap.release()
 
-    strategy = ReframeStrategy.SPLIT_SCREEN if max_faces_seen > 1 else ReframeStrategy.SINGLE_SPEAKER
+    # Scene & content aware decision:
+    # If a clear dominant face was present in >= 15% of sampled frames (and at least 2 frames), use CROP_TRACKING
+    # Otherwise, this is a non-face / B-Roll / slide / screen record -> fallback to BLURRED_BACKGROUND
+    has_dominant_face = (valid_face_frames >= 2) and (valid_face_frames / max(1, sampled_frames) >= 0.15)
+    strategy = ReframeStrategy.CROP_TRACKING if has_dominant_face else ReframeStrategy.BLURRED_BACKGROUND
+
     return centers, strategy

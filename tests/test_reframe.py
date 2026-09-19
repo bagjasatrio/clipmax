@@ -38,4 +38,8 @@ def test_smooth_ema_series():
 def test_detect_face_centers_file_not_found():
     centers, strategy = detect_face_centers("non_existent_video.mp4", 0.0, 5.0)
     assert centers == []
-    assert strategy == ReframeStrategy.STATIC_CENTER
+    assert strategy == ReframeStrategy.BLURRED_BACKGROUND
+
+def test_reframe_strategies_enum():
+    assert ReframeStrategy.CROP_TRACKING.value == "CROP_TRACKING"
+    assert ReframeStrategy.BLURRED_BACKGROUND.value == "BLURRED_BACKGROUND"

@@ -32,7 +32,8 @@ def render_clip(
     video_bitrate: str = "6000k",
     audio_bitrate: str = "192k",
     cancel_event: Optional[threading.Event] = None,
-    pid_callback: Optional[Callable[[int], None]] = None
+    pid_callback: Optional[Callable[[int], None]] = None,
+    reframe_mode: str = "CROP_TRACKING"
 ) -> str:
     in_p = Path(input_video)
     if not os.path.exists(str(in_p)):
@@ -44,34 +45,58 @@ def render_clip(
     # Force NVENC GPU encoder
     encoder = "h264_nvenc" if use_gpu else "libx264"
     preset = "p4" if encoder == "h264_nvenc" else "veryfast"
-    print(f"[ClipMax Render] Rendering via FFmpeg using encoder={encoder}, preset={preset}...")
+    print(f"[ClipMax Render] Rendering via FFmpeg using encoder={encoder}, preset={preset}, mode={reframe_mode}...")
 
-    # Filter string: 9:16 crop + scale to 1080x1920 + optional subtitles
-    filter_parts = [
-        f"crop=ih*(9/16):ih:{crop_x}:0",
-        "scale=1080:1920"
-    ]
+    escaped_ass = sanitize_ffmpeg_path(ass_path) if (ass_path and os.path.exists(ass_path)) else None
 
-    if ass_path and os.path.exists(ass_path):
-        escaped_ass = sanitize_ffmpeg_path(ass_path)
-        filter_parts.append(f"subtitles='{escaped_ass}'")
+    if reframe_mode == "BLURRED_BACKGROUND":
+        # Mode BLURRED_BACKGROUND: Canvas 1080x1920 with blurred background and centered 16:9 foreground
+        sub_filter = f",subtitles='{escaped_ass}'" if escaped_ass else ""
+        filter_str = (
+            f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:5[bg];"
+            f"[0:v]scale=1080:-1[fg];"
+            f"[bg][fg]overlay=(W-w)/2:(H-h)/2{sub_filter}[outv]"
+        )
+        cmd = [
+            get_ffmpeg_bin(),
+            "-y",
+            "-ss", str(start_time),
+            "-to", str(end_time),
+            "-i", str(in_p.resolve()),
+            "-filter_complex", filter_str,
+            "-map", "[outv]",
+            "-map", "0:a?",
+            "-c:v", encoder,
+            "-preset", preset,
+            "-b:v", video_bitrate,
+            "-c:a", "aac",
+            "-b:a", audio_bitrate,
+            str(out_p.resolve())
+        ]
+    else:
+        # Mode CROP_TRACKING: 9:16 crop centered on tracked face
+        filter_parts = [
+            f"crop=ih*(9/16):ih:{crop_x}:0",
+            "scale=1080:1920"
+        ]
+        if escaped_ass:
+            filter_parts.append(f"subtitles='{escaped_ass}'")
+        vf_chain = ",".join(filter_parts)
 
-    vf_chain = ",".join(filter_parts)
-
-    cmd = [
-        get_ffmpeg_bin(),
-        "-y",
-        "-ss", str(start_time),
-        "-to", str(end_time),
-        "-i", str(in_p.resolve()),
-        "-vf", vf_chain,
-        "-c:v", encoder,
-        "-preset", preset,
-        "-b:v", video_bitrate,
-        "-c:a", "aac",
-        "-b:a", audio_bitrate,
-        str(out_p.resolve())
-    ]
+        cmd = [
+            get_ffmpeg_bin(),
+            "-y",
+            "-ss", str(start_time),
+            "-to", str(end_time),
+            "-i", str(in_p.resolve()),
+            "-vf", vf_chain,
+            "-c:v", encoder,
+            "-preset", preset,
+            "-b:v", video_bitrate,
+            "-c:a", "aac",
+            "-b:a", audio_bitrate,
+            str(out_p.resolve())
+        ]
 
     proc = subprocess.Popen(
         cmd,
