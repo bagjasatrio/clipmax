@@ -50,7 +50,8 @@ def detect_face_centers(
     video_path: str,
     start_time: float,
     end_time: float,
-    sample_fps: int = 4
+    sample_step: int = 6,
+    detect_width: int = 640
 ) -> Tuple[List[float], ReframeStrategy]:
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -59,11 +60,17 @@ def detect_face_centers(
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1920
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 1080
-    frame_step = max(1, int(fps / sample_fps))
 
     start_frame = int(start_time * fps)
     end_frame = int(end_time * fps)
+    if end_frame < start_frame:
+        end_frame = start_frame
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+
+    # Calculate resized dimensions for ultra-fast CPU face inference (e.g. 640x360)
+    detect_w = min(width, detect_width)
+    detect_h = int(round(height * (detect_w / float(width)))) if width > 0 else 360
+    scale_x = (width / float(detect_w)) if detect_w > 0 else 1.0
 
     model_path = get_face_detector_model()
     detector = None
@@ -72,7 +79,7 @@ def detect_face_centers(
             detector = cv2.FaceDetectorYN_create(
                 model_path,
                 "",
-                (width, height),
+                (detect_w, detect_h),
                 score_threshold=0.6,
                 nms_threshold=0.3
             )
@@ -82,32 +89,34 @@ def detect_face_centers(
     centers: List[float] = []
     max_faces_seen = 1
     default_center = width / 2.0
+    last_center = default_center
+    frame_idx = 0
     current_frame = start_frame
 
     while current_frame <= end_frame:
-        ret, frame = cap.read()
-        if not ret:
+        # Fast grab packet without full decoding
+        if not cap.grab():
             break
 
-        if (current_frame - start_frame) % frame_step == 0:
-            best_cx = None
-            if detector is not None:
-                try:
-                    _, faces = detector.detect(frame)
-                    if faces is not None and len(faces) > 0:
-                        max_faces_seen = max(max_faces_seen, len(faces))
-                        # Face format: [x, y, w, h, x_re, y_re, x_le, y_le, x_nt, y_nt, x_rc, y_rc, x_lc, y_lc, score]
-                        # Choose largest face
-                        best_face = max(faces, key=lambda f: f[2] * f[3])
-                        best_cx = float(best_face[0] + best_face[2] / 2.0)
-                except Exception:
-                    best_cx = None
+        # Only decode and run inference every sample_step frames (e.g. frame_idx % 6 == 0)
+        if frame_idx % sample_step == 0:
+            ret, frame = cap.retrieve()
+            if ret and frame is not None:
+                small_frame = cv2.resize(frame, (detect_w, detect_h))
+                if detector is not None:
+                    try:
+                        _, faces = detector.detect(small_frame)
+                        if faces is not None and len(faces) > 0:
+                            max_faces_seen = max(max_faces_seen, len(faces))
+                            best_face = max(faces, key=lambda f: f[2] * f[3])
+                            cx_small = float(best_face[0] + best_face[2] / 2.0)
+                            last_center = cx_small * scale_x
+                    except Exception:
+                        pass
 
-            if best_cx is not None:
-                centers.append(best_cx)
-            else:
-                centers.append(centers[-1] if centers else default_center)
-
+        # Use last known face center (hold / sample-and-hold)
+        centers.append(last_center)
+        frame_idx += 1
         current_frame += 1
 
     cap.release()

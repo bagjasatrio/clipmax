@@ -1,5 +1,6 @@
 import pytest
-from clipmax.reframe import calculate_crop_box, smooth_ema_series, ReframeStrategy
+from unittest.mock import patch, MagicMock
+from clipmax.reframe import calculate_crop_box, smooth_ema_series, ReframeStrategy, detect_face_centers
 
 def test_calculate_crop_box_center():
     x_crop, crop_w, crop_h = calculate_crop_box(
@@ -33,3 +34,8 @@ def test_smooth_ema_series():
     assert len(smoothed) == len(raw_series)
     assert smoothed[0] == 100.0
     assert smoothed[2] < 500.0
+
+def test_detect_face_centers_file_not_found():
+    centers, strategy = detect_face_centers("non_existent_video.mp4", 0.0, 5.0)
+    assert centers == []
+    assert strategy == ReframeStrategy.STATIC_CENTER
