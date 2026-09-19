@@ -10,12 +10,32 @@ QWidget#CentralWidget {
     border-radius: 12px;
 }
 
-/* Floating Card with subtle glow */
+/* Floating Cards with subtle ambient glow */
 QFrame.Card {
     background-color: #111827;
     border: 1px solid #1f2937;
     border-radius: 10px;
     padding: 14px;
+}
+
+/* Clip Gallery Card */
+QFrame.ClipCard {
+    background-color: #131d31;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+QFrame.ClipCard:hover {
+    border: 1px solid #3b82f6;
+    background-color: #1a2744;
+}
+
+QFrame.ClipCardActive {
+    background-color: #1e2d4d;
+    border: 1px solid #60a5fa;
+    border-radius: 8px;
+    padding: 10px;
 }
 
 QLabel {
@@ -34,6 +54,26 @@ QLabel.Title {
 QLabel.Sub {
     font-size: 12px;
     color: #9ca3af;
+}
+
+QLabel.BadgeHigh {
+    background-color: #064e3b;
+    color: #34d399;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 2px 6px;
+    border: 1px solid #059669;
+}
+
+QLabel.BadgeMid {
+    background-color: #78350f;
+    color: #fbbf24;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 2px 6px;
+    border: 1px solid #d97706;
 }
 
 QLineEdit, QComboBox {
@@ -80,6 +120,15 @@ QPushButton.Secondary:hover {
     border: 1px solid #4b5563;
 }
 
+QPushButton.Success {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10b981);
+    color: #ffffff;
+}
+
+QPushButton.Success:hover {
+    background: #047857;
+}
+
 QPushButton.Danger {
     background: #dc2626;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -109,5 +158,79 @@ QProgressBar {
 QProgressBar::chunk {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3b82f6, stop:1 #8b5cf6);
     border-radius: 6px;
+}
+
+/* Tabs */
+QTabWidget::pane {
+    border: 1px solid #1f2937;
+    background: #111827;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+QTabBar::tab {
+    background: #1a2234;
+    color: #9ca3af;
+    padding: 8px 16px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    margin-right: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QTabBar::tab:selected {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+/* Sliders */
+QSlider::groove:horizontal {
+    border: 1px solid #2d3748;
+    height: 6px;
+    background: #1f2937;
+    margin: 2px 0;
+    border-radius: 3px;
+}
+
+QSlider::sub-page:horizontal {
+    background: #3b82f6;
+    border-radius: 3px;
+}
+
+QSlider::handle:horizontal {
+    background: #ffffff;
+    border: 1px solid #3b82f6;
+    width: 14px;
+    margin-top: -4px;
+    margin-bottom: -4px;
+    border-radius: 7px;
+}
+
+/* ScrollBars */
+QScrollArea {
+    border: none;
+    background: transparent;
+}
+
+QScrollBar:vertical {
+    background: #0b0f19;
+    width: 8px;
+    margin: 0px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical {
+    background: #2d3748;
+    min-height: 24px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #4b5563;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
 }
 """

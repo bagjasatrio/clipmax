@@ -4,16 +4,19 @@ import threading
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Optional, List
-from clipmax.config import AppConfig
+from pydantic import BaseModel
+from clipmax.config import AppConfig, get_ffmpeg_bin
 from clipmax.audio import extract_audio
 from clipmax.transcriber import transcribe_audio, cleanup_vram
 from clipmax.ai_gateway import evaluate_viral_clips, ViralClipCandidate
 from clipmax.reframe import detect_face_centers, calculate_crop_box, smooth_ema_series
 from clipmax.subtitle import generate_kinetic_ass
 from clipmax.renderer import render_clip
+from clipmax.downloader import download_video, is_valid_video_url
 
 class PipelineStatus(str, Enum):
     IDLE = "IDLE"
+    DOWNLOADING = "DOWNLOADING"
     EXTRACTING_AUDIO = "EXTRACTING_AUDIO"
     TRANSCRIBING = "TRANSCRIBING"
     AI_EVALUATING = "AI_EVALUATING"
@@ -22,6 +25,17 @@ class PipelineStatus(str, Enum):
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
     FAILED = "FAILED"
+
+class ClipResult(BaseModel):
+    clip_id: int
+    title: str
+    hook: str
+    virality_score: int
+    reasoning: str
+    start_time: float
+    end_time: float
+    staging_path: str
+    thumbnail_path: str
 
 def kill_process_tree(pid: int) -> None:
     try:
@@ -32,6 +46,27 @@ def kill_process_tree(pid: int) -> None:
     except Exception:
         pass
 
+def generate_thumbnail(video_path: str, output_thumb_path: str, time_offset: float = 1.0) -> str:
+    out_p = Path(output_thumb_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+    ffmpeg_bin = get_ffmpeg_bin()
+    cmd = [
+        ffmpeg_bin,
+        "-y",
+        "-ss", str(time_offset),
+        "-i", str(Path(video_path).resolve()),
+        "-vframes", "1",
+        "-vf", "scale=360:640:force_original_aspect_ratio=decrease",
+        "-q:v", "2",
+        str(out_p.resolve())
+    ]
+    res = subprocess.run(cmd, capture_output=True)
+    if res.returncode != 0 and not out_p.exists():
+        # Fallback without time offset if video shorter than time_offset
+        cmd[2] = "0.0"
+        subprocess.run(cmd, capture_output=True)
+    return str(out_p.resolve())
+
 class PipelineOrchestrator:
     def __init__(self, config: AppConfig):
         self.config = config
@@ -39,6 +74,7 @@ class PipelineOrchestrator:
         self.active_pid: Optional[int] = None
         self.status = PipelineStatus.IDLE
         self.temp_files: List[str] = []
+        self.staging_files: List[str] = []
 
     def set_pid(self, pid: int) -> None:
         self.active_pid = pid
@@ -48,10 +84,10 @@ class PipelineOrchestrator:
         if self.active_pid:
             kill_process_tree(self.active_pid)
             self.active_pid = None
-        self.cleanup()
+        self.cleanup(clean_staging=True)
         self.status = PipelineStatus.CANCELLED
 
-    def cleanup(self) -> None:
+    def cleanup(self, clean_staging: bool = False) -> None:
         for f in self.temp_files:
             try:
                 p = Path(f)
@@ -60,30 +96,69 @@ class PipelineOrchestrator:
             except Exception:
                 pass
         self.temp_files.clear()
+
+        if clean_staging:
+            for f in self.staging_files:
+                try:
+                    p = Path(f)
+                    if p.exists():
+                        p.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            self.staging_files.clear()
+
         cleanup_vram()
 
     def run(
         self,
-        video_path: str,
+        input_source: str,
         progress_callback: Optional[Callable[[PipelineStatus, int, str], None]] = None
-    ) -> List[str]:
+    ) -> List[ClipResult]:
         self.cancel_requested.clear()
         self.temp_files.clear()
-        generated_clips: List[str] = []
+        self.staging_files.clear()
+        results: List[ClipResult] = []
 
         temp_dir = Path(self.config.temp_dir)
         temp_dir.mkdir(parents=True, exist_ok=True)
-        output_dir = Path(self.config.output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        temp_wav = str((temp_dir / "temp_audio.wav").resolve())
-        self.temp_files.append(temp_wav)
+        staging_dir = temp_dir / "staging"
+        staging_dir.mkdir(parents=True, exist_ok=True)
 
         try:
+            # Step 0: Check if URL or local file
+            if is_valid_video_url(input_source):
+                self.status = PipelineStatus.DOWNLOADING
+                if progress_callback:
+                    progress_callback(self.status, 5, "Mengunduh video dari tautan via yt-dlp...")
+                
+                download_folder = str((temp_dir / "downloads").resolve())
+                def on_dl_progress(pct, msg):
+                    if progress_callback:
+                        progress_callback(PipelineStatus.DOWNLOADING, min(10, int(pct * 0.1)), msg)
+
+                video_path = download_video(
+                    input_source,
+                    download_folder,
+                    cancel_event=self.cancel_requested,
+                    progress_callback=on_dl_progress
+                )
+                self.temp_files.append(video_path)
+            else:
+                video_path = input_source
+                if not Path(video_path).exists():
+                    raise FileNotFoundError(f"Video file not found: {video_path}")
+
+            if self.cancel_requested.is_set():
+                self.status = PipelineStatus.CANCELLED
+                return []
+
             # Stage 1: Audio Extraction (10%)
             self.status = PipelineStatus.EXTRACTING_AUDIO
+            temp_wav = str((temp_dir / "temp_audio.wav").resolve())
+            self.temp_files.append(temp_wav)
+
             if progress_callback:
-                progress_callback(self.status, 10, "Mengestrak audio WAV 16kHz mono...")
+                progress_callback(self.status, 15, "Mengekstrak audio WAV 16kHz mono...")
             extract_audio(video_path, temp_wav, self.cancel_requested, self.set_pid)
             self.active_pid = None
 
@@ -94,7 +169,7 @@ class PipelineOrchestrator:
             # Stage 2: Transcription (30%)
             self.status = PipelineStatus.TRANSCRIBING
             if progress_callback:
-                progress_callback(self.status, 30, "Transkripsi kata via Faster-Whisper...")
+                progress_callback(self.status, 35, "Transkripsi kata via Faster-Whisper...")
             words, full_text = transcribe_audio(
                 temp_wav,
                 model_size=self.config.whisper_model,
@@ -124,7 +199,7 @@ class PipelineOrchestrator:
                 self.status = PipelineStatus.CANCELLED
                 return []
 
-            # Process Each Clip (Stages 4, 5, 6)
+            # Process Each Clip in Staging Directory (Stages 4, 5, 6)
             total_clips = len(candidates)
             for idx, clip in enumerate(candidates):
                 clip_num = idx + 1
@@ -153,15 +228,17 @@ class PipelineOrchestrator:
                 self.temp_files.append(temp_ass)
                 generate_kinetic_ass(words, clip.start_time, clip.end_time, temp_ass)
 
-                # Stage 6: Video Rendering (90%)
+                # Stage 6: Video Rendering into Staging Cache (Non-destructive)
                 self.status = PipelineStatus.RENDERING
                 if progress_callback:
-                    progress_callback(self.status, min(95, base_pct + 10), f"Rendering NVENC klip {clip_num}/{total_clips}...")
+                    progress_callback(self.status, min(95, base_pct + 10), f"Rendering klip {clip_num}/{total_clips} ke staging...")
 
-                out_clip_path = str((output_dir / f"clipmax_{clip_num}_{int(clip.start_time)}.mp4").resolve())
+                staging_clip_path = str((staging_dir / f"clipmax_{clip_num}_{int(clip.start_time)}.mp4").resolve())
+                self.staging_files.append(staging_clip_path)
+
                 render_clip(
                     input_video=video_path,
-                    output_clip=out_clip_path,
+                    output_clip=staging_clip_path,
                     start_time=clip.start_time,
                     end_time=clip.end_time,
                     crop_x=crop_x,
@@ -173,19 +250,38 @@ class PipelineOrchestrator:
                     pid_callback=self.set_pid
                 )
                 self.active_pid = None
-                generated_clips.append(out_clip_path)
+
+                # Generate thumbnail for preview gallery
+                staging_thumb_path = str((staging_dir / f"thumb_{clip_num}_{int(clip.start_time)}.jpg").resolve())
+                self.staging_files.append(staging_thumb_path)
+                generate_thumbnail(staging_clip_path, staging_thumb_path)
+
+                results.append(
+                    ClipResult(
+                        clip_id=clip_num,
+                        title=clip.title,
+                        hook=clip.hook,
+                        virality_score=clip.virality_score,
+                        reasoning=clip.reasoning,
+                        start_time=clip.start_time,
+                        end_time=clip.end_time,
+                        staging_path=staging_clip_path,
+                        thumbnail_path=staging_thumb_path
+                    )
+                )
 
             self.status = PipelineStatus.COMPLETED
             if progress_callback:
-                progress_callback(self.status, 100, "Semua klip berhasil diproses!")
-            return generated_clips
+                progress_callback(self.status, 100, f"Selesai! {len(results)} klip siap di Review Workspace.")
+            return results
 
         except Exception as e:
-            self.cleanup()
+            self.cleanup(clean_staging=True)
             if self.cancel_requested.is_set():
                 self.status = PipelineStatus.CANCELLED
                 return []
             self.status = PipelineStatus.FAILED
             raise e
         finally:
-            self.cleanup()
+            # Clean intermediate temp files (.wav, .ass) but preserve staging clips on normal run
+            self.cleanup(clean_staging=False)
