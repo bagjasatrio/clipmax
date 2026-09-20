@@ -14,30 +14,34 @@ from clipmax.reframe import (
 )
 
 def test_determine_segment_layout_rules():
-    # Test Standalone Universal Evaluator:
-    # A1. Multi-person (>= 2 faces in some frames) -> BLURRED_BG
+    # User's exact signature with list of detected face dicts:
+    # KASUS A: Layar / Slide / B-Roll (0 wajah sama sekali) -> BLURRED_BACKGROUND
+    assert determine_segment_layout([[] for _ in range(5)]) == "BLURRED_BACKGROUND"
+
+    # KASUS B: Multi-orang (>= 2 wajah) -> BLURRED_BACKGROUND
+    assert determine_segment_layout([[{"x_center": 0.25}, {"x_center": 0.75}]] * 5) == "BLURRED_BACKGROUND"
+
+    # KASUS C1: 1 Wajah di tengah (0.35 <= avg_x <= 0.65) -> CROP_9_16 (WAJIB FULL CROP 9:16)
+    assert determine_segment_layout([[{"x_center": 0.50}]] * 5) == "CROP_9_16"
+    assert determine_segment_layout([[{"x_center": 0.40}]] * 5) == "CROP_9_16"
+    assert determine_segment_layout([[{"x_center": 0.60}]] * 5) == "CROP_9_16"
+
+    # KASUS C2: 1 Wajah di pinggir (indikasi wide podcast 2 orang) -> BLURRED_BACKGROUND
+    assert determine_segment_layout([[{"x_center": 0.20}]] * 5) == "BLURRED_BACKGROUND"
+    assert determine_segment_layout([[{"x_center": 0.80}]] * 5) == "BLURRED_BACKGROUND"
+
+    # Backward-compatible tuple inputs:
     frames_multi = [(1, 450.0)] * 10 + [(2, 450.0)] * 2
-    assert determine_segment_layout(frames_multi) == "BLURRED_BG"
+    assert determine_segment_layout(frames_multi) == "BLURRED_BACKGROUND"
 
-    # A2. Zero face detected throughout -> BLURRED_BG
     frames_zero = [(0, None)] * 15
-    assert determine_segment_layout(frames_zero) == "BLURRED_BG"
+    assert determine_segment_layout(frames_zero) == "BLURRED_BACKGROUND"
 
-    # A3. Single face on left edge (X=450, norm=0.234 < 0.38) -> BLURRED_BG
     frames_left_edge = [(1, 450.0)] * 20
-    assert determine_segment_layout(frames_left_edge, frame_width=1920) == "BLURRED_BG"
+    assert determine_segment_layout(frames_left_edge, frame_width=1920) == "BLURRED_BACKGROUND"
 
-    # A4. Single face on right edge (X=1450, norm=0.755 > 0.62) -> BLURRED_BG
-    frames_right_edge = [(1, 1450.0)] * 20
-    assert determine_segment_layout(frames_right_edge, frame_width=1920) == "BLURRED_BG"
-
-    # B. Single face centered (X=960, norm=0.50 within [0.38, 0.62]) -> CROP_9_16
     frames_centered = [(1, 960.0)] * 20
     assert determine_segment_layout(frames_centered, frame_width=1920) == "CROP_9_16"
-
-    # B2. Slightly off-center presenter (X=864, norm=0.45 within [0.38, 0.62]) -> CROP_9_16
-    frames_off_center = [(1, 864.0)] * 20
-    assert determine_segment_layout(frames_off_center, frame_width=1920) == "CROP_9_16"
 
 def test_fixed_scene_crop_median_calculation():
     detected_faces = [940.0, 960.0, 950.0, 980.0, 955.0]

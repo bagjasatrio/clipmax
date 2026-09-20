@@ -8,6 +8,8 @@ from pydantic import BaseModel
 class ReframeStrategy(str, Enum):
     CROP_TRACKING = "CROP_TRACKING"
     BLURRED_BACKGROUND = "BLURRED_BACKGROUND"
+    CROP_9_16 = "CROP_TRACKING"
+    BLURRED_BG = "BLURRED_BACKGROUND"
     SINGLE_SPEAKER = "CROP_TRACKING"
     STATIC_CENTER = "BLURRED_BACKGROUND"
     SPLIT_SCREEN = "CROP_TRACKING"
@@ -62,11 +64,9 @@ def build_dynamic_crop_expression(
     if not values:
         return str(max_x // 2)
 
-    # In fixed scene mode, values in a segment are identical or median-centered
     if max(values) - min(values) < 2.0 or len(values) == 1:
         return str(int(round(values[0])))
 
-    # Discrete step function (Hard Cuts between scenes)
     blocks = []
     cur_val = values[0]
     cur_start = timestamps[0]
@@ -99,73 +99,93 @@ def get_face_detector_model() -> Optional[str]:
         return str(model_p)
     return None
 
+def normalize_sample_to_frame(item: Any, frame_width: int = 1920) -> List[Dict[str, float]]:
+    if isinstance(item, list):
+        frame_faces = []
+        for face in item:
+            if isinstance(face, dict):
+                xc = face.get("x_center", face.get("cx", 0.5))
+                norm_xc = xc / float(frame_width) if xc > 1.0 else float(xc)
+                frame_faces.append({"x_center": norm_xc})
+            elif isinstance(face, (int, float)):
+                norm_xc = face / float(frame_width) if face > 1.0 else float(face)
+                frame_faces.append({"x_center": norm_xc})
+        return frame_faces
+    elif isinstance(item, tuple):
+        if len(item) == 3:
+            _, ind, cx = item
+        elif len(item) == 2:
+            ind, cx = item
+        else:
+            ind, cx = item[0], None
+
+        if isinstance(ind, list):
+            return normalize_sample_to_frame(ind, frame_width)
+        if isinstance(ind, bool):
+            fc = 1 if ind else 0
+        else:
+            fc = int(ind) if ind is not None else 0
+
+        if fc == 0 or cx is None:
+            return []
+        norm_xc = cx / float(frame_width) if cx > 1.0 else float(cx)
+        if fc == 1:
+            return [{"x_center": norm_xc}]
+        else:
+            return [{"x_center": norm_xc}] * fc
+    elif isinstance(item, dict):
+        fc = item.get("face_count", item.get("faces", 0))
+        cx = item.get("cx", item.get("x_center", None))
+        if fc == 0 or cx is None:
+            return []
+        norm_xc = cx / float(frame_width) if cx > 1.0 else float(cx)
+        return [{"x_center": norm_xc}] * int(fc)
+    return []
+
 def determine_segment_layout(
-    segment_frames: List[Any],
+    detected_faces_list: List[Any],
     frame_width: int = 1920
 ) -> str:
     """
-    Universal Standalone Segment Layout Evaluator:
+    Evaluasi layout per segmen:
+    - detected_faces_list: list hasil deteksi wajah per frame sampel di segmen tersebut
     
-    A. BLURRED_BG (16:9 Fit in center + blurred background):
-       - If in this segment max_detected_faces >= 2 (even if only in a few sample frames).
-       - OR if 0 faces are detected throughout the segment (screen share / slide / presentation / B-roll).
-       - OR if only 1 face detected, but average/median X-center is on screen edge (X < 0.38 or X > 0.62),
-         indicating a two-person podcast shot where the partner is sitting on the opposite side.
-    
-    B. CROP_9_16:
-       - ONLY if throughout the segment consistently max_detected_faces <= 1 (and at least 1 valid face),
-         AND median X-center is in the centered region (0.38 <= X <= 0.62).
-    
-    Returns: 'CROP_9_16' or 'BLURRED_BG'.
+    1. KASUS A: Layar / Slide / B-Roll (Tidak ada wajah sama sekali)
+       -> "BLURRED_BACKGROUND"
+    2. KASUS B: Multi-orang (Ada 2 wajah atau lebih dalam frame)
+       -> "BLURRED_BACKGROUND"
+    3. KASUS C: 1 Wajah (Single Talking Head)
+       - Jika posisi rata-rata X di tengah (0.35 <= avg_x <= 0.65) -> "CROP_9_16" (WAJIB FULL CROP 9:16)
+       - Jika posisi wajah di pinggir layar (avg_x < 0.35 atau avg_x > 0.65) -> "BLURRED_BACKGROUND"
     """
-    if not segment_frames:
-        return "BLURRED_BG"
+    if not detected_faces_list:
+        return "BLURRED_BACKGROUND"
 
-    face_counts: List[int] = []
-    face_xs: List[float] = []
+    normalized_frames = [normalize_sample_to_frame(item, frame_width) for item in detected_faces_list]
 
-    for item in segment_frames:
-        # Support various formats: (t, fc, cx) or (fc, cx) or dict or raw int
-        if isinstance(item, (tuple, list)):
-            if len(item) == 3:
-                fc, cx = item[1], item[2]
-            elif len(item) == 2:
-                fc, cx = item[0], item[1]
-            else:
-                fc, cx = item[0], None
-        elif isinstance(item, dict):
-            fc = item.get("face_count", item.get("faces", 0))
-            cx = item.get("cx", item.get("center_x", None))
-        elif isinstance(item, (int, float)):
-            fc, cx = int(item), None
-        else:
-            fc, cx = 0, None
+    # 1. Hitung frame yang memiliki wajah
+    valid_frames = [f for f in normalized_frames if len(f) > 0]
 
-        if isinstance(fc, bool):
-            fc = 1 if fc else 0
-        face_counts.append(int(fc))
-        if int(fc) == 1 and cx is not None:
-            face_xs.append(float(cx))
+    # KASUS A: Layar / Slide / B-Roll (Tidak ada wajah sama sekali)
+    if len(valid_frames) == 0:
+        return "BLURRED_BACKGROUND"
 
-    max_detected_faces = max(face_counts) if face_counts else 0
+    # KASUS B: Multi-orang (Ada 2 wajah atau lebih dalam frame)
+    max_faces = max([len(f) for f in normalized_frames])
+    if max_faces >= 2:
+        return "BLURRED_BACKGROUND"
 
-    # Condition A1: Multi-person frame detected (max_detected_faces >= 2)
-    if max_detected_faces >= 2:
-        return "BLURRED_BG"
+    # KASUS C: 1 Wajah (Single Talking Head)
+    # Ambil rata-rata posisi X wajah
+    x_centers = [f[0]["x_center"] for f in valid_frames]
+    avg_x = sum(x_centers) / len(x_centers)
 
-    # Condition A2: No face detected throughout the segment
-    if not face_xs:
-        return "BLURRED_BG"
-
-    median_x = float(np.median(face_xs))
-    x_norm = median_x / float(frame_width)
-
-    # Condition A3: Asymmetric edge position (X < 0.38 or X > 0.62)
-    if x_norm < 0.38 or x_norm > 0.62:
-        return "BLURRED_BG"
-
-    # Condition B: Centered single talking head (0.38 <= X <= 0.62)
-    return "CROP_9_16"
+    # Jika posisi wajah wajar di tengah (antara 35% sampai 65% lebar layar)
+    if 0.35 <= avg_x <= 0.65:
+        return "CROP_9_16"  # WAJIB FULL CROP 9:16
+    else:
+        # Wajah terlalu di pinggir (indikasi wide podcast 2 orang)
+        return "BLURRED_BACKGROUND"
 
 def merge_scene_intervals(
     raw_samples: List[Tuple[float, Any, float]],
@@ -190,30 +210,32 @@ def merge_scene_intervals(
 
     final_end = clip_duration if clip_duration > 0 else raw_samples[-1][0]
 
-    def to_state(ind):
+    def to_state(s):
+        ind = s[1] if isinstance(s, tuple) and len(s) > 1 else s
+        if isinstance(ind, list):
+            return 2 if len(ind) >= 2 else (1 if len(ind) == 1 else 0)
         if isinstance(ind, bool):
             return 1 if ind else 0
         return 2 if ind >= 2 else (1 if ind == 1 else 0)
 
     # 1. Group contiguous raw samples into candidate blocks
     chunks: List[Dict[str, Any]] = []
-    cur_state = to_state(raw_samples[0][1])
+    cur_state = to_state(raw_samples[0])
     cur_start = raw_samples[0][0]
     cur_chunk_samples = [raw_samples[0]]
 
     for s in raw_samples[1:]:
-        t, ind, fx = s
-        state = to_state(ind)
+        state = to_state(s)
         if state == cur_state:
             cur_chunk_samples.append(s)
         else:
             chunks.append({
                 "start": cur_start,
-                "end": t,
+                "end": s[0],
                 "samples": cur_chunk_samples
             })
             cur_state = state
-            cur_start = t
+            cur_start = s[0]
             cur_chunk_samples = [s]
 
     chunks.append({
@@ -240,12 +262,12 @@ def merge_scene_intervals(
                 changed = True
                 break
 
-    # 3. Classify each chunk using the standalone determine_segment_layout evaluator
+    # 3. Classify each chunk using determine_segment_layout
     classified: List[Dict[str, Any]] = []
     for c in chunks:
         layout = determine_segment_layout(c["samples"], frame_width=frame_width)
         mode = "CROP_TRACKING" if layout == "CROP_9_16" else "BLURRED_BACKGROUND"
-        faces = [s[2] for s in c["samples"] if (s[1] == 1 or s[1] is True) and s[2] is not None]
+        faces = [s[2] for s in c["samples"] if len(s) > 2 and s[2] is not None]
         classified.append({
             "start": c["start"],
             "end": c["end"],
@@ -307,8 +329,8 @@ def segment_clip_scenes(
     - Samples frames periodically (~0.5s interval).
     - Runs Face Detection on each sample.
     - Evaluates every segment with determine_segment_layout:
-      * CROP_9_16: Locked static crop 9:16 on median X position (0.38 <= X <= 0.62).
-      * BLURRED_BG: 16:9 full view fit in center with blurred background (>= 2 faces, 0 faces, or edge anchor).
+      * CROP_9_16: Locked static crop 9:16 on median X position (0.35 <= avg_x <= 0.65).
+      * BLURRED_BACKGROUND: 16:9 full view fit in center with blurred background (>= 2 faces, 0 faces, or edge anchor).
     """
     if padding_sec is None:
         padding_sec = 0.2
@@ -334,7 +356,6 @@ def segment_clip_scenes(
         end_frame = start_frame
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
 
-    # 0.5s periodic sampling interval
     step = max(1, int(round(fps * 0.5))) if sample_step is None or sample_step <= 0 else sample_step
 
     detect_w = min(width, detect_width)
@@ -357,7 +378,7 @@ def segment_clip_scenes(
 
     default_center = width / 2.0
     last_center = default_center
-    raw_samples: List[Tuple[float, int, float]] = []
+    raw_samples: List[Tuple[float, Any, float]] = []
     visual_cuts: List[float] = []
     prev_gray = None
     cut_diff_threshold = 28.0
@@ -374,7 +395,7 @@ def segment_clip_scenes(
         if frame_idx % step == 0:
             t_rel = (current_frame - start_frame) / fps
             ret, frame = cap.retrieve()
-            face_count = 0
+            frame_faces = []
 
             if ret and frame is not None:
                 small_frame = cv2.resize(frame, (detect_w, detect_h))
@@ -392,23 +413,26 @@ def segment_clip_scenes(
                     try:
                         _, faces = detector.detect(small_frame)
                         if faces is not None and len(faces) > 0:
-                            valid_faces = []
                             for f in faces:
                                 w_f, h_f = float(f[2]), float(f[3])
                                 area = w_f * h_f
                                 score = float(f[14]) if len(f) > 14 else 1.0
                                 if score >= 0.6 and area >= min_face_area:
-                                    valid_faces.append((area, f))
-
-                            face_count = len(valid_faces)
-                            if face_count == 1:
-                                best_face = valid_faces[0][1]
-                                cx_small = float(best_face[0] + best_face[2] / 2.0)
-                                last_center = cx_small * scale_x
+                                    cx_small = float(f[0] + f[2] / 2.0)
+                                    norm_x = cx_small / float(detect_w)
+                                    frame_faces.append({
+                                        "x_center": norm_x,
+                                        "cx_px": cx_small * scale_x,
+                                        "box": (float(f[0]), float(f[1]), w_f, h_f),
+                                        "score": score
+                                    })
                     except Exception:
-                        face_count = 0
+                        frame_faces = []
 
-            raw_samples.append((t_rel, face_count, last_center))
+            if len(frame_faces) == 1:
+                last_center = frame_faces[0]["cx_px"]
+
+            raw_samples.append((t_rel, frame_faces, last_center))
 
         frame_idx += 1
         current_frame += 1
@@ -442,17 +466,22 @@ def segment_clip_scenes(
         if s_end <= s_start:
             continue
 
-        # Universal evaluator called on every segment
         seg_samples = c.get("samples", [])
         layout = determine_segment_layout(seg_samples, frame_width=width)
 
         if layout == "CROP_9_16":
-            faces = [s[2] for s in seg_samples if (s[1] == 1 or s[1] is True) and s[2] is not None]
-            if faces:
-                median_cx = float(np.median(faces))
-            else:
-                median_cx = default_center
+            # Extract valid pixel centers from detected face dicts
+            cx_vals = []
+            for s in seg_samples:
+                item = s[1] if len(s) > 1 else None
+                if isinstance(item, list):
+                    for f in item:
+                        if isinstance(f, dict) and "cx_px" in f:
+                            cx_vals.append(f["cx_px"])
+                elif len(s) > 2 and s[2] is not None:
+                    cx_vals.append(float(s[2]))
 
+            median_cx = float(np.median(cx_vals)) if cx_vals else default_center
             fixed_crop_x, _, _ = calculate_crop_box(width, height, median_cx)
             scenes.append(
                 SceneSegment(

@@ -50,13 +50,21 @@ def render_clip(
 
     escaped_ass = sanitize_ffmpeg_path(ass_path) if (ass_path and os.path.exists(ass_path)) else None
 
+    # Resolve active mode and crop_x
+    active_mode = reframe_mode
+    active_crop_x = crop_x
+    if scenes and len(scenes) >= 1:
+        active_mode = scenes[0].mode
+        if scenes[0].mode in ("CROP_9_16", "CROP_TRACKING"):
+            active_crop_x = scenes[0].crop_x
+
     # Multi-scene dynamic layout transition inside the same clip
     if scenes and len(scenes) > 1:
         v_chains = []
         for i, sc in enumerate(scenes):
             t_s = f"{sc.start_time:.3f}"
             t_e = f"{sc.end_time:.3f}"
-            if sc.mode == "BLURRED_BACKGROUND":
+            if sc.mode in ("BLURRED_BACKGROUND", "BLURRED_BG"):
                 chain = (
                     f"[0:v]trim=start={t_s}:end={t_e},setpts=PTS-STARTPTS,split[bg_in{i}][fg_in{i}];"
                     f"[bg_in{i}]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg{i}];"
@@ -96,7 +104,7 @@ def render_clip(
             str(out_p.resolve())
         ]
 
-    elif reframe_mode == "BLURRED_BACKGROUND":
+    elif active_mode in ("BLURRED_BACKGROUND", "BLURRED_BG"):
         # Mode BLURRED_BACKGROUND: Canvas 1080x1920 with blurred background and centered 16:9 foreground
         sub_filter = f",subtitles='{escaped_ass}'" if escaped_ass else ""
         filter_str = (
@@ -121,8 +129,8 @@ def render_clip(
             str(out_p.resolve())
         ]
     else:
-        # Mode CROP_TRACKING: 9:16 crop centered on tracked face
-        crop_x_val = f"'{crop_x}'" if (isinstance(crop_x, str) and not str(crop_x).isdigit()) else str(crop_x)
+        # Mode CROP_9_16 / CROP_TRACKING: 9:16 crop centered on tracked face
+        crop_x_val = f"'{active_crop_x}'" if (isinstance(active_crop_x, str) and not str(active_crop_x).isdigit()) else str(active_crop_x)
         filter_parts = [
             f"crop=ih*(9/16):ih:{crop_x_val}:0",
             "scale=1080:1920"
