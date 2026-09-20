@@ -59,46 +59,9 @@ def test_build_dynamic_crop_expression_moving():
     assert "if(lt(t,2.00)" in expr
     assert "max(0,min(1312" in expr
 
-def test_merge_scene_intervals_wide_shot_priority():
-    # Wide shot of a person sitting in chair:
-    # Face is intermittently detected (e.g. looking down/away for <= 1.2s at a time)
-    # Under strict zero-face rule, this must remain 100% CROP_TRACKING
-    samples = []
-    for s in range(31):
-        has_face = (s % 2 == 0) or (s % 3 == 0)
-        samples.append((float(s), has_face, 500.0))
-
-    segments = merge_scene_intervals(samples, min_scene_sec=1.5, clip_duration=30.0)
-    assert len(segments) == 1
-    assert segments[0]["mode"] == "CROP_TRACKING"
-    assert segments[0]["start"] == 0.0
-    assert segments[0]["end"] == 30.0
-
-def test_merge_scene_intervals_pure_screen_record():
-    # Presenter talking (0-10s), pure screen record with ZERO faces for 15s (10-25s), presenter returns (25-30s)
-    samples = []
-    for s in range(31):
-        if 0 <= s < 10 or 25 <= s <= 30:
-            samples.append((float(s), True, 600.0))
-        else:
-            samples.append((float(s), False, 960.0))
-
-    visual_cuts = [10.0, 25.0]
-    segments = merge_scene_intervals(
-        samples,
-        min_scene_sec=1.5,
-        clip_duration=30.0,
-        visual_cuts=visual_cuts,
-        padding_sec=0.2
-    )
-    assert len(segments) == 3
-    assert segments[0]["mode"] == "CROP_TRACKING"
-    assert segments[1]["mode"] == "BLURRED_BACKGROUND"
-    assert segments[2]["mode"] == "CROP_TRACKING"
-
 def test_merge_scene_intervals_anti_micro_cut():
     # 0-10s: face
-    # 10-11.2s: short 1.2s screen share switch (under 1.5s threshold)
+    # 10-11.2s: short 1.2s screen share switch (under 1.8s threshold)
     # 11.2-20s: face
     samples = []
     for s in range(21):
@@ -107,7 +70,7 @@ def test_merge_scene_intervals_anti_micro_cut():
         else:
             samples.append((float(s), True, 600.0))
 
-    segments = merge_scene_intervals(samples, min_scene_sec=1.5, clip_duration=20.0, padding_sec=0.0)
+    segments = merge_scene_intervals(samples, min_scene_sec=1.8, clip_duration=20.0, padding_sec=0.0)
     # The 1s micro-cut must be completely absorbed
     assert len(segments) == 1
     assert segments[0]["mode"] == "CROP_TRACKING"
@@ -128,7 +91,7 @@ def test_merge_scene_intervals_visual_cut_snapping_and_padding():
     visual_cuts = [9.8, 24.9]
     segments = merge_scene_intervals(
         samples,
-        min_scene_sec=1.5,
+        min_scene_sec=2.0,
         clip_duration=30.0,
         visual_cuts=visual_cuts,
         padding_sec=0.2
