@@ -62,6 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const hwPill = document.getElementById("hwPill");
   const hwPillText = document.getElementById("hwPillText");
+  const btnResetClear = document.getElementById("btnResetClear");
   const btnMin = document.getElementById("btnMin");
   const btnClose = document.getElementById("btnClose");
 
@@ -135,7 +136,15 @@ document.addEventListener("DOMContentLoaded", () => {
       inputEndpoint.value = cfg.endpoint_url || "http://localhost:20128/v1";
       inputApiKey.value = cfg.api_key || "";
       inputTargetClips.value = cfg.target_clip_count || 3;
-      inputRules.value = cfg.campaign_rules || "";
+      
+      // Auto-clear form state on initial load / DOM ready
+      inputUrl.value = "";
+      inputRules.value = "";
+      localVideoPath = "";
+      lblLocalFile.textContent = "Pilih video MP4 dari komputer...";
+      localStorage.removeItem("clipmax_campaign_brief");
+      localStorage.removeItem("clipmax_youtube_url");
+
       if (selectClipMode && cfg.clip_mode) {
         selectClipMode.value = cfg.clip_mode;
       }
@@ -554,6 +563,43 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       window.close();
     }
+  });
+
+  // 13. Reset Form & Clear Cache
+  if (btnResetClear) {
+    btnResetClear.addEventListener("click", async () => {
+      inputUrl.value = "";
+      inputRules.value = "";
+      localVideoPath = "";
+      lblLocalFile.textContent = "Pilih video MP4 dari komputer...";
+      localStorage.removeItem("clipmax_campaign_brief");
+      localStorage.removeItem("clipmax_youtube_url");
+      sessionStorage.clear();
+
+      btnResetClear.disabled = true;
+      const originalHTML = btnResetClear.innerHTML;
+      btnResetClear.innerHTML = `<span class="animate-spin mr-1">⌛</span><span>Cleaning...</span>`;
+      try {
+        const res = await fetch("/api/cache/clear", { method: "POST" });
+        const data = await res.json();
+        alert(data.message || "Cache berhasil dibersihkan & form di-reset.");
+      } catch (e) {
+        console.warn("Gagal membersihkan cache:", e);
+      } finally {
+        btnResetClear.disabled = false;
+        btnResetClear.innerHTML = originalHTML;
+      }
+    });
+  }
+
+  // 14. Auto-Clear on Window Close / Unload
+  window.addEventListener("beforeunload", () => {
+    localStorage.removeItem("clipmax_campaign_brief");
+    localStorage.removeItem("clipmax_youtube_url");
+    sessionStorage.clear();
+    try {
+      navigator.sendBeacon("/api/cache/clear");
+    } catch (e) {}
   });
 
   // Initialization

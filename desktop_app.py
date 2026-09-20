@@ -12,6 +12,7 @@ setup_cuda_dll_paths()
 
 import uvicorn
 import webview
+from clipmax.config import clear_temp_cache
 from clipmax.web.server import app, state
 
 def find_free_port(start_port: int = 20130) -> int:
@@ -36,6 +37,7 @@ class DesktopJsApi:
             w.minimize()
 
     def close_window(self):
+        clear_temp_cache()
         w = self.window_holder.get("window")
         if w:
             w.destroy()
@@ -138,6 +140,7 @@ def main():
     window_holder["window"] = window
 
     webview.start(debug=False)
+    clear_temp_cache()
 
 if __name__ == "__main__":
     main()

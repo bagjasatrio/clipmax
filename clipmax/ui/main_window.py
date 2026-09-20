@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QSlider, QSizePolicy, QSplitter, QSpinBox,
     QPlainTextEdit
 )
-from clipmax.config import AppConfig
+from clipmax.config import AppConfig, clear_temp_cache
 from clipmax.ai_gateway import discover_models
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
 from clipmax.downloader import is_valid_video_url, clean_error_message
@@ -234,6 +234,14 @@ class MainWindow(QMainWindow):
         self.lbl_hw_pill = QLabel("<span style='color: #10B981;'>●</span> &nbsp;NVIDIA RTX 3050 | CUDA Active")
         self.lbl_hw_pill.setObjectName("HardwarePill")
         h_layout.addWidget(self.lbl_hw_pill)
+
+        # Reset Form & Clear Cache
+        btn_reset_cache = QPushButton("Reset & Clear Cache")
+        btn_reset_cache.setFixedHeight(28)
+        btn_reset_cache.setProperty("class", "Secondary")
+        btn_reset_cache.setToolTip("Reset input URL & Campaign Brief, serta bersihkan cache sementara")
+        btn_reset_cache.clicked.connect(self._on_reset_and_clear_cache)
+        h_layout.addWidget(btn_reset_cache)
 
         # Window Controls: Minimize, Maximize/Restore, Close
         btn_min = QPushButton("—")
@@ -788,6 +796,17 @@ class MainWindow(QMainWindow):
             elif "60-90" in preset:
                 self.spn_min_dur.setValue(60)
                 self.spn_max_dur.setValue(90)
+
+    def _on_reset_and_clear_cache(self):
+        self.txt_url.clear()
+        self.txt_video.clear()
+        self.txt_rules.clear()
+        count = clear_temp_cache()
+        QMessageBox.information(self, "Cache Cleared", f"Form telah di-reset dan {count} file cache sementara berhasil dibersihkan.")
+
+    def closeEvent(self, event):
+        clear_temp_cache()
+        super().closeEvent(event)
 
     def _on_browse_video(self):
         file_path, _ = QFileDialog.getOpenFileName(

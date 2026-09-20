@@ -43,6 +43,12 @@ def test_api_models():
     assert "models" in data
     assert isinstance(data["models"], list)
 
+def test_api_cache_clear():
+    res = client.post("/api/cache/clear")
+    assert res.status_code == 200
+    assert res.json().get("status") == "ok"
+    assert "Cache cleared" in res.json().get("message")
+
 def test_static_index_html():
     res = client.get("/")
     assert res.status_code == 200
@@ -50,3 +56,4 @@ def test_static_index_html():
     assert "Invidious API Stream" in res.text
     assert "cookies.txt" not in res.text
     assert "Multi-Cut Montage" in res.text
+    assert "Reset &amp; Clear Cache" in res.text or "Reset & Clear Cache" in res.text

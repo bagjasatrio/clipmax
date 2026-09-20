@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 from pathlib import Path
 from typing import Any, Optional
 from pydantic import BaseModel, Field
@@ -95,3 +96,22 @@ class AppConfig(BaseModel):
         p.parent.mkdir(parents=True, exist_ok=True)
         with open(p, "w", encoding="utf-8") as f:
             json.dump(self.model_dump(), f, indent=2)
+
+def clear_temp_cache(temp_dir_path: Optional[str] = None) -> int:
+    """Removes all temporary cache files, subclips, wav chunks, and directories."""
+    target = Path(temp_dir_path or AppConfig().temp_dir).resolve()
+    removed_count = 0
+    if target.exists():
+        for item in target.iterdir():
+            try:
+                if item.is_file():
+                    item.unlink()
+                    removed_count += 1
+                elif item.is_dir():
+                    shutil.rmtree(item)
+                    removed_count += 1
+            except Exception as e:
+                print(f"[Cleanup Warning] Gagal hapus {item}: {e}")
+        (target / "staging").mkdir(parents=True, exist_ok=True)
+        (target / "downloads").mkdir(parents=True, exist_ok=True)
+    return removed_count

@@ -31,3 +31,24 @@ def test_default_app_config():
     assert cfg.whisper_model == "small"
     assert cfg.device in ["cuda", "cpu"]
     assert cfg.endpoint_url == "http://localhost:20128/v1"
+
+def test_clear_temp_cache(tmp_path):
+    from clipmax.config import clear_temp_cache
+    temp_dir = tmp_path / "temp_cache"
+    temp_dir.mkdir(parents=True)
+    (temp_dir / "temp_part_1.mp4").write_text("dummy")
+    (temp_dir / "audio.wav").write_text("dummy")
+    sub_folder = temp_dir / "old_subfolder"
+    sub_folder.mkdir()
+    (sub_folder / "file.txt").write_text("dummy")
+
+    assert (temp_dir / "temp_part_1.mp4").exists()
+    assert sub_folder.exists()
+
+    removed = clear_temp_cache(str(temp_dir))
+    assert removed >= 2
+    assert not (temp_dir / "temp_part_1.mp4").exists()
+    assert not sub_folder.exists()
+    assert (temp_dir / "staging").exists()
+    assert (temp_dir / "downloads").exists()
+

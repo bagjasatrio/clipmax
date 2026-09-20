@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from clipmax.config import AppConfig, is_cuda_available
+from clipmax.config import AppConfig, is_cuda_available, clear_temp_cache
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
 from clipmax.ai_gateway import discover_models
 from clipmax.downloader import is_valid_video_url, clean_error_message, extract_video_id, download_via_invidious
@@ -78,12 +78,27 @@ state = AppState()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     state.loop = asyncio.get_running_loop()
-    # Ensure staging directory exists
-    staging_dir = Path(state.config.temp_dir) / "staging"
-    staging_dir.mkdir(parents=True, exist_ok=True)
+    # Auto-clean cache on startup
+    clear_temp_cache(state.config.temp_dir)
     yield
+    # Auto-clean cache on shutdown
+    clear_temp_cache(state.config.temp_dir)
 
 app = FastAPI(title="ClipMax Studio Backend", version="2.4.0", lifespan=lifespan)
+
+@app.on_event("startup")
+def on_startup():
+    clear_temp_cache(state.config.temp_dir)
+
+@app.on_event("shutdown")
+def on_shutdown():
+    clear_temp_cache(state.config.temp_dir)
+
+@app.post("/api/cache/clear")
+def api_clear_cache():
+    count = clear_temp_cache(state.config.temp_dir)
+    state.clips = []
+    return {"status": "ok", "message": f"Cache cleared ({count} items removed)"}
 
 app.add_middleware(
     CORSMiddleware,
