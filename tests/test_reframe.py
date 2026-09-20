@@ -15,17 +15,45 @@ from clipmax.reframe import (
 def test_fixed_scene_crop_median_calculation():
     # If a talking head segment contains fluctuating face detections,
     # it must compute the MEDIAN face X position and lock crop_x to that exact fixed value.
-    detected_faces = [400.0, 420.0, 410.0, 800.0, 415.0]  # outlier at 800
-    median_val = float(np.median(detected_faces))  # 415.0
+    detected_faces = [940.0, 960.0, 950.0, 980.0, 955.0]
+    median_val = float(np.median(detected_faces))
     crop_x, crop_w, crop_h = calculate_crop_box(1920, 1080, median_val)
-    assert crop_x == int(round(415.0 - crop_w / 2.0))
+    assert crop_x == int(round(median_val - crop_w / 2.0))
     # Must be a fixed integer string, not a dynamic expression
     assert str(crop_x).isdigit()
 
-def test_face_count_rule_single_face_crop_916():
-    # Condition 1: EXACTLY 1 Face (Single Talking Head) -> CROP_TRACKING (Fixed median X)
-    samples = [(i * 0.2, 1, 480.0 + (i % 3) * 5) for i in range(50)]
-    segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=10.0)
+def test_aggregated_face_voting_podcast_partial_turn():
+    # User's podcast case:
+    # 0s - 15s: 1 person detected (partner turned head 90 deg)
+    # 15s - 30s: 2 people detected
+    # Aggregated face voting MUST lock the ENTIRE 30-second scene to BLURRED_BACKGROUND
+    samples = [(i * 0.2, 1, 450.0) for i in range(75)] + [(15.0 + i * 0.2, 2, 450.0) for i in range(75)]
+    segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=30.0)
+    assert len(segments) == 1
+    assert segments[0]["mode"] == "BLURRED_BACKGROUND"
+    assert segments[0]["start"] == 0.0
+    assert segments[0]["end"] == 30.0
+
+def test_asymmetric_edge_anchor_blurred_bg():
+    # User's edge anchor case:
+    # Only 1 face detected throughout the segment, but person sits on far left (X=450, X/W=0.23)
+    # The system must recognize this as an asymmetric edge anchor (podcast partner undetected)
+    # and assign BLURRED_BACKGROUND, never a lopsided 9:16 crop.
+    samples_left = [(i * 0.2, 1, 450.0) for i in range(50)]
+    seg_left = merge_scene_intervals(samples_left, min_scene_sec=2.0, clip_duration=10.0, frame_width=1920)
+    assert len(seg_left) == 1
+    assert seg_left[0]["mode"] == "BLURRED_BACKGROUND"
+
+    # Same for far right edge (X=1500, X/W=0.78)
+    samples_right = [(i * 0.2, 1, 1500.0) for i in range(50)]
+    seg_right = merge_scene_intervals(samples_right, min_scene_sec=2.0, clip_duration=10.0, frame_width=1920)
+    assert len(seg_right) == 1
+    assert seg_right[0]["mode"] == "BLURRED_BACKGROUND"
+
+def test_face_count_rule_single_face_centered_crop_916():
+    # Single presenter centered (X=960, X/W=0.50) -> CROP_TRACKING (Fixed 9:16 crop)
+    samples = [(i * 0.2, 1, 960.0 + (i % 3) * 5) for i in range(50)]
+    segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=10.0, frame_width=1920)
     assert len(segments) == 1
     assert segments[0]["mode"] == "CROP_TRACKING"
     assert segments[0]["start"] == 0.0
@@ -50,17 +78,17 @@ def test_face_count_rule_zero_face_blurred_bg():
     assert segments[0]["end"] == 10.0
 
 def test_face_count_rule_mixed_timeline():
-    # 0s-6s: Single talking head (fc=1) -> CROP_TRACKING
+    # 0s-6s: Single centered talking head (fc=1, x=960) -> CROP_TRACKING
     # 6s-12s: Two-shot podcast (fc=2) -> BLURRED_BACKGROUND
     # 12s-16s: Screen share (fc=0) -> BLURRED_BACKGROUND (merged seamlessly)
-    # 16s-20s: Single talking head (fc=1) -> CROP_TRACKING
+    # 16s-20s: Single centered talking head (fc=1, x=960) -> CROP_TRACKING
     samples = (
-        [(i * 0.2, 1, 450.0) for i in range(30)] +
+        [(i * 0.2, 1, 960.0) for i in range(30)] +
         [(6.0 + i * 0.2, 2, 800.0) for i in range(30)] +
         [(12.0 + i * 0.2, 0, None) for i in range(20)] +
-        [(16.0 + i * 0.2, 1, 450.0) for i in range(20)]
+        [(16.0 + i * 0.2, 1, 960.0) for i in range(20)]
     )
-    segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=20.0, padding_sec=0.0)
+    segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=20.0, padding_sec=0.0, frame_width=1920)
     assert len(segments) == 3
     assert segments[0]["mode"] == "CROP_TRACKING"
     assert segments[0]["start"] == 0.0
@@ -127,7 +155,7 @@ def test_merge_scene_intervals_anti_micro_cut():
         if s == 10:
             samples.append((float(s), False, 960.0))
         else:
-            samples.append((float(s), True, 600.0))
+            samples.append((float(s), True, 960.0))
 
     segments = merge_scene_intervals(samples, min_scene_sec=1.8, clip_duration=20.0, padding_sec=0.0)
     assert len(segments) == 1
@@ -139,7 +167,7 @@ def test_merge_scene_intervals_visual_cut_snapping_and_padding():
     samples = []
     for s in range(31):
         if 0 <= s < 10 or 25 <= s <= 30:
-            samples.append((float(s), True, 600.0))
+            samples.append((float(s), True, 960.0))
         else:
             samples.append((float(s), False, 960.0))
 
