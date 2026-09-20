@@ -370,8 +370,17 @@ document.addEventListener("DOMContentLoaded", () => {
     btnCancel.classList.add("hidden");
   }
 
+  function cleanErrorText(text) {
+    if (!text) return "";
+    return text
+      .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+      .replace(/(?:\[\]|\[)[0-9;]+m/g, "")
+      .replace(/\[0m/g, "")
+      .trim();
+  }
+
   function onPipelineError(msg) {
-    alert("Pipeline terhenti:\n" + msg);
+    alert("Pipeline terhenti:\n" + cleanErrorText(msg));
     showStage("standby");
     btnGenerate.classList.remove("hidden");
     btnCancel.classList.add("hidden");

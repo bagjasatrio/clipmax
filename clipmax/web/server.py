@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from clipmax.config import AppConfig, is_cuda_available
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
 from clipmax.ai_gateway import discover_models
-from clipmax.downloader import find_manual_cookie_file, is_valid_video_url
+from clipmax.downloader import find_manual_cookie_file, is_valid_video_url, clean_error_message
 
 class PipelineStartRequest(BaseModel):
     input_source: str
@@ -232,13 +232,14 @@ def start_pipeline(req: PipelineStartRequest):
                 })
 
         except Exception as e:
+            cleaned_msg = clean_error_message(str(e))
             state.status = "FAILED"
-            state.message = str(e)
+            state.message = cleaned_msg
             state.broadcast_sync({
                 "type": "error",
                 "status": "FAILED",
                 "progress": 0,
-                "message": str(e)
+                "message": cleaned_msg
             })
 
     state.worker_thread = threading.Thread(target=run_worker, daemon=True)

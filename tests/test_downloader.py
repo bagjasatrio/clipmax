@@ -6,7 +6,8 @@ from clipmax.downloader import (
     is_valid_video_url,
     auto_update_ytdlp,
     get_ydl_options,
-    find_manual_cookie_file
+    find_manual_cookie_file,
+    clean_error_message
 )
 
 def test_download_video_invalid_url():
@@ -24,9 +25,18 @@ def test_get_ydl_options_structure():
         assert "format" in opts
         assert "outtmpl" in opts
         assert "cookiesfrombrowser" not in opts
-        assert opts["extractor_args"]["youtube"]["player_client"] == ["tv_embedded", "creator"]
-        assert "Mozilla/5.0 (PlayStation 4 9.00)" in opts["http_headers"]["User-Agent"]
+        assert opts["extractor_args"]["youtube"]["player_client"] == ["android_vr", "android"]
+        assert "Chrome/128.0.0.0" in opts["http_headers"]["User-Agent"]
+        assert opts["http_headers"]["Referer"] == "https://www.google.com/"
         assert opts["quiet"] is False
+        assert "cookiefile" not in opts
+
+def test_clean_error_message():
+    raw = "\x1b[0;31mERROR:\x1b[0m []0;31mERROR:[]0m [youtube] UCCZ-F2bidU: This video is unavailable."
+    cleaned = clean_error_message(raw)
+    assert "[]0;31m" not in cleaned
+    assert "\x1b" not in cleaned
+    assert "This video is unavailable." in cleaned
 
 def test_find_manual_cookie_file(tmp_path):
     cookie_txt = tmp_path / "cookies.txt"

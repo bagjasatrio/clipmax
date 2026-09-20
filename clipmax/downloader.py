@@ -1,9 +1,23 @@
 import os
+import re
 import subprocess
 import threading
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any, List, Tuple
 from clipmax.config import get_ffmpeg_bin
+
+def clean_error_message(text: str) -> str:
+    """Removes raw terminal ANSI escape sequences, color codes, and bracketed escapes."""
+    if not text:
+        return ""
+    # Remove standard ANSI escape sequences \x1b[...]
+    cleaned = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
+    # Remove raw bracket escapes like []0;31m or \x1b[0;31m or [0;31m or [0m
+    cleaned = re.sub(r'(?:\[\]|\[)[0-9;]+m', '', cleaned)
+    cleaned = re.sub(r'\[0m', '', cleaned)
+    # Remove terminal control characters
+    cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', cleaned)
+    return cleaned.strip()
 
 def auto_update_ytdlp() -> bool:
     """Updates yt-dlp to the latest version to maintain extraction compatibility against YouTube changes."""
@@ -40,28 +54,26 @@ def find_manual_cookie_file() -> Optional[str]:
 
 def get_ydl_options(output_path: str, active_cookie_path: Optional[str] = None) -> Dict[str, Any]:
     """
-    Returns yt-dlp options using login-free tv_embedded / creator clients with optional cookies.txt.
+    Returns yt-dlp options using login-free android_vr / android clients.
+    Does not include cookiefile for android/android_vr clients to avoid skipping warnings.
     """
     ydl_opts: Dict[str, Any] = {
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "outtmpl": output_path,
         "extractor_args": {
             "youtube": {
-                "player_client": ["tv_embedded", "creator"],
+                "player_client": ["android_vr", "android"],
                 "player_skip": ["webpage", "configs"]
             }
         },
         "http_headers": {
-            "User-Agent": "Mozilla/5.0 (PlayStation 4 9.00) AppleWebKit/537.78 (KHTML, like Gecko)"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Referer": "https://www.google.com/"
         },
         "nocheckcertificate": True,
         "no_warnings": True,
         "quiet": False
     }
-
-    cookie = active_cookie_path or find_manual_cookie_file()
-    if cookie and os.path.isfile(cookie):
-        ydl_opts["cookiefile"] = cookie
 
     return ydl_opts
 
@@ -104,48 +116,39 @@ def download_video(
     # Build strategies without cookiesfrombrowser:
     strategies: List[Tuple[str, Dict[str, Any]]] = []
 
-    # 1. Primary Strategy: TV Embedded / Creator (100% login-free, no GVS PO Token required)
-    opts_tv: Dict[str, Any] = {
-        "outtmpl": out_template,
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "merge_output_format": "mp4",
-        "ffmpeg_location": ffmpeg_bin,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["tv_embedded", "creator"],
-                "player_skip": ["webpage", "configs"]
-            }
-        },
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (PlayStation 4 9.00) AppleWebKit/537.78 (KHTML, like Gecko)"
-        },
-        "nocheckcertificate": True,
-        "no_warnings": True,
-        "quiet": False,
-        "progress_hooks": [progress_hook],
-        "ignoreerrors": False,
-        "extract_flat": False,
-    }
+    # 1. If cookies.txt is provided, prioritize Web Client with cookies
     if active_cookie and os.path.isfile(active_cookie):
-        opts_tv["cookiefile"] = active_cookie
-        strategies.append(("TV Embedded / Creator (dengan cookies.txt)", opts_tv))
-    else:
-        strategies.append(("TV Embedded / Creator (Bebas Login)", opts_tv))
+        opts_cookie: Dict[str, Any] = {
+            "outtmpl": out_template,
+            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "merge_output_format": "mp4",
+            "ffmpeg_location": ffmpeg_bin,
+            "cookiefile": active_cookie,
+            "nocheckcertificate": True,
+            "no_warnings": True,
+            "quiet": False,
+            "progress_hooks": [progress_hook],
+            "ignoreerrors": False,
+            "extract_flat": False,
+        }
+        strategies.append(("Web Client (dengan cookies.txt)", opts_cookie))
 
-    # 2. Android + iOS Mobile Client Fallback
-    opts_mobile: Dict[str, Any] = {
+    # 2. Login-free android_vr / android Strategy (NO GVS PO Token required, NO error 152)
+    # Never include cookiefile with android/android_vr to avoid skipping warnings
+    opts_android_vr: Dict[str, Any] = {
         "outtmpl": out_template,
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
         "ffmpeg_location": ffmpeg_bin,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "ios"],
+                "player_client": ["android_vr", "android"],
                 "player_skip": ["webpage", "configs"]
             }
         },
         "http_headers": {
-            "User-Agent": "com.google.android.youtube/19.05.36 (Linux; U; Android 14; US) gzip"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Referer": "https://www.google.com/"
         },
         "nocheckcertificate": True,
         "no_warnings": True,
@@ -154,9 +157,7 @@ def download_video(
         "ignoreerrors": False,
         "extract_flat": False,
     }
-    if active_cookie and os.path.isfile(active_cookie):
-        opts_mobile["cookiefile"] = active_cookie
-    strategies.append(("Android/iOS Mobile Client", opts_mobile))
+    strategies.append(("Android VR / Android (Bebas Login)", opts_android_vr))
 
     # 3. Android + Web Client fallback
     opts_web: Dict[str, Any] = {
@@ -176,8 +177,6 @@ def download_video(
         "ignoreerrors": False,
         "extract_flat": False,
     }
-    if active_cookie and os.path.isfile(active_cookie):
-        opts_web["cookiefile"] = active_cookie
     strategies.append(("Android/Web Client", opts_web))
 
     last_error: Optional[Exception] = None
@@ -217,5 +216,6 @@ def download_video(
         "menggunakan ekstensi 'Get cookies.txt LOCALLY' lalu muat lewat tombol 'Import cookies.txt'."
     )
     if last_error:
-        raise RuntimeError(f"Gagal mengunduh video: {str(last_error)}\n{bot_msg}") from last_error
+        cleaned_err = clean_error_message(str(last_error))
+        raise RuntimeError(f"Gagal mengunduh video: {cleaned_err}\n{bot_msg}") from last_error
     raise RuntimeError(f"Gagal mengunduh video setelah mencoba seluruh strategi yt-dlp.\n{bot_msg}")

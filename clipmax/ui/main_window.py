@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 from clipmax.config import AppConfig
 from clipmax.ai_gateway import discover_models
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
-from clipmax.downloader import is_valid_video_url
+from clipmax.downloader import is_valid_video_url, clean_error_message
 
 class PipelineWorker(QThread):
     progress_changed = Signal(str, int, str)
@@ -956,7 +956,8 @@ class MainWindow(QMainWindow):
         self.btn_cancel.setVisible(False)
         self.stage_stack.setCurrentIndex(0)
 
-        err_lower = error.lower()
+        cleaned_err = clean_error_message(error)
+        err_lower = cleaned_err.lower()
         if "bot" in err_lower or "sign in" in err_lower or "cookies" in err_lower:
             QMessageBox.critical(
                 self,
@@ -965,7 +966,7 @@ class MainWindow(QMainWindow):
                 "menggunakan ekstensi 'Get cookies.txt LOCALLY' lalu muat lewat tombol 'Import cookies.txt'."
             )
         else:
-            QMessageBox.critical(self, "Pipeline Error", f"Pipeline execution failed:\n{error}")
+            QMessageBox.critical(self, "Pipeline Error", f"Pipeline execution failed:\n{cleaned_err}")
 
     def _populate_review_workspace(self):
         for c in self.card_widgets:
