@@ -18,43 +18,99 @@ class SceneSegment(BaseModel):
     mode: str              # "CROP_TRACKING" or "BLURRED_BACKGROUND"
     crop_x: str            # dynamic expression or static number
 
+def cluster_face_anchors(all_cx: List[float], min_dist: float = 250.0) -> List[float]:
+    """
+    Groups face X-coordinates into discrete anchor clusters for multi-person podcasts.
+    Returns the sorted average X position for each identified speaker.
+    """
+    if not all_cx:
+        return []
+    xs = sorted(all_cx)
+    clusters = []
+    current_cluster = [xs[0]]
+    for x in xs[1:]:
+        if x - np.mean(current_cluster) < min_dist:
+            current_cluster.append(x)
+        else:
+            clusters.append(current_cluster)
+            current_cluster = [x]
+    clusters.append(current_cluster)
+
+    min_count = max(3, int(0.04 * len(all_cx)))
+    anchors = []
+    for cl in clusters:
+        if len(cl) >= min_count:
+            anchors.append(float(np.mean(cl)))
+    return sorted(anchors)
+
 class ActiveSpeakerTracker:
     """
-    Tracks multiple faces across time in multi-person videos (e.g., podcasts)
-    and switches camera target X-center to the active speaker based on
-    Mouth Aspect Ratio (MAR) variation over a 1.0-second sliding window,
-    with 1.0-second continuous activity hysteresis to eliminate jitter.
+    Shot-Locking Switcher for multi-person podcast reframing (OpusClip style):
+    - Clusters face positions into fixed anchor points (e.g. x1, x2).
+    - Active speaker detected by Mouth Aspect Ratio (MAR) variation over a 1.5s sliding window.
+    - Cooldown / Shot Hold Time: locks camera on current speaker for at least 2.5s (prevents jitter).
+    - Discrete camera switching (Hard Cut) between fixed anchors.
     """
-    def __init__(self, switch_threshold_sec: float = 1.0, window_sec: float = 1.0):
+    def __init__(
+        self,
+        anchors: Optional[List[float]] = None,
+        switch_threshold_sec: float = 1.0,
+        window_sec: float = 1.5,
+        min_hold_sec: float = 2.5,
+        mar_threshold: float = 0.02
+    ):
+        self.anchors = sorted(anchors) if anchors else []
         self.switch_threshold_sec = switch_threshold_sec
         self.window_sec = window_sec
+        self.min_hold_sec = min_hold_sec
+        self.mar_threshold = mar_threshold
+
         self.history: Dict[str, List[Tuple[float, float, float]]] = {}  # pid -> [(timestamp, mar, cx)]
+        self.anchor_points: Dict[str, float] = {}  # pid -> anchor cx
         self.active_person_id: Optional[str] = None
+        self.last_switch_time: float = 0.0
         self.candidate_person_id: Optional[str] = None
         self.candidate_active_time: float = 0.0
 
     def match_person(self, cx: float, max_dist: float = 250.0) -> str:
+        # Match to pre-defined anchors if available
+        if self.anchors:
+            dists = [abs(cx - a) for a in self.anchors]
+            best_idx = int(np.argmin(dists))
+            pid = f"person_{best_idx}"
+            self.anchor_points[pid] = self.anchors[best_idx]
+            if pid not in self.history:
+                self.history[pid] = []
+            return pid
+
+        # Otherwise match to existing tracked person clusters
         best_id = None
         min_d = float("inf")
         for pid, records in self.history.items():
             if records:
-                last_cx = records[-1][2]
-                d = abs(cx - last_cx)
+                anchor = self.anchor_points.get(pid, records[-1][2])
+                d = abs(cx - anchor)
                 if d < min_d and d < max_dist:
                     min_d = d
                     best_id = pid
+
         if best_id is None:
             best_id = f"person_{len(self.history)}"
             self.history[best_id] = []
+            self.anchor_points[best_id] = cx
+        else:
+            all_cxs = [r[2] for r in self.history[best_id]] + [cx]
+            self.anchor_points[best_id] = float(np.mean(all_cxs))
+
         return best_id
 
     def update(self, timestamp: float, detected_faces: List[Tuple[float, float]]) -> Optional[float]:
         """
         detected_faces: List of tuples (cx, mar)
-        Returns the target X position of the active speaker.
+        Returns the discrete target X position of the active speaker.
         """
         if not detected_faces:
-            return None
+            return self.anchor_points.get(self.active_person_id) if self.active_person_id else None
 
         current_frame_pids = []
         for cx, mar in detected_faces:
@@ -62,50 +118,61 @@ class ActiveSpeakerTracker:
             current_frame_pids.append(pid)
             self.history[pid].append((timestamp, mar, cx))
 
-        # Prune history older than window_sec
+        # Prune history older than window_sec (1.5s)
         cutoff = timestamp - self.window_sec
         for pid in list(self.history.keys()):
             self.history[pid] = [r for r in self.history[pid] if r[0] >= cutoff]
 
-        if self.active_person_id is None or self.active_person_id not in current_frame_pids:
+        if self.active_person_id is None or self.active_person_id not in self.anchor_points:
             self.active_person_id = current_frame_pids[0]
+            self.last_switch_time = timestamp
 
-        if len(current_frame_pids) == 1:
+        # Single person observed
+        if len(self.anchor_points) <= 1:
             self.active_person_id = current_frame_pids[0]
             self.candidate_person_id = None
             self.candidate_active_time = 0.0
-            return self.history[self.active_person_id][-1][2]
+            return self.anchor_points[self.active_person_id]
 
-        # Multi-person detected: compute MAR variation over the 1-second window
+        # Multi-person: compute mouth activity (MAR variation / delta) over 1.5s window
         scores = {}
-        for pid in current_frame_pids:
-            mars = [r[1] for r in self.history[pid]]
-            if len(mars) >= 2:
-                # Active speech exhibits high variance in lip opening (talking cadence)
+        for pid in self.anchor_points:
+            records = self.history.get(pid, [])
+            if len(records) >= 2:
+                mars = [r[1] for r in records]
                 scores[pid] = float(np.std(mars))
             else:
                 scores[pid] = 0.0
 
         top_speaker_id = max(scores, key=scores.get)
+        top_score = scores[top_speaker_id]
+        current_score = scores.get(self.active_person_id, 0.0)
 
-        # Hysteresis & Anti-Jitter Switching:
-        # Only switch focus if the candidate's speech variation is significant and lasts >= switch_threshold_sec
-        if top_speaker_id != self.active_person_id and scores[top_speaker_id] > 0.015:
+        time_since_switch = timestamp - self.last_switch_time
+
+        # Cooldown / Shot-Locking rule:
+        # Sekali kamera mengunci ke Orang A, kamera DILARANG berpindah selama minimal min_hold_sec (2.5s)
+        if top_speaker_id != self.active_person_id and top_score >= self.mar_threshold:
             if top_speaker_id == self.candidate_person_id:
                 dt = timestamp - (self.history[top_speaker_id][-2][0] if len(self.history[top_speaker_id]) >= 2 else timestamp)
-                self.candidate_active_time += dt
-                if self.candidate_active_time >= self.switch_threshold_sec:
-                    self.active_person_id = top_speaker_id
-                    self.candidate_person_id = None
-                    self.candidate_active_time = 0.0
+                self.candidate_active_time += max(0.01, dt)
             else:
                 self.candidate_person_id = top_speaker_id
+                self.candidate_active_time = 0.0
+
+            # Switch only if cooldown passed AND candidate has been speaking consistently
+            if (time_since_switch >= self.min_hold_sec and
+                self.candidate_active_time >= self.switch_threshold_sec and
+                top_score > current_score + 0.005):
+                self.active_person_id = top_speaker_id
+                self.last_switch_time = timestamp
+                self.candidate_person_id = None
                 self.candidate_active_time = 0.0
         else:
             self.candidate_person_id = None
             self.candidate_active_time = 0.0
 
-        return self.history[self.active_person_id][-1][2]
+        return self.anchor_points[self.active_person_id]
 
 def calculate_crop_box(
     frame_width: int,
@@ -140,8 +207,15 @@ def smooth_ema_series(values: List[float], alpha: float = 0.1) -> List[float]:
 def build_dynamic_crop_expression(
     values: List[float],
     timestamps: List[float],
-    max_x: int = 1312
+    max_x: int = 1312,
+    discrete: bool = False,
+    visual_cuts: Optional[List[float]] = None
 ) -> str:
+    """
+    Builds FFmpeg crop X filter expression.
+    - discrete=True: Generates discrete step function (HARD CUT) between speakers with no panning.
+    - discrete=False: Generates piecewise linear continuous motion for single speakers.
+    """
     if not values:
         return str(max_x // 2)
 
@@ -149,29 +223,56 @@ def build_dynamic_crop_expression(
     if max(values) - min(values) < 8.0 or len(values) == 1:
         return str(int(round(values[0])))
 
-    # Subsample to at most ~30 keypoints (~1 per second) for a concise, efficient FFmpeg expression
-    if len(values) > 35:
-        step = max(1, len(values) // 30)
-        sub_values = values[::step]
-        sub_times = timestamps[::step]
-        if sub_times[-1] != timestamps[-1]:
-            sub_values.append(values[-1])
-            sub_times.append(timestamps[-1])
+    if discrete:
+        # Shot-Locking Switcher: discrete step function (Hard Cuts)
+        blocks = []
+        cur_val = values[0]
+        cur_start = timestamps[0]
+        for v, t in zip(values[1:], timestamps[1:]):
+            if abs(v - cur_val) >= 2.0:
+                t_cut = t
+                if visual_cuts:
+                    nearby = [c for c in visual_cuts if abs(c - t) <= 0.6]
+                    if nearby:
+                        t_cut = min(nearby, key=lambda c: abs(c - t))
+                blocks.append((cur_start, t_cut, int(round(cur_val))))
+                cur_val = v
+                cur_start = t_cut
+        blocks.append((cur_start, timestamps[-1], int(round(cur_val))))
+
+        if len(blocks) == 1:
+            return str(blocks[0][2])
+
+        expr = str(blocks[-1][2])
+        for i in range(len(blocks) - 2, -1, -1):
+            t_end = blocks[i][1]
+            val = blocks[i][2]
+            expr = f"if(lt(t,{t_end:.2f}),{val},{expr})"
+        return f"max(0,min({max_x},{expr}))"
     else:
-        sub_values = values
-        sub_times = timestamps
+        # Subsample to at most ~30 keypoints (~1 per second) for a concise, efficient FFmpeg expression
+        if len(values) > 35:
+            step = max(1, len(values) // 30)
+            sub_values = values[::step]
+            sub_times = timestamps[::step]
+            if sub_times[-1] != timestamps[-1]:
+                sub_values.append(values[-1])
+                sub_times.append(timestamps[-1])
+        else:
+            sub_values = values
+            sub_times = timestamps
 
-    expr = str(int(round(sub_values[-1])))
-    for i in range(len(sub_values) - 2, -1, -1):
-        t_start = sub_times[i]
-        t_end = sub_times[i + 1]
-        x0 = int(round(sub_values[i]))
-        x1 = int(round(sub_values[i + 1]))
-        dt = max(0.01, t_end - t_start)
-        piece = f"({x0}+({x1}-{x0})*(t-{t_start:.2f})/{dt:.2f})"
-        expr = f"if(lt(t,{t_end:.2f}),{piece},{expr})"
+        expr = str(int(round(sub_values[-1])))
+        for i in range(len(sub_values) - 2, -1, -1):
+            t_start = sub_times[i]
+            t_end = sub_times[i + 1]
+            x0 = int(round(sub_values[i]))
+            x1 = int(round(sub_values[i + 1]))
+            dt = max(0.01, t_end - t_start)
+            piece = f"({x0}+({x1}-{x0})*(t-{t_start:.2f})/{dt:.2f})"
+            expr = f"if(lt(t,{t_end:.2f}),{piece},{expr})"
 
-    return f"max(0,min({max_x},{expr}))"
+        return f"max(0,min({max_x},{expr}))"
 
 def get_face_detector_model() -> Optional[str]:
     project_root = Path(__file__).resolve().parent.parent
@@ -360,14 +461,19 @@ def segment_clip_scenes(
 
     default_center = width / 2.0
     last_center = default_center
-    speaker_tracker = ActiveSpeakerTracker(switch_threshold_sec=1.0, window_sec=1.0)
+    speaker_tracker = ActiveSpeakerTracker(
+        window_sec=1.5,
+        min_hold_sec=2.5,
+        switch_threshold_sec=1.0
+    )
 
     raw_samples: List[Tuple[float, bool, float]] = []
+    all_detected_cx: List[float] = []
     visual_cuts: List[float] = []
     prev_gray = None
     cut_diff_threshold = 28.0
 
-    min_face_area = 0.015 * (detect_w * detect_h)  # >= 1.5% frame area (excludes small corner webcams)
+    min_face_area = 0.015 * (detect_w * detect_h)  # >= 1.5% frame area
 
     frame_idx = 0
     current_frame = start_frame
@@ -392,7 +498,7 @@ def segment_clip_scenes(
                         visual_cuts.append(t_rel)
                 prev_gray = gray
 
-                # 1. MediaPipe FaceLandmarker for Multi-Face & Lip Movement (MAR) Active Speaker Tracking
+                # 1. MediaPipe FaceLandmarker for Multi-Face & Lip Movement (MAR)
                 if landmarker is not None:
                     try:
                         import mediapipe as mp
@@ -402,14 +508,12 @@ def segment_clip_scenes(
                         if res.face_landmarks and len(res.face_landmarks) > 0:
                             face_candidates = []
                             for landmarks in res.face_landmarks:
-                                # Inner lip vertical distance (indices 13, 14)
                                 lip_dist = abs(landmarks[14].y - landmarks[13].y)
-                                # Mouth corners horizontal distance (indices 61, 291)
                                 lip_w = max(1e-5, abs(landmarks[291].x - landmarks[61].x))
                                 mar = float(lip_dist / lip_w)
-                                # Horizontal center of face scaled to original video width
                                 cx = float(np.mean([lm.x for lm in landmarks]) * width)
                                 face_candidates.append((cx, mar))
+                                all_detected_cx.append(cx)
 
                             if face_candidates:
                                 face_found = True
@@ -434,9 +538,14 @@ def segment_clip_scenes(
 
                             if valid_faces:
                                 face_found = True
-                                best_face = max(valid_faces, key=lambda x: x[0])[1]
-                                cx_small = float(best_face[0] + best_face[2] / 2.0)
-                                last_center = cx_small * scale_x
+                                cand = []
+                                for vf in valid_faces:
+                                    fcx = float(vf[1][0] + vf[1][2] / 2.0) * scale_x
+                                    cand.append((fcx, 0.0))
+                                    all_detected_cx.append(fcx)
+                                active_cx = speaker_tracker.update(t_rel, cand)
+                                if active_cx is not None:
+                                    last_center = active_cx
                     except Exception:
                         pass
 
@@ -457,6 +566,12 @@ def segment_clip_scenes(
             )
         ]
 
+    # Detect if scene is multi-speaker podcast (>= 2 distinct face clusters)
+    anchors = cluster_face_anchors(all_detected_cx, min_dist=250.0)
+    is_multi_speaker = len(anchors) >= 2 or len(speaker_tracker.anchor_points) >= 2
+    if is_multi_speaker and not anchors:
+        anchors = sorted(speaker_tracker.anchor_points.values())
+
     # Merge into stable scene intervals with visual cut snapping and padding
     chunks = merge_scene_intervals(
         raw_samples,
@@ -475,12 +590,31 @@ def segment_clip_scenes(
 
         if c["mode"] == "CROP_TRACKING":
             faces = c["faces"] if c["faces"] else [default_center]
-            smoothed = smooth_ema_series(faces, alpha=0.1)
-            crop_positions = [float(calculate_crop_box(width, height, fx)[0]) for fx in smoothed]
             dur_sc = max(0.01, s_end - s_start)
-            dt = dur_sc / max(1, len(crop_positions) - 1)
-            timestamps = [k * dt for k in range(len(crop_positions))]
-            crop_expr = build_dynamic_crop_expression(crop_positions, timestamps, max_x=max_crop_x)
+
+            if is_multi_speaker and len(anchors) >= 2:
+                # Shot-Locking Switcher: Snap to discrete anchor points, Hard Cut transitions (no panning)
+                discrete_faces = []
+                for fx in faces:
+                    best_a = min(anchors, key=lambda a: abs(fx - a))
+                    discrete_faces.append(best_a)
+
+                crop_positions = [float(calculate_crop_box(width, height, a)[0]) for a in discrete_faces]
+                dt = dur_sc / max(1, len(crop_positions) - 1)
+                timestamps = [k * dt for k in range(len(crop_positions))]
+                crop_expr = build_dynamic_crop_expression(
+                    crop_positions, timestamps, max_x=max_crop_x, discrete=True, visual_cuts=visual_cuts
+                )
+            else:
+                # Single speaker: smooth EMA continuous tracking
+                smoothed = smooth_ema_series(faces, alpha=0.1)
+                crop_positions = [float(calculate_crop_box(width, height, fx)[0]) for fx in smoothed]
+                dt = dur_sc / max(1, len(crop_positions) - 1)
+                timestamps = [k * dt for k in range(len(crop_positions))]
+                crop_expr = build_dynamic_crop_expression(
+                    crop_positions, timestamps, max_x=max_crop_x, discrete=False
+                )
+
             scenes.append(
                 SceneSegment(
                     start_time=s_start,

@@ -19,12 +19,13 @@ def test_auto_update_ytdlp():
         assert auto_update_ytdlp() is True
 
 def test_get_ydl_options_structure():
-    opts = get_ydl_options("temp/out.mp4")
-    assert "format" in opts
-    assert "outtmpl" in opts
-    assert "cookiesfrombrowser" not in opts
-    assert opts["extractor_args"]["youtube"]["player_client"] == ["android", "ios"]
-    assert "com.google.android.youtube" in opts["http_headers"]["User-Agent"]
+    with patch("clipmax.downloader.find_manual_cookie_file", return_value=None):
+        opts = get_ydl_options("temp/out.mp4")
+        assert "format" in opts
+        assert "outtmpl" in opts
+        assert "cookiesfrombrowser" not in opts
+        assert opts["extractor_args"]["youtube"]["player_client"] == ["android", "ios"]
+        assert "com.google.android.youtube" in opts["http_headers"]["User-Agent"]
 
 def test_find_manual_cookie_file(tmp_path):
     cookie_txt = tmp_path / "cookies.txt"

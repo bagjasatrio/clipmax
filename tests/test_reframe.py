@@ -10,11 +10,20 @@ from clipmax.reframe import (
     segment_clip_scenes,
     SceneSegment,
     ActiveSpeakerTracker,
+    cluster_face_anchors,
     get_face_landmarker
 )
 
+def test_cluster_face_anchors():
+    # 2 persons: left sitting at ~440-460, right sitting at ~1460-1490
+    cxs = [440.0, 450.0, 460.0, 445.0, 455.0] * 10 + [1460.0, 1475.0, 1490.0, 1480.0] * 10
+    anchors = cluster_face_anchors(cxs, min_dist=250.0)
+    assert len(anchors) == 2
+    assert abs(anchors[0] - 450.0) < 10.0
+    assert abs(anchors[1] - 1476.0) < 15.0
+
 def test_active_speaker_tracker_multi_face_hysteresis():
-    tracker = ActiveSpeakerTracker(switch_threshold_sec=1.0, window_sec=1.0)
+    tracker = ActiveSpeakerTracker(switch_threshold_sec=1.0, window_sec=1.0, min_hold_sec=2.5)
     # Person 1 (cx=400, left), Person 2 (cx=1500, right)
 
     # 0s to 3s: Person 1 speaking (MAR varying 0.15 - 0.45), Person 2 silent (MAR=0.15)
@@ -46,11 +55,27 @@ def test_active_speaker_tracker_multi_face_hysteresis():
     assert tracker.active_person_id == "person_1"
     assert cx == 1500.0
 
+def test_active_speaker_cooldown_locking():
+    # Once locked to Person 0, camera CANNOT switch to Person 1 for at least 2.5s
+    tracker = ActiveSpeakerTracker(min_hold_sec=2.5, switch_threshold_sec=0.8)
+    for step in range(25):  # 0.0s to 5.0s in 0.2s steps
+        t = step * 0.2
+        # Person 0 active for 0.4s
+        mar_0 = 0.35 if t < 0.4 else 0.15
+        # Person 1 active starting at t=0.6s
+        mar_1 = 0.15 if t < 0.6 else (0.35 + 0.15 * (1 if step % 2 == 0 else -1))
+        cx = tracker.update(t, [(400.0, mar_0), (1500.0, mar_1)])
+        if t < 2.5:
+            # During the 2.5s cooldown period, camera MUST stay locked on Person 0
+            assert cx == 400.0
+        elif t >= 2.6:
+            # Cooldown passed and Person 1 spoke consistently -> hard switch
+            assert cx == 1500.0
+
 def test_active_speaker_tracker_single_person():
     tracker = ActiveSpeakerTracker()
     cx = tracker.update(1.0, [(600.0, 0.25)])
     assert cx == 600.0
-
 
 def test_calculate_crop_box_center():
     x_crop, crop_w, crop_h = calculate_crop_box(
@@ -83,7 +108,6 @@ def test_smooth_ema_series():
     smoothed = smooth_ema_series(raw_series, alpha=0.1)
     assert len(smoothed) == len(raw_series)
     assert smoothed[0] == 100.0
-    # With alpha=0.1, jump from 100 to 500 moves to 140
     assert abs(smoothed[2] - 140.0) < 1.0
 
 def test_build_dynamic_crop_expression_static():
@@ -100,10 +124,18 @@ def test_build_dynamic_crop_expression_moving():
     assert "if(lt(t,2.00)" in expr
     assert "max(0,min(1312" in expr
 
+def test_build_dynamic_crop_expression_discrete_hard_cut():
+    # Discrete multi-person switcher: must create a step function (Hard Cut), no linear pan
+    vals = [146.0, 146.0, 146.0, 1176.0, 1176.0, 1176.0]
+    times = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+    cuts = [2.9]
+    expr = build_dynamic_crop_expression(vals, times, discrete=True, visual_cuts=cuts)
+    # Snapped to cut at 2.90s
+    assert "if(lt(t,2.90),146,1176)" in expr
+    # No linear interpolator term
+    assert "(t-" not in expr
+
 def test_merge_scene_intervals_anti_micro_cut():
-    # 0-10s: face
-    # 10-11.2s: short 1.2s screen share switch (under 1.8s threshold)
-    # 11.2-20s: face
     samples = []
     for s in range(21):
         if s == 10:
@@ -112,16 +144,12 @@ def test_merge_scene_intervals_anti_micro_cut():
             samples.append((float(s), True, 600.0))
 
     segments = merge_scene_intervals(samples, min_scene_sec=1.8, clip_duration=20.0, padding_sec=0.0)
-    # The 1s micro-cut must be completely absorbed
     assert len(segments) == 1
     assert segments[0]["mode"] == "CROP_TRACKING"
     assert segments[0]["start"] == 0.0
     assert segments[0]["end"] == 20.0
 
 def test_merge_scene_intervals_visual_cut_snapping_and_padding():
-    # 0-10s: face
-    # 10-25s: screen share
-    # 25-30s: face
     samples = []
     for s in range(31):
         if 0 <= s < 10 or 25 <= s <= 30:
@@ -138,15 +166,10 @@ def test_merge_scene_intervals_visual_cut_snapping_and_padding():
         padding_sec=0.2
     )
     assert len(segments) == 3
-    # Seg 0 is CROP_TRACKING: snapped to 9.8s + 0.2s padding = 10.00s
     assert segments[0]["mode"] == "CROP_TRACKING"
     assert abs(segments[0]["end"] - 10.00) < 0.05
-
-    # Seg 1 is BLURRED_BACKGROUND: starts at 10.0s, ends where next CROP starts (24.9 - 0.2 = 24.7s)
     assert segments[1]["mode"] == "BLURRED_BACKGROUND"
     assert abs(segments[1]["end"] - 24.70) < 0.05
-
-    # Seg 2 is CROP_TRACKING: starts with 0.2s padding before visual cut at 24.9s
     assert segments[2]["mode"] == "CROP_TRACKING"
     assert abs(segments[2]["start"] - 24.70) < 0.05
     assert segments[2]["end"] == 30.0
@@ -171,7 +194,6 @@ def test_segment_clip_scenes_execution_no_nameerror(tmp_path):
         "-c:v", "h264_nvenc", str(vid_file)
     ], capture_output=True)
 
-    # Calling with standard positional args without specifying padding_sec explicitly
     scenes = segment_clip_scenes(str(vid_file), 0.0, 2.0)
     assert len(scenes) >= 1
     assert scenes[0].mode in ("CROP_TRACKING", "BLURRED_BACKGROUND")
