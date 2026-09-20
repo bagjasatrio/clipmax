@@ -101,6 +101,9 @@ def merge_scene_intervals(
     if not raw_samples:
         return []
 
+    if padding_sec is None:
+        padding_sec = 0.2
+
     if visual_cuts is None:
         visual_cuts = []
 
@@ -198,8 +201,11 @@ def segment_clip_scenes(
     clip_end: float,
     sample_step: int = 6,
     detect_width: int = 640,
-    min_scene_sec: float = 2.0
+    min_scene_sec: float = 2.0,
+    padding_sec: float = 0.2
 ) -> List[SceneSegment]:
+    if padding_sec is None:
+        padding_sec = 0.2
     clip_dur = max(0.1, clip_end - clip_start)
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():

@@ -121,6 +121,20 @@ def test_detect_face_centers_file_not_found():
     assert centers == [960.0]
     assert strategy == ReframeStrategy.BLURRED_BACKGROUND
 
+def test_segment_clip_scenes_execution_no_nameerror(tmp_path):
+    import subprocess
+    vid_file = tmp_path / "test_run.mp4"
+    subprocess.run([
+        "./bin/ffmpeg.exe", "-y",
+        "-f", "lavfi", "-i", "testsrc=duration=2:size=640x360:rate=30",
+        "-c:v", "h264_nvenc", str(vid_file)
+    ], capture_output=True)
+
+    # Calling with standard positional args without specifying padding_sec explicitly
+    scenes = segment_clip_scenes(str(vid_file), 0.0, 2.0)
+    assert len(scenes) >= 1
+    assert scenes[0].mode in ("CROP_TRACKING", "BLURRED_BACKGROUND")
+
 def test_reframe_strategies_enum():
     assert ReframeStrategy.CROP_TRACKING.value == "CROP_TRACKING"
     assert ReframeStrategy.BLURRED_BACKGROUND.value == "BLURRED_BACKGROUND"
