@@ -1,7 +1,13 @@
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from clipmax.downloader import download_video, is_valid_video_url, auto_update_ytdlp, get_ydl_options
+from clipmax.downloader import (
+    download_video,
+    is_valid_video_url,
+    auto_update_ytdlp,
+    get_ydl_options,
+    find_manual_cookie_file
+)
 
 def test_download_video_invalid_url():
     with pytest.raises(ValueError, match="Invalid URL"):
@@ -16,36 +22,44 @@ def test_get_ydl_options_structure():
     opts = get_ydl_options("temp/out.mp4")
     assert "format" in opts
     assert "outtmpl" in opts
-    assert ("cookiesfrombrowser" in opts) or ("extractor_args" in opts)
+    assert "cookiesfrombrowser" not in opts
+    assert opts["extractor_args"]["youtube"]["player_client"] == ["android", "ios"]
+    assert "com.google.android.youtube" in opts["http_headers"]["User-Agent"]
 
-def test_download_video_browser_cookie_and_fallback(tmp_path):
+def test_find_manual_cookie_file(tmp_path):
+    cookie_txt = tmp_path / "cookies.txt"
+    cookie_txt.write_text("# Netscape HTTP Cookie File\n")
+    with patch("clipmax.downloader.Path.home", return_value=tmp_path):
+        found = find_manual_cookie_file()
+        assert found is not None
+        assert "cookies.txt" in found
+
+def test_download_video_mobile_client_success(tmp_path):
     fake_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     out_dir = tmp_path / "downloads"
     out_dir.mkdir(parents=True, exist_ok=True)
     simulated_file = out_dir / "yt_download_dQw4w9WgXcQ.mp4"
     simulated_file.touch()
 
-    # Simulate: first 2 attempts (browser cookies) throw "Database locked" / DPAPI error,
-    # then 3rd attempt succeeds
-    call_count = [0]
-
-    def fake_ydl_enter(self):
-        call_count[0] += 1
-        if call_count[0] <= 2:
-            raise RuntimeError("Database locked by running browser")
+    with patch("yt_dlp.YoutubeDL") as mock_ydl_cls, patch("clipmax.downloader.auto_update_ytdlp"):
         mock_ydl = MagicMock()
         mock_ydl.extract_info.return_value = {
             "id": "dQw4w9WgXcQ",
             "ext": "mp4"
         }
         mock_ydl.prepare_filename.return_value = str(simulated_file)
-        return mock_ydl
-
-    with patch("yt_dlp.YoutubeDL") as mock_ydl_cls, patch("clipmax.downloader.auto_update_ytdlp"):
-        mock_ydl_cls.return_value.__enter__ = fake_ydl_enter
-        mock_ydl_cls.return_value.__exit__ = MagicMock()
+        mock_ydl_cls.return_value.__enter__.return_value = mock_ydl
 
         result = download_video(fake_url, str(out_dir))
         assert Path(result).exists()
         assert "dQw4w9WgXcQ" in result
-        assert call_count[0] >= 3
+
+def test_download_video_failure_includes_tips(tmp_path):
+    fake_url = "https://www.youtube.com/watch?v=invalid_id"
+    out_dir = tmp_path / "downloads"
+
+    with patch("yt_dlp.YoutubeDL") as mock_ydl_cls, patch("clipmax.downloader.auto_update_ytdlp"):
+        mock_ydl_cls.return_value.__enter__.side_effect = RuntimeError("Sign in to confirm you're not a bot")
+        with pytest.raises(RuntimeError) as excinfo:
+            download_video(fake_url, str(out_dir))
+        assert "Tips: Jika YouTube memblokir IP" in str(excinfo.value)
