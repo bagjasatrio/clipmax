@@ -231,3 +231,31 @@ def test_segment_clip_scenes_execution_no_nameerror(tmp_path):
 def test_reframe_strategies_enum():
     assert ReframeStrategy.CROP_TRACKING.value == "CROP_TRACKING"
     assert ReframeStrategy.BLURRED_BACKGROUND.value == "BLURRED_BACKGROUND"
+
+def test_face_validation_size_and_confidence_filter():
+    # Icons / logos on slide with h_norm < 0.12 (8% screen height) or low confidence must be ignored
+    slide_icons = [[{"x_center": 0.50, "h_norm": 0.08, "score": 0.90}]] * 10
+    assert determine_segment_layout(slide_icons) == "BLURRED_BACKGROUND"
+
+    low_conf = [[{"x_center": 0.50, "h_norm": 0.20, "score": 0.40}]] * 10
+    assert determine_segment_layout(low_conf) == "BLURRED_BACKGROUND"
+
+    # Valid solo face with h_norm >= 0.12 and score >= 0.55
+    valid_solo = [[{"x_center": 0.50, "h_norm": 0.20, "score": 0.85}]] * 10
+    assert determine_segment_layout(valid_solo) == "CROP_9_16"
+
+def test_robust_scene_ratio_voting_slide():
+    # When faces are only detected in 2 out of 10 sampled frames (face_ratio = 0.20 < 0.35)
+    # the system recognizes it as a slide / screen share and locks to BLURRED_BACKGROUND
+    sparse_faces = (
+        [[{"x_center": 0.50, "h_norm": 0.20, "score": 0.80}]] * 2 +
+        [[]] * 8
+    )
+    assert determine_segment_layout(sparse_faces) == "BLURRED_BACKGROUND"
+
+def test_detect_visual_shots_py_scenedetect():
+    from clipmax.reframe import detect_visual_shots
+    # Test with non-existent or synthetic video
+    shots = detect_visual_shots("non_existent.mp4", 0.0, 10.0)
+    assert len(shots) == 1
+    assert shots[0] == (0.0, 10.0)
