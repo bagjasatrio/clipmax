@@ -31,7 +31,8 @@ class PipelineWorker(QThread):
         target_clip_count: int = 3,
         min_duration: float = 30.0,
         max_duration: float = 60.0,
-        campaign_rules: str = ""
+        campaign_rules: str = "",
+        cookie_file: Optional[str] = None
     ):
         super().__init__()
         self.orchestrator = orchestrator
@@ -40,6 +41,7 @@ class PipelineWorker(QThread):
         self.min_duration = min_duration
         self.max_duration = max_duration
         self.campaign_rules = campaign_rules
+        self.cookie_file = cookie_file
 
     def run(self):
         try:
@@ -52,7 +54,8 @@ class PipelineWorker(QThread):
                 target_clip_count=self.target_clip_count,
                 min_duration=self.min_duration,
                 max_duration=self.max_duration,
-                campaign_rules=self.campaign_rules
+                campaign_rules=self.campaign_rules,
+                cookie_file=self.cookie_file
             )
             self.finished.emit(clips)
         except Exception as e:
@@ -160,6 +163,7 @@ class MainWindow(QMainWindow):
         self.current_clips: List[ClipResult] = []
         self.selected_clip: Optional[ClipResult] = None
         self.card_widgets: List[ClipCardWidget] = []
+        self.active_cookie_path: Optional[str] = None
 
         # Video Player
         self.player = QMediaPlayer()
@@ -168,6 +172,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._setup_player_events()
+        self._auto_detect_cookies()
 
     def _build_ui(self):
         central = QWidget()
@@ -255,9 +260,27 @@ class MainWindow(QMainWindow):
         tab_url = QWidget()
         tu_layout = QVBoxLayout(tab_url)
         tu_layout.setContentsMargins(6, 6, 6, 6)
+        tu_layout.setSpacing(6)
         self.txt_url = QLineEdit()
         self.txt_url.setPlaceholderText("Paste YouTube / X / web video URL...")
         tu_layout.addWidget(self.txt_url)
+
+        # Cookie bar row
+        cookie_row = QHBoxLayout()
+        cookie_row.setSpacing(8)
+        self.btn_import_cookie = QPushButton("Import cookies.txt")
+        self.btn_import_cookie.setFixedHeight(32)
+        self.btn_import_cookie.setStyleSheet(
+            "background-color: transparent; border: 1px dashed #386FA4; font-size: 11px; padding: 4px 8px; color: #E6E9EE;"
+        )
+        self.btn_import_cookie.clicked.connect(self._on_import_cookies)
+
+        self.lbl_cookie_status = QLabel("No cookies loaded")
+        self.lbl_cookie_status.setStyleSheet("color: #8B949E; font-size: 11px;")
+        cookie_row.addWidget(self.btn_import_cookie)
+        cookie_row.addWidget(self.lbl_cookie_status)
+        cookie_row.addStretch()
+        tu_layout.addLayout(cookie_row)
 
         # Tab Local File
         tab_local = QWidget()
@@ -670,6 +693,38 @@ class MainWindow(QMainWindow):
                 self.spn_min_dur.setValue(60)
                 self.spn_max_dur.setValue(90)
 
+    def _auto_detect_cookies(self):
+        project_root = Path(__file__).resolve().parent.parent.parent
+        candidates = [
+            project_root / "cookies.txt",
+            Path(self.config.cookie_file) if self.config.cookie_file else None,
+            Path("cookies.txt")
+        ]
+        for c in candidates:
+            if c and c.exists() and c.is_file():
+                self.active_cookie_path = str(c.resolve())
+                self.lbl_cookie_status.setText("✓ cookies.txt active")
+                self.lbl_cookie_status.setStyleSheet("color: #4ADE80; font-size: 11px; font-weight: 600;")
+                break
+
+    def _on_import_cookies(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Import Netscape cookies.txt", "", "Netscape Cookie (*.txt);;All Files (*)"
+        )
+        if file_path:
+            try:
+                project_root = Path(__file__).resolve().parent.parent.parent
+                dest_file = project_root / "cookies.txt"
+                shutil.copy2(file_path, dest_file)
+                self.active_cookie_path = str(dest_file.resolve())
+                self.config.cookie_file = self.active_cookie_path
+                self.config.save()
+                self.lbl_cookie_status.setText("✓ cookies.txt active")
+                self.lbl_cookie_status.setStyleSheet("color: #4ADE80; font-size: 11px; font-weight: 600;")
+                QMessageBox.information(self, "Cookies Loaded", "File cookies.txt berhasil dimuat dan aktif.")
+            except Exception as e:
+                QMessageBox.warning(self, "Import Failed", f"Failed to import cookie file: {str(e)}")
+
     def _on_browse_video(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Source Video", "", "Video Files (*.mp4 *.mkv *.mov *.avi)"
@@ -732,7 +787,8 @@ class MainWindow(QMainWindow):
             target_clip_count=target_count,
             min_duration=min_dur,
             max_duration=max_dur,
-            campaign_rules=rules
+            campaign_rules=rules,
+            cookie_file=self.active_cookie_path
         )
         self.worker.progress_changed.connect(self._on_worker_progress)
         self.worker.finished.connect(self._on_worker_finished)
@@ -801,7 +857,17 @@ class MainWindow(QMainWindow):
         self.btn_start.setEnabled(True)
         self.btn_cancel.setVisible(False)
         self.stage_stack.setCurrentIndex(0)
-        QMessageBox.critical(self, "Pipeline Error", f"Pipeline execution failed:\n{error}")
+
+        err_lower = error.lower()
+        if "bot" in err_lower or "sign in" in err_lower or "cookies" in err_lower:
+            QMessageBox.critical(
+                self,
+                "Verifikasi Bot YouTube",
+                "YouTube meminta verifikasi bot. Silakan ekspor cookies YouTube dari browser "
+                "menggunakan ekstensi 'Get cookies.txt LOCALLY' lalu muat lewat tombol 'Import cookies.txt'."
+            )
+        else:
+            QMessageBox.critical(self, "Pipeline Error", f"Pipeline execution failed:\n{error}")
 
     def _populate_review_workspace(self):
         for c in self.card_widgets:

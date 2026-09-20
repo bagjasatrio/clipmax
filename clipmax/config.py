@@ -76,6 +76,7 @@ class AppConfig(BaseModel):
     min_duration: float = 30.0
     max_duration: float = 60.0
     campaign_rules: str = ""
+    cookie_file: Optional[str] = None
 
     @classmethod
     def load(cls, path: str = "config.json") -> "AppConfig":

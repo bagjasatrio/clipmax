@@ -38,44 +38,44 @@ def find_manual_cookie_file() -> Optional[str]:
             return str(p.resolve())
     return None
 
-def get_ydl_options(output_path: str) -> Dict[str, Any]:
+def get_ydl_options(output_path: str, active_cookie_path: Optional[str] = None) -> Dict[str, Any]:
     """
-    Returns robust yt-dlp options using Android & iOS clients and custom mobile user agent,
-    completely eliminating dependency on local browser cookie extraction (DPAPI/DB lock).
+    Returns yt-dlp options prioritizing active cookies.txt without any cookiesfrombrowser dependency.
     """
-    opts: Dict[str, Any] = {
+    ydl_opts: Dict[str, Any] = {
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "outtmpl": output_path,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "ios"],
-                "player_skip": ["webpage", "configs"]
-            }
-        },
-        "http_headers": {
-            "User-Agent": "com.google.android.youtube/19.05.36 (Linux; U; Android 14; US) gzip"
-        },
         "nocheckcertificate": True,
-        "ignoreerrors": False,
         "quiet": True,
         "no_warnings": True,
     }
 
-    cookie_file = find_manual_cookie_file()
-    if cookie_file:
-        opts["cookiefile"] = cookie_file
+    cookie = active_cookie_path or find_manual_cookie_file()
+    if cookie and os.path.isfile(cookie):
+        ydl_opts["cookiefile"] = cookie
+    else:
+        ydl_opts["extractor_args"] = {
+            "youtube": {
+                "player_client": ["android", "ios"],
+                "player_skip": ["webpage", "configs"]
+            }
+        }
+        ydl_opts["http_headers"] = {
+            "User-Agent": "com.google.android.youtube/19.05.36 (Linux; U; Android 14; US) gzip"
+        }
 
-    return opts
+    return ydl_opts
 
 def download_video(
     url: str,
     output_dir: str,
+    cookie_file: Optional[str] = None,
     cancel_event: Optional[threading.Event] = None,
     progress_callback: Optional[Callable[[int, str], None]] = None
 ) -> str:
     """
-    Downloads video with safe mobile client extraction (Android + iOS player) and manual cookie fallback.
-    Avoids cookiesfrombrowser to prevent DPAPI / database lock errors.
+    Downloads video using manual cookies.txt (if loaded) or mobile client anti-bot extraction.
+    Never calls cookiesfrombrowser to eliminate DPAPI decryption or database lock errors.
     """
     import yt_dlp
 
@@ -100,61 +100,99 @@ def download_video(
 
     ffmpeg_bin = get_ffmpeg_bin()
 
-    base_shared: Dict[str, Any] = {
-        "outtmpl": out_template,
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "merge_output_format": "mp4",
-        "ffmpeg_location": ffmpeg_bin,
-        "quiet": True,
-        "no_warnings": True,
-        "progress_hooks": [progress_hook],
-        "nocheckcertificate": True,
-        "ignoreerrors": False,
-        "extract_flat": False,
-    }
+    active_cookie = cookie_file or find_manual_cookie_file()
 
-    cookie_file = find_manual_cookie_file()
-    if cookie_file:
-        base_shared["cookiefile"] = cookie_file
+    # Build strategies without cookiesfrombrowser:
+    strategies: List[Tuple[str, Dict[str, Any]]] = []
 
-    # Build reliable fallback strategies without browser cookies:
-    # 1. Primary: Android & iOS Mobile Client + Player Skip + Android User-Agent
-    opts_android_ios = dict(base_shared)
-    opts_android_ios["extractor_args"] = {
-        "youtube": {
-            "player_client": ["android", "ios"],
-            "player_skip": ["webpage", "configs"]
+    # 1. If cookies.txt is provided, try with cookiefile first
+    if active_cookie and os.path.isfile(active_cookie):
+        strategies.append((
+            "Manual cookies.txt",
+            {
+                "outtmpl": out_template,
+                "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "merge_output_format": "mp4",
+                "ffmpeg_location": ffmpeg_bin,
+                "cookiefile": active_cookie,
+                "nocheckcertificate": True,
+                "quiet": True,
+                "no_warnings": True,
+                "progress_hooks": [progress_hook],
+                "ignoreerrors": False,
+                "extract_flat": False,
+            }
+        ))
+
+    # 2. Android + iOS Mobile Client (safe anti-bot bypass)
+    strategies.append((
+        "Android/iOS Mobile Client",
+        {
+            "outtmpl": out_template,
+            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "merge_output_format": "mp4",
+            "ffmpeg_location": ffmpeg_bin,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "ios"],
+                    "player_skip": ["webpage", "configs"]
+                }
+            },
+            "http_headers": {
+                "User-Agent": "com.google.android.youtube/19.05.36 (Linux; U; Android 14; US) gzip"
+            },
+            "nocheckcertificate": True,
+            "quiet": True,
+            "no_warnings": True,
+            "progress_hooks": [progress_hook],
+            "ignoreerrors": False,
+            "extract_flat": False,
         }
-    }
-    opts_android_ios["http_headers"] = {
-        "User-Agent": "com.google.android.youtube/19.05.36 (Linux; U; Android 14; US) gzip"
-    }
+    ))
 
-    # 2. Secondary: Android & Web Client
-    opts_android_web = dict(base_shared)
-    opts_android_web["extractor_args"] = {
-        "youtube": {
-            "player_client": ["android", "web"]
+    # 3. Android + Web Client fallback
+    strategies.append((
+        "Android/Web Client",
+        {
+            "outtmpl": out_template,
+            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "merge_output_format": "mp4",
+            "ffmpeg_location": ffmpeg_bin,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "web"]
+                }
+            },
+            "nocheckcertificate": True,
+            "quiet": True,
+            "no_warnings": True,
+            "progress_hooks": [progress_hook],
+            "ignoreerrors": False,
+            "extract_flat": False,
         }
-    }
+    ))
 
-    # 3. Tertiary: TV & Web Safari Client
-    opts_tv_safari = dict(base_shared)
-    opts_tv_safari["extractor_args"] = {
-        "youtube": {
-            "player_client": ["tv", "web_safari"]
+    # 4. TV / Safari Client fallback
+    strategies.append((
+        "TV/Safari Client",
+        {
+            "outtmpl": out_template,
+            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "merge_output_format": "mp4",
+            "ffmpeg_location": ffmpeg_bin,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv", "web_safari"]
+                }
+            },
+            "nocheckcertificate": True,
+            "quiet": True,
+            "no_warnings": True,
+            "progress_hooks": [progress_hook],
+            "ignoreerrors": False,
+            "extract_flat": False,
         }
-    }
-
-    # 4. Quaternary: Standard default fallback
-    opts_default = dict(base_shared)
-
-    strategies: List[Tuple[str, Dict[str, Any]]] = [
-        ("Android/iOS Mobile Client", opts_android_ios),
-        ("Android/Web Client", opts_android_web),
-        ("TV/Safari Client", opts_tv_safari),
-        ("Default Extractor", opts_default)
-    ]
+    ))
 
     last_error: Optional[Exception] = None
 
@@ -188,7 +226,10 @@ def download_video(
                 raise RuntimeError("Download dibatalkan oleh pengguna.") from e
             continue
 
-    tips_msg = "Tips: Jika YouTube memblokir IP, letakkan file cookies.txt di folder proyek."
+    bot_msg = (
+        "YouTube meminta verifikasi bot. Silakan ekspor cookies YouTube dari browser "
+        "menggunakan ekstensi 'Get cookies.txt LOCALLY' lalu muat lewat tombol 'Import cookies.txt'."
+    )
     if last_error:
-        raise RuntimeError(f"Gagal mengunduh video: {str(last_error)}\n{tips_msg}") from last_error
-    raise RuntimeError(f"Gagal mengunduh video setelah mencoba seluruh strategi yt-dlp.\n{tips_msg}")
+        raise RuntimeError(f"Gagal mengunduh video: {str(last_error)}\n{bot_msg}") from last_error
+    raise RuntimeError(f"Gagal mengunduh video setelah mencoba seluruh strategi yt-dlp.\n{bot_msg}")

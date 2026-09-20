@@ -125,7 +125,8 @@ class PipelineOrchestrator:
         target_clip_count: Optional[int] = None,
         min_duration: Optional[float] = None,
         max_duration: Optional[float] = None,
-        campaign_rules: Optional[str] = None
+        campaign_rules: Optional[str] = None,
+        cookie_file: Optional[str] = None
     ) -> List[ClipResult]:
         self.cancel_requested.clear()
         self.temp_files.clear()
@@ -154,9 +155,11 @@ class PipelineOrchestrator:
                     if progress_callback:
                         progress_callback(PipelineStatus.DOWNLOADING, min(10, int(pct * 0.1)), msg)
 
+                active_cookie = cookie_file or getattr(self.config, "cookie_file", None)
                 video_path = download_video(
                     input_source,
                     download_folder,
+                    cookie_file=active_cookie,
                     cancel_event=self.cancel_requested,
                     progress_callback=on_dl_progress
                 )
