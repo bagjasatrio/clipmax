@@ -93,7 +93,7 @@ def get_face_detector_model() -> Optional[str]:
 
 def merge_scene_intervals(
     raw_samples: List[Tuple[float, bool, float]],
-    min_scene_sec: float = 2.0,
+    min_scene_sec: float = 1.5,
     clip_duration: float = 0.0,
     visual_cuts: Optional[List[float]] = None,
     padding_sec: float = 0.2
@@ -121,7 +121,7 @@ def merge_scene_intervals(
             chunks.append({
                 "start": cur_start,
                 "end": t,
-                "mode": "CROP_TRACKING" if cur_is_face else "BLURRED_BACKGROUND",
+                "is_face": cur_is_face,
                 "faces": cur_faces
             })
             cur_is_face = is_face
@@ -132,31 +132,21 @@ def merge_scene_intervals(
     chunks.append({
         "start": cur_start,
         "end": final_end,
-        "mode": "CROP_TRACKING" if cur_is_face else "BLURRED_BACKGROUND",
+        "is_face": cur_is_face,
         "faces": cur_faces
     })
 
-    # 2. Iteratively merge short flickers (< min_scene_sec, anti-micro cut)
-    changed = True
-    while changed and len(chunks) > 1:
-        changed = False
-        for i in range(len(chunks)):
-            dur = chunks[i]["end"] - chunks[i]["start"]
-            if dur < min_scene_sec:
-                if i == 0:
-                    chunks[1]["start"] = chunks[0]["start"]
-                    if chunks[0].get("faces"):
-                        chunks[1].setdefault("faces", []).extend(chunks[0]["faces"])
-                    chunks.pop(0)
-                else:
-                    chunks[i - 1]["end"] = chunks[i]["end"]
-                    if chunks[i].get("faces"):
-                        chunks[i - 1].setdefault("faces", []).extend(chunks[i]["faces"])
-                    chunks.pop(i)
-                changed = True
-                break
+    # 2. Strict Zero-Face Rule:
+    # BLURRED_BACKGROUND is ONLY assigned if a chunk is strictly ZERO-FACE for > min_scene_sec (1.5s).
+    # All wide/medium shots, occasional missed frames, and presenter gestures remain CROP_TRACKING.
+    for c in chunks:
+        dur = c["end"] - c["start"]
+        if not c["is_face"] and dur > min_scene_sec:
+            c["mode"] = "BLURRED_BACKGROUND"
+        else:
+            c["mode"] = "CROP_TRACKING"
 
-    # 3. Merge adjacent chunks that have identical mode
+    # Consolidate adjacent chunks with identical mode
     merged: List[Dict[str, Any]] = []
     for c in chunks:
         if merged and merged[-1]["mode"] == c["mode"]:
@@ -166,34 +156,64 @@ def merge_scene_intervals(
         else:
             merged.append(c)
 
+    # 3. Iteratively merge any short isolated BLURRED_BACKGROUND (duration <= min_scene_sec)
+    changed = True
+    while changed and len(merged) > 1:
+        changed = False
+        for i in range(len(merged)):
+            dur = merged[i]["end"] - merged[i]["start"]
+            if merged[i]["mode"] == "BLURRED_BACKGROUND" and dur <= min_scene_sec:
+                if i > 0:
+                    merged[i - 1]["end"] = merged[i]["end"]
+                    if merged[i].get("faces"):
+                        merged[i - 1].setdefault("faces", []).extend(merged[i]["faces"])
+                    merged.pop(i)
+                else:
+                    merged[1]["start"] = merged[0]["start"]
+                    if merged[0].get("faces"):
+                        merged[1].setdefault("faces", []).extend(merged[0]["faces"])
+                    merged.pop(0)
+                changed = True
+                break
+
+    # Re-merge identical adjacent modes after consolidation
+    final_merged: List[Dict[str, Any]] = []
+    for m in merged:
+        if final_merged and final_merged[-1]["mode"] == m["mode"]:
+            final_merged[-1]["end"] = m["end"]
+            if m.get("faces"):
+                final_merged[-1].setdefault("faces", []).extend(m["faces"])
+        else:
+            final_merged.append(m)
+
     # 4. Snap boundaries to closest visual scene cut within +/- 0.8s
-    for i in range(len(merged) - 1):
-        b = merged[i]["end"]
+    for i in range(len(final_merged) - 1):
+        b = final_merged[i]["end"]
         nearby_cuts = [c for c in visual_cuts if abs(c - b) <= 0.8]
         if nearby_cuts:
             best_cut = min(nearby_cuts, key=lambda c: abs(c - b))
-            if merged[i]["start"] + 0.8 < best_cut < merged[i + 1]["end"] - 0.8:
-                merged[i]["end"] = best_cut
-                merged[i + 1]["start"] = best_cut
+            if final_merged[i]["start"] + 0.5 < best_cut < final_merged[i + 1]["end"] - 0.5:
+                final_merged[i]["end"] = best_cut
+                final_merged[i + 1]["start"] = best_cut
 
     # 5. Apply padding (+/- 0.2s) for CROP_TRACKING (Talking Head)
-    for i in range(len(merged) - 1):
-        curr_mode = merged[i]["mode"]
-        next_mode = merged[i + 1]["mode"]
-        b = merged[i]["end"]
+    for i in range(len(final_merged) - 1):
+        curr_mode = final_merged[i]["mode"]
+        next_mode = final_merged[i + 1]["mode"]
+        b = final_merged[i]["end"]
 
         if curr_mode == "CROP_TRACKING" and next_mode == "BLURRED_BACKGROUND":
             # Extend talking head by +padding_sec
             new_b = min(final_end, b + padding_sec)
-            merged[i]["end"] = new_b
-            merged[i + 1]["start"] = new_b
+            final_merged[i]["end"] = new_b
+            final_merged[i + 1]["start"] = new_b
         elif curr_mode == "BLURRED_BACKGROUND" and next_mode == "CROP_TRACKING":
             # Start talking head padding_sec earlier
             new_b = max(0.0, b - padding_sec)
-            merged[i]["end"] = new_b
-            merged[i + 1]["start"] = new_b
+            final_merged[i]["end"] = new_b
+            final_merged[i + 1]["start"] = new_b
 
-    return merged
+    return final_merged
 
 def segment_clip_scenes(
     video_path: str,
@@ -201,7 +221,7 @@ def segment_clip_scenes(
     clip_end: float,
     sample_step: int = 6,
     detect_width: int = 640,
-    min_scene_sec: float = 2.0,
+    min_scene_sec: float = 1.5,
     padding_sec: float = 0.2
 ) -> List[SceneSegment]:
     if padding_sec is None:
@@ -238,11 +258,12 @@ def segment_clip_scenes(
     detector = None
     if model_path:
         try:
+            # Low threshold (0.35) to capture distant presenters, wide shots, and side profiles
             detector = cv2.FaceDetectorYN_create(
                 model_path,
                 "",
                 (detect_w, detect_h),
-                score_threshold=0.6,
+                score_threshold=0.35,
                 nms_threshold=0.3
             )
         except Exception:
@@ -254,8 +275,6 @@ def segment_clip_scenes(
     visual_cuts: List[float] = []
     prev_gray = None
     cut_diff_threshold = 28.0
-
-    min_face_area = 0.015 * (detect_w * detect_h)  # >= 1.5% frame area (excludes small corner webcams)
 
     frame_idx = 0
     current_frame = start_frame
@@ -287,10 +306,10 @@ def segment_clip_scenes(
                             valid_faces = []
                             for f in faces:
                                 w_f, h_f = float(f[2]), float(f[3])
-                                area = w_f * h_f
                                 score = float(f[14]) if len(f) > 14 else 1.0
-                                if score >= 0.6 and area >= min_face_area:
-                                    valid_faces.append((area, f))
+                                # Unrestrictive area threshold: capture wide/medium shots sitting in a chair
+                                if score >= 0.35 and w_f >= 8 and h_f >= 8:
+                                    valid_faces.append((w_f * h_f, f))
 
                             if valid_faces:
                                 face_found = True
@@ -317,7 +336,7 @@ def segment_clip_scenes(
             )
         ]
 
-    # Merge into stable scene intervals with visual cut snapping and padding
+    # Merge into stable scene intervals with strict zero-face rule, visual cut snapping, and padding
     chunks = merge_scene_intervals(
         raw_samples,
         min_scene_sec=min_scene_sec,
@@ -334,7 +353,7 @@ def segment_clip_scenes(
             continue
 
         if c["mode"] == "CROP_TRACKING":
-            faces = c["faces"] if c["faces"] else [default_center]
+            faces = c["faces"] if c.get("faces") else [default_center]
             smoothed = smooth_ema_series(faces, alpha=0.1)
             crop_positions = [float(calculate_crop_box(width, height, fx)[0]) for fx in smoothed]
             dur_sc = max(0.01, s_end - s_start)
