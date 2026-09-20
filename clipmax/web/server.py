@@ -15,13 +15,7 @@ from pydantic import BaseModel
 from clipmax.config import AppConfig, is_cuda_available
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
 from clipmax.ai_gateway import discover_models
-from clipmax.downloader import (
-    is_valid_video_url,
-    clean_error_message,
-    is_youtube_oauth_authenticated,
-    initiate_youtube_oauth,
-    poll_youtube_oauth_token
-)
+from clipmax.downloader import is_valid_video_url, clean_error_message, extract_video_id, download_via_invidious
 
 class PipelineStartRequest(BaseModel):
     input_source: str
@@ -119,7 +113,7 @@ def get_config():
         "min_duration": state.config.min_duration,
         "max_duration": state.config.max_duration,
         "campaign_rules": state.config.campaign_rules,
-        "youtube_authenticated": is_youtube_oauth_authenticated()
+        "engine": "invidious_api"
     }
 
 @app.post("/api/config")
@@ -149,26 +143,6 @@ def update_config(req: ConfigUpdateRequest):
 def get_models():
     models = discover_models(state.config.endpoint_url, state.config.api_key)
     return {"models": models}
-
-@app.get("/api/youtube/oauth/status")
-def get_oauth_status():
-    return {"authenticated": is_youtube_oauth_authenticated()}
-
-@app.post("/api/youtube/oauth/initiate")
-def oauth_initiate():
-    try:
-        data = initiate_youtube_oauth()
-        return {"status": "ok", "data": data}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=clean_error_message(str(e)))
-
-class OAuthPollRequest(BaseModel):
-    device_code: str
-
-@app.post("/api/youtube/oauth/poll")
-def oauth_poll(req: OAuthPollRequest):
-    res = poll_youtube_oauth_token(req.device_code)
-    return res
 
 @app.post("/api/pipeline/start")
 def start_pipeline(req: PipelineStartRequest):

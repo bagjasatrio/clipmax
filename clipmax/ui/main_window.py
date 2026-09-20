@@ -17,13 +17,7 @@ from PySide6.QtWidgets import (
 from clipmax.config import AppConfig
 from clipmax.ai_gateway import discover_models
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
-from clipmax.downloader import (
-    is_valid_video_url,
-    clean_error_message,
-    is_youtube_oauth_authenticated,
-    initiate_youtube_oauth,
-    poll_youtube_oauth_token
-)
+from clipmax.downloader import is_valid_video_url, clean_error_message
 
 class PipelineWorker(QThread):
     progress_changed = Signal(str, int, str)
@@ -208,7 +202,6 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._setup_player_events()
-        self._check_youtube_oauth_status()
 
     def _build_ui(self):
         central = QWidget()
@@ -332,23 +325,6 @@ class MainWindow(QMainWindow):
         self.txt_url = QLineEdit()
         self.txt_url.setPlaceholderText("Paste YouTube / X / web video URL...")
         tu_layout.addWidget(self.txt_url)
-
-        # YouTube OAuth2 bar row
-        oauth_row = QHBoxLayout()
-        oauth_row.setSpacing(8)
-        self.btn_connect_oauth = QPushButton("Hubungkan Akun YouTube (OAuth2)")
-        self.btn_connect_oauth.setFixedHeight(32)
-        self.btn_connect_oauth.setStyleSheet(
-            "background-color: transparent; border: 1px solid #386FA4; font-size: 11px; padding: 4px 8px; color: #E6E9EE; border-radius: 4px;"
-        )
-        self.btn_connect_oauth.clicked.connect(self._on_connect_youtube_oauth)
-
-        self.lbl_oauth_status = QLabel("")
-        self.lbl_oauth_status.setStyleSheet("color: #8B949E; font-size: 11px;")
-        oauth_row.addWidget(self.btn_connect_oauth)
-        oauth_row.addWidget(self.lbl_oauth_status)
-        oauth_row.addStretch()
-        tu_layout.addLayout(oauth_row)
 
         # Tab Local File
         tab_local = QWidget()
@@ -793,45 +769,6 @@ class MainWindow(QMainWindow):
             elif "60-90" in preset:
                 self.spn_min_dur.setValue(60)
                 self.spn_max_dur.setValue(90)
-
-    def _check_youtube_oauth_status(self):
-        if is_youtube_oauth_authenticated():
-            self.btn_connect_oauth.setText("Ganti Akun")
-            self.lbl_oauth_status.setText("✓ Akun Terhubung (OAuth2)")
-            self.lbl_oauth_status.setStyleSheet("color: #4ADE80; font-size: 11px; font-weight: 600;")
-        else:
-            self.btn_connect_oauth.setText("Hubungkan Akun YouTube (OAuth2)")
-            self.lbl_oauth_status.setText("Belum Terhubung")
-            self.lbl_oauth_status.setStyleSheet("color: #8B949E; font-size: 11px;")
-
-    def _on_connect_youtube_oauth(self):
-        import webbrowser
-        try:
-            data = initiate_youtube_oauth()
-            verify_url = data.get("verification_url", "https://www.google.com/device")
-            user_code = data.get("user_code", "")
-            device_code = data.get("device_code", "")
-
-            webbrowser.open(verify_url)
-
-            msg = (
-                f"Langkah Otorisasi YouTube OAuth2:\n\n"
-                f"1. Buka browser: {verify_url}\n"
-                f"2. Masukkan kode berikut: {user_code}\n\n"
-                f"Klik OK setelah Anda mengonfirmasi kode di browser."
-            )
-            ret = QMessageBox.information(self, "Otorisasi Akun YouTube", msg, QMessageBox.Ok | QMessageBox.Cancel)
-            if ret == QMessageBox.Ok:
-                res = poll_youtube_oauth_token(device_code)
-                if res.get("status") == "success":
-                    QMessageBox.information(self, "Berhasil", "Akun YouTube berhasil terhubung!")
-                    self._check_youtube_oauth_status()
-                elif res.get("status") == "pending":
-                    QMessageBox.warning(self, "Belum Selesai", "Konfirmasi perangkat belum selesai. Silakan pastikan kode dimasukkan di browser lalu coba kembali.")
-                else:
-                    QMessageBox.critical(self, "Otorisasi Gagal", res.get("message", "Gagal memverifikasi akun"))
-        except Exception as e:
-            QMessageBox.critical(self, "OAuth2 Error", f"Gagal memulai otorisasi:\n{clean_error_message(str(e))}")
 
     def _on_browse_video(self):
         file_path, _ = QFileDialog.getOpenFileName(
