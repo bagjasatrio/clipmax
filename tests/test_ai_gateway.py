@@ -175,3 +175,70 @@ def test_evaluate_viral_clips_montage_mode():
         assert c.cuts[2].event == "Wipeout & Base Push"
         # Total duration = (139.5-124.0) + (368.0-350.2) + (542.5-520.0) = 15.5 + 17.8 + 22.5 = 55.8s
         assert 55.0 <= (c.cuts[0].end - c.cuts[0].start + c.cuts[1].end - c.cuts[1].start + c.cuts[2].end - c.cuts[2].start) <= 56.5
+
+def test_evaluate_viral_clips_mandatory_ending_and_penalty():
+    mock_json_response = '''
+    [
+      {
+        "title": "Early War Highlight",
+        "hook": "War di awal game",
+        "start_time": "02:00",
+        "end_time": "02:45",
+        "virality_score": 0,
+        "reasoning": "Melanggar mandatory rule: tidak ada ending victory"
+      },
+      {
+        "title": "Final Epic Comeback & Victory",
+        "hook": "Kemenangan dramatis di menit akhir",
+        "start_time": "14:20",
+        "end_time": "15:05",
+        "virality_score": 98,
+        "reasoning": "Sesuai aturan wajib diakhiri kemenangan victory"
+      }
+    ]
+    '''
+    with patch("clipmax.ai_gateway.OpenAI") as mock_openai:
+        mock_client = MagicMock()
+        mock_choice = MagicMock()
+        mock_choice.message.content = mock_json_response
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice])
+        mock_openai.return_value = mock_client
+
+        campaign_rules = "wajib diakhiri kemenangan / victory"
+        clips = evaluate_viral_clips(
+            transcript="Transkrip lengkap pertandingan gaming...",
+            endpoint_url="http://localhost:20128/v1",
+            api_key="test-key",
+            model="gemini-flash",
+            target_clip_count=1,
+            min_duration=30.0,
+            max_duration=60.0,
+            campaign_rules=campaign_rules
+        )
+
+        create_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        sys_message = create_kwargs["messages"][0]["content"]
+        user_message = create_kwargs["messages"][1]["content"]
+
+        # Check hierarchy rule in system prompt
+        assert "ATURAN UTAMA (ENFORCE MANDATORY CONSTRAINTS)" in sys_message
+        assert "END_TIME (Anchor Akhir)" in sys_message
+        assert "hitung mundur dari END_TIME" in sys_message
+        assert "PENALTI" in sys_message
+
+        # Check context injection order (rules before transcript, recency reminder at end)
+        rules_pos = user_message.find("CRITICAL CAMPAIGN RULES")
+        transcript_pos = user_message.find("Transkrip Video:")
+        recency_pos = user_message.find("PENGINGAT AKHIR (RECENCY BIAS)")
+        assert rules_pos != -1
+        assert transcript_pos != -1
+        assert recency_pos != -1
+        assert rules_pos < transcript_pos < recency_pos
+
+        # Check penalty: clip with virality_score = 0 was skipped, only victory clip kept
+        assert len(clips) == 1
+        assert clips[0].title == "Final Epic Comeback & Victory"
+        assert clips[0].virality_score == 98
+        assert clips[0].start_time == 14 * 60 + 20
+        assert clips[0].end_time == 15 * 60 + 5
+

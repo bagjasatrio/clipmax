@@ -91,7 +91,16 @@ def discover_models(endpoint_url: str, api_key: str = "") -> List[str]:
 
 SYSTEM_PROMPT = """Anda adalah kurator video viral profesional untuk TikTok, Instagram Reels, dan YouTube Shorts.
 Analisis transkrip dan pilih segmen klip terbaik berdasarkan kriteria dan instruksi khusus.
-Kriteria seleksi:
+
+ATURAN UTAMA (ENFORCE MANDATORY CONSTRAINTS):
+Periksa 'Campaign Brief & Custom Rules'. Jika ada syarat akhir spesifik (seperti diakhiri kemenangan/victory/end-game):
+1. Cari segmen transkrip paling relevan di bagian akhir sesi pertandingan (analisis kata penutup, seruan 'menang', 'kelar', 'push base', 'GG', atau segmen audio intens di menit-menit akhir).
+2. Jadikan titik tersebut sebagai END_TIME (Anchor Akhir).
+3. Tentukan START_TIME dengan menghitung mundur dari END_TIME sesuai durasi preset (misal 30-60 detik sebelumnya) sehingga momen setup war, wipeout, dan selebrasi kemenangan masuk ke dalam satu klip utuh.
+4. Jika dalam transkrip tidak ada teks kata 'victory', cari stempel waktu di mana terdengar teriakan puncak terakhir sebelum video berakhir atau sebelum gameplay terhenti.
+5. PENALTI: Berikan skor viral_score = 0 jika klip melanggar instruksi mandatory ending yang diberikan pengguna di Custom Rules!
+
+Kriteria seleksi umum:
 1. Memiliki Hook kuat di 3 detik pertama.
 2. Memiliki narasi yang utuh atau poin klimaks yang berbobot.
 3. Beri skor viralitas (1-100) dan alasan.
@@ -110,6 +119,13 @@ Format output WAJIB berupa JSON array murni tanpa markdown wrapper:
 
 MONTAGE_SYSTEM_PROMPT = """Anda adalah editor dan kurator video montage profesional untuk TikTok, Instagram Reels, dan YouTube Shorts.
 Tugas Anda adalah merangkai video Multi-Cut Montage dengan menggabungkan beberapa momen penting atau klimaks berbeda dari transkrip video.
+
+ATURAN UTAMA (ENFORCE MANDATORY CONSTRAINTS):
+Periksa 'Campaign Brief & Custom Rules'. Jika ada syarat akhir spesifik (seperti diakhiri kemenangan/victory/end-game):
+1. Cut terakhir (ending cut) WAJIB berupa segmen penutup/kemenangan pertandingan (analisis kata penutup, seruan 'menang', 'kelar', 'push base', 'GG', atau segmen puncak di menit-menit akhir).
+2. Jika dalam transkrip tidak ada teks kata 'victory', cari stempel waktu di mana terdengar teriakan puncak terakhir sebelum video berakhir atau sebelum gameplay terhenti.
+3. Rangkai cuts sebelumnya sebagai setup menuju cut klimaks akhir tersebut.
+4. PENALTI: Berikan skor viral_score = 0 jika rangkaian cuts melanggar instruksi mandatory ending yang diberikan pengguna di Custom Rules!
 
 Kriteria seleksi montage:
 1. Pilih 2 sampai 5 potongan momen penting/menarik (cuts) dari bagian video yang berbeda.
@@ -152,6 +168,14 @@ def evaluate_viral_clips(
         rules_section = f"""
 CRITICAL CAMPAIGN RULES (User Guidelines):
 {campaign_rules.strip()}
+
+ATURAN UTAMA (ENFORCE MANDATORY CONSTRAINTS):
+Periksa 'Campaign Brief & Custom Rules' di atas! Jika ada syarat akhir spesifik (seperti diakhiri kemenangan/victory/end-game):
+1. Cari segmen transkrip paling relevan di bagian akhir sesi pertandingan (analisis kata penutup, seruan 'menang', 'kelar', 'push base', 'GG', atau segmen audio intens di menit-menit akhir).
+2. Jadikan titik tersebut sebagai END_TIME (Anchor Akhir).
+3. Tentukan START_TIME dengan menghitung mundur dari END_TIME sesuai durasi preset ({int(min_duration)} sampai {int(max_duration)} detik sebelumnya) sehingga momen setup war, wipeout, dan selebrasi kemenangan masuk ke dalam satu klip utuh.
+4. Jika dalam transkrip tidak ada teks kata 'victory', cari stempel waktu di mana terdengar teriakan puncak terakhir sebelum video berakhir atau sebelum gameplay terhenti.
+5. PENALTI KERAS: Berikan skor virality_score = 0 (atau viral_score = 0) jika segmen melanggar instruksi mandatory ending di atas!
 Kamu WAJIB memilih dan memotong klip yang memenuhi aturan di atas.
 """
 
@@ -159,23 +183,29 @@ Kamu WAJIB memilih dan memotong klip yang memenuhi aturan di atas.
 
     if is_montage:
         system_content = MONTAGE_SYSTEM_PROMPT
-        prompt = f"""Transkrip Video:
-
-{transcript}
-
-Instruksi Pemilihan Multi-Cut Montage:
+        prompt = f"""Instruksi Pemilihan Multi-Cut Montage:
 - Hasilkan tepat {target_clip_count} montage terbaik.
 - Setiap montage menggabungkan beberapa momen (cuts) berbeda.
-- Pastikan TOTAL akumulasi durasi dari seluruh cuts di setiap montage berada di dalam rentang {int(min_duration)} sampai {int(max_duration)} detik.{rules_section}"""
-    else:
-        system_content = SYSTEM_PROMPT
-        prompt = f"""Transkrip Video:
+- Pastikan TOTAL akumulasi durasi dari seluruh cuts di setiap montage berada di dalam rentang {int(min_duration)} sampai {int(max_duration)} detik.{rules_section}
+
+Transkrip Video:
 
 {transcript}
 
-Instruksi Pemilihan Klip:
+PENGINGAT AKHIR (RECENCY BIAS):
+Wajib patuhi CRITICAL CAMPAIGN RULES dan ATURAN UTAMA di atas. Jika ada syarat kemenangan/ending wajib, pastikan klip berlabuh di momen penutup tersebut."""
+    else:
+        system_content = SYSTEM_PROMPT
+        prompt = f"""Instruksi Pemilihan Klip:
 - Hasilkan tepat {target_clip_count} klip terbaik.
-- Pastikan durasi setiap klip berada di dalam rentang {int(min_duration)} sampai {int(max_duration)} detik.{rules_section}"""
+- Pastikan durasi setiap klip berada di dalam rentang {int(min_duration)} sampai {int(max_duration)} detik.{rules_section}
+
+Transkrip Video:
+
+{transcript}
+
+PENGINGAT AKHIR (RECENCY BIAS):
+Wajib patuhi CRITICAL CAMPAIGN RULES dan ATURAN UTAMA di atas. Jika ada syarat kemenangan/ending wajib, pastikan klip berlabuh di momen penutup tersebut."""
 
     response = client.chat.completions.create(
         model=model,
@@ -203,6 +233,11 @@ Instruksi Pemilihan Klip:
         if not isinstance(item, dict):
             continue
 
+        v_score = int(item.get("viral_score", item.get("virality_score", 50)))
+        if v_score <= 0:
+            # Penalized candidate (score = 0), skip
+            continue
+
         if is_montage or item.get("mode") == "montage" or "cuts" in item:
             cuts_raw = item.get("cuts", [])
             valid_cuts: List[MontageCut] = []
@@ -222,7 +257,7 @@ Instruksi Pemilihan Klip:
                     hook=valid_cuts[0].event or str(item.get("hook", "")),
                     start_time=valid_cuts[0].start,
                     end_time=valid_cuts[-1].end,
-                    virality_score=int(item.get("viral_score", item.get("virality_score", 50))),
+                    virality_score=v_score,
                     reasoning=" | ".join(c.event for c in valid_cuts if c.event),
                     mode="montage",
                     cuts=valid_cuts
@@ -245,7 +280,7 @@ Instruksi Pemilihan Klip:
             hook=str(item.get("hook", "")),
             start_time=start_sec,
             end_time=end_sec,
-            virality_score=int(item.get("virality_score", 50)),
+            virality_score=v_score,
             reasoning=str(item.get("reasoning", "")),
             mode="single"
         )
