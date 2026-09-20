@@ -18,6 +18,95 @@ class SceneSegment(BaseModel):
     mode: str              # "CROP_TRACKING" or "BLURRED_BACKGROUND"
     crop_x: str            # dynamic expression or static number
 
+class ActiveSpeakerTracker:
+    """
+    Tracks multiple faces across time in multi-person videos (e.g., podcasts)
+    and switches camera target X-center to the active speaker based on
+    Mouth Aspect Ratio (MAR) variation over a 1.0-second sliding window,
+    with 1.0-second continuous activity hysteresis to eliminate jitter.
+    """
+    def __init__(self, switch_threshold_sec: float = 1.0, window_sec: float = 1.0):
+        self.switch_threshold_sec = switch_threshold_sec
+        self.window_sec = window_sec
+        self.history: Dict[str, List[Tuple[float, float, float]]] = {}  # pid -> [(timestamp, mar, cx)]
+        self.active_person_id: Optional[str] = None
+        self.candidate_person_id: Optional[str] = None
+        self.candidate_active_time: float = 0.0
+
+    def match_person(self, cx: float, max_dist: float = 250.0) -> str:
+        best_id = None
+        min_d = float("inf")
+        for pid, records in self.history.items():
+            if records:
+                last_cx = records[-1][2]
+                d = abs(cx - last_cx)
+                if d < min_d and d < max_dist:
+                    min_d = d
+                    best_id = pid
+        if best_id is None:
+            best_id = f"person_{len(self.history)}"
+            self.history[best_id] = []
+        return best_id
+
+    def update(self, timestamp: float, detected_faces: List[Tuple[float, float]]) -> Optional[float]:
+        """
+        detected_faces: List of tuples (cx, mar)
+        Returns the target X position of the active speaker.
+        """
+        if not detected_faces:
+            return None
+
+        current_frame_pids = []
+        for cx, mar in detected_faces:
+            pid = self.match_person(cx)
+            current_frame_pids.append(pid)
+            self.history[pid].append((timestamp, mar, cx))
+
+        # Prune history older than window_sec
+        cutoff = timestamp - self.window_sec
+        for pid in list(self.history.keys()):
+            self.history[pid] = [r for r in self.history[pid] if r[0] >= cutoff]
+
+        if self.active_person_id is None or self.active_person_id not in current_frame_pids:
+            self.active_person_id = current_frame_pids[0]
+
+        if len(current_frame_pids) == 1:
+            self.active_person_id = current_frame_pids[0]
+            self.candidate_person_id = None
+            self.candidate_active_time = 0.0
+            return self.history[self.active_person_id][-1][2]
+
+        # Multi-person detected: compute MAR variation over the 1-second window
+        scores = {}
+        for pid in current_frame_pids:
+            mars = [r[1] for r in self.history[pid]]
+            if len(mars) >= 2:
+                # Active speech exhibits high variance in lip opening (talking cadence)
+                scores[pid] = float(np.std(mars))
+            else:
+                scores[pid] = 0.0
+
+        top_speaker_id = max(scores, key=scores.get)
+
+        # Hysteresis & Anti-Jitter Switching:
+        # Only switch focus if the candidate's speech variation is significant and lasts >= switch_threshold_sec
+        if top_speaker_id != self.active_person_id and scores[top_speaker_id] > 0.015:
+            if top_speaker_id == self.candidate_person_id:
+                dt = timestamp - (self.history[top_speaker_id][-2][0] if len(self.history[top_speaker_id]) >= 2 else timestamp)
+                self.candidate_active_time += dt
+                if self.candidate_active_time >= self.switch_threshold_sec:
+                    self.active_person_id = top_speaker_id
+                    self.candidate_person_id = None
+                    self.candidate_active_time = 0.0
+            else:
+                self.candidate_person_id = top_speaker_id
+                self.candidate_active_time = 0.0
+        else:
+            self.candidate_person_id = None
+            self.candidate_active_time = 0.0
+
+        return self.history[self.active_person_id][-1][2]
+
 def calculate_crop_box(
     frame_width: int,
     frame_height: int,
@@ -90,6 +179,26 @@ def get_face_detector_model() -> Optional[str]:
     if model_p.exists():
         return str(model_p)
     return None
+
+def get_face_landmarker():
+    project_root = Path(__file__).resolve().parent.parent
+    task_p = project_root / "bin" / "face_landmarker.task"
+    if not task_p.exists():
+        return None
+    try:
+        import mediapipe as mp
+        from mediapipe.tasks import python
+        from mediapipe.tasks.python import vision
+
+        base_options = python.BaseOptions(model_asset_path=str(task_p))
+        options = vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            output_face_blendshapes=False,
+            num_faces=4
+        )
+        return vision.FaceLandmarker.create_from_options(options)
+    except Exception:
+        return None
 
 def merge_scene_intervals(
     raw_samples: List[Tuple[float, bool, float]],
@@ -234,6 +343,7 @@ def segment_clip_scenes(
     detect_h = int(round(height * (detect_w / float(width)))) if width > 0 else 360
     scale_x = (width / float(detect_w)) if detect_w > 0 else 1.0
 
+    landmarker = get_face_landmarker()
     model_path = get_face_detector_model()
     detector = None
     if model_path:
@@ -250,6 +360,8 @@ def segment_clip_scenes(
 
     default_center = width / 2.0
     last_center = default_center
+    speaker_tracker = ActiveSpeakerTracker(switch_threshold_sec=1.0, window_sec=1.0)
+
     raw_samples: List[Tuple[float, bool, float]] = []
     visual_cuts: List[float] = []
     prev_gray = None
@@ -280,7 +392,35 @@ def segment_clip_scenes(
                         visual_cuts.append(t_rel)
                 prev_gray = gray
 
-                if detector is not None:
+                # 1. MediaPipe FaceLandmarker for Multi-Face & Lip Movement (MAR) Active Speaker Tracking
+                if landmarker is not None:
+                    try:
+                        import mediapipe as mp
+                        rgb_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+                        mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+                        res = landmarker.detect(mp_img)
+                        if res.face_landmarks and len(res.face_landmarks) > 0:
+                            face_candidates = []
+                            for landmarks in res.face_landmarks:
+                                # Inner lip vertical distance (indices 13, 14)
+                                lip_dist = abs(landmarks[14].y - landmarks[13].y)
+                                # Mouth corners horizontal distance (indices 61, 291)
+                                lip_w = max(1e-5, abs(landmarks[291].x - landmarks[61].x))
+                                mar = float(lip_dist / lip_w)
+                                # Horizontal center of face scaled to original video width
+                                cx = float(np.mean([lm.x for lm in landmarks]) * width)
+                                face_candidates.append((cx, mar))
+
+                            if face_candidates:
+                                face_found = True
+                                active_cx = speaker_tracker.update(t_rel, face_candidates)
+                                if active_cx is not None:
+                                    last_center = active_cx
+                    except Exception:
+                        pass
+
+                # 2. Fallback to YuNet if landmarker was unavailable / returned no detection
+                if not face_found and detector is not None:
                     try:
                         _, faces = detector.detect(small_frame)
                         if faces is not None and len(faces) > 0:

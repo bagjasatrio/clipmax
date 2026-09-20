@@ -8,8 +8,49 @@ from clipmax.reframe import (
     build_dynamic_crop_expression,
     merge_scene_intervals,
     segment_clip_scenes,
-    SceneSegment
+    SceneSegment,
+    ActiveSpeakerTracker,
+    get_face_landmarker
 )
+
+def test_active_speaker_tracker_multi_face_hysteresis():
+    tracker = ActiveSpeakerTracker(switch_threshold_sec=1.0, window_sec=1.0)
+    # Person 1 (cx=400, left), Person 2 (cx=1500, right)
+
+    # 0s to 3s: Person 1 speaking (MAR varying 0.15 - 0.45), Person 2 silent (MAR=0.15)
+    for step in range(15):
+        t = step * 0.2
+        mar_p1 = 0.3 + 0.15 * (1 if step % 2 == 0 else -1)
+        faces = [(400.0, mar_p1), (1500.0, 0.15)]
+        cx = tracker.update(t, faces)
+        assert cx == 400.0
+    assert tracker.active_person_id == "person_0"
+
+    # 3.0s to 3.4s: Person 2 smiles / reacts briefly (< 1.0s)
+    for step in range(15, 18):
+        t = step * 0.2
+        faces = [(400.0, 0.15), (1500.0, 0.35)]
+        cx = tracker.update(t, faces)
+        # Hysteresis prevents switching
+        assert cx == 400.0
+    assert tracker.active_person_id == "person_0"
+
+    # 3.4s to 5.0s: Person 2 speaks continuously for > 1.0s
+    for step in range(18, 26):
+        t = step * 0.2
+        mar_p2 = 0.35 + 0.15 * (1 if step % 2 == 0 else -1)
+        faces = [(400.0, 0.15), (1500.0, mar_p2)]
+        cx = tracker.update(t, faces)
+
+    # Now camera switched to Person 2
+    assert tracker.active_person_id == "person_1"
+    assert cx == 1500.0
+
+def test_active_speaker_tracker_single_person():
+    tracker = ActiveSpeakerTracker()
+    cx = tracker.update(1.0, [(600.0, 0.25)])
+    assert cx == 600.0
+
 
 def test_calculate_crop_box_center():
     x_crop, crop_w, crop_h = calculate_crop_box(
