@@ -69,47 +69,46 @@ class ClipCardWidget(QFrame):
         self.setMouseTracking(True)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(12)
 
         # Thumbnail
         self.thumb_lbl = QLabel()
         self.thumb_lbl.setFixedSize(68, 100)
-        self.thumb_lbl.setStyleSheet("background-color: #000000; border-radius: 4px;")
+        self.thumb_lbl.setStyleSheet("background-color: #181A1D; border: 1px solid #3B3F47; border-radius: 4px;")
         self.thumb_lbl.setAlignment(Qt.AlignCenter)
         if clip.thumbnail_path and os.path.exists(clip.thumbnail_path):
             pix = QPixmap(clip.thumbnail_path)
             self.thumb_lbl.setPixmap(pix.scaled(68, 100, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
         else:
             self.thumb_lbl.setText("9:16")
-            self.thumb_lbl.setStyleSheet("color: #64748b; font-size: 11px;")
+            self.thumb_lbl.setStyleSheet("color: #9CA3AF; font-size: 11px;")
         layout.addWidget(self.thumb_lbl)
 
         # Info container
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(3)
+        info_layout.setSpacing(4)
 
         # Top row: title + score badge
         top_row = QHBoxLayout()
         title_lbl = QLabel(clip.title)
-        title_lbl.setStyleSheet("font-weight: bold; font-size: 13px; color: #f3f4f6;")
+        title_lbl.setStyleSheet("font-weight: 600; font-size: 13px; color: #E4E7EB;")
         title_lbl.setWordWrap(True)
         top_row.addWidget(title_lbl, 1)
 
-        badge_class = "BadgeHigh" if clip.virality_score >= 80 else "BadgeMid"
-        score_lbl = QLabel(f"{clip.virality_score} 🔥")
-        score_lbl.setProperty("class", badge_class)
+        score_lbl = QLabel(f"{clip.virality_score} pts")
+        score_lbl.setProperty("class", "BadgePill")
         score_lbl.setFixedHeight(20)
         top_row.addWidget(score_lbl)
         info_layout.addLayout(top_row)
 
         # Hook
         hook_lbl = QLabel(f'"{clip.hook}"')
-        hook_lbl.setStyleSheet("color: #60a5fa; font-style: italic; font-size: 11px;")
+        hook_lbl.setStyleSheet("color: #9CA3AF; font-style: italic; font-size: 11px;")
         hook_lbl.setWordWrap(True)
         info_layout.addWidget(hook_lbl)
 
-        # Time range
+        # Time range & Mode tag
         dur = max(0.0, clip.end_time - clip.start_time)
         mode_val = getattr(clip, "reframe_mode", "DYNAMIC_SCENE")
         if mode_val == "DYNAMIC_SCENE":
@@ -118,10 +117,20 @@ class ClipCardWidget(QFrame):
             mode_tag = "👤 Face Crop"
         else:
             mode_tag = "🖼 Blurred BG"
-        time_lbl = QLabel(f"⏱ {int(clip.start_time)}s - {int(clip.end_time)}s ({dur:.1f}s) • {mode_tag}")
-        time_lbl.setStyleSheet("color: #9ca3af; font-size: 11px;")
-        info_layout.addWidget(time_lbl)
 
+        time_row = QHBoxLayout()
+        time_row.setSpacing(6)
+        time_lbl = QLabel(f"⏱ {int(clip.start_time)}s - {int(clip.end_time)}s ({dur:.1f}s)")
+        time_lbl.setStyleSheet("color: #9CA3AF; font-size: 11px;")
+        time_row.addWidget(time_lbl)
+
+        mode_lbl = QLabel(mode_tag)
+        mode_lbl.setProperty("class", "BadgePill")
+        mode_lbl.setStyleSheet("font-size: 10px; padding: 1px 6px;")
+        time_row.addWidget(mode_lbl)
+        time_row.addStretch()
+
+        info_layout.addLayout(time_row)
         layout.addLayout(info_layout, 1)
 
     def mousePressEvent(self, event):
@@ -139,7 +148,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.resize(1000, 720)
+        self.resize(1040, 740)
 
         self.config = AppConfig.load()
         self.orchestrator = PipelineOrchestrator(self.config)
@@ -169,7 +178,7 @@ class MainWindow(QMainWindow):
 
         # Custom Frameless Titlebar
         title_bar = QHBoxLayout()
-        title_lbl = QLabel("ClipMax ⚡ Autonomous Desktop Clipper")
+        title_lbl = QLabel("ClipMax — Autonomous Desktop Clipper")
         title_lbl.setProperty("class", "Title")
 
         btn_close = QPushButton("✕")
@@ -197,15 +206,17 @@ class MainWindow(QMainWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(14)
+        layout.setSpacing(12)
 
         # Card 1: AI Provider Gateway
         provider_card = QFrame()
         provider_card.setProperty("class", "Card")
         p_layout = QVBoxLayout(provider_card)
+        p_layout.setContentsMargins(14, 12, 14, 12)
+        p_layout.setSpacing(10)
 
         p_lbl = QLabel("AI Provider & Dynamic Model Discovery")
-        p_lbl.setStyleSheet("font-weight: bold; color: #93c5fd;")
+        p_lbl.setProperty("class", "SectionHeader")
         p_layout.addWidget(p_lbl)
 
         row1 = QHBoxLayout()
@@ -227,7 +238,7 @@ class MainWindow(QMainWindow):
         self.cmb_models = QComboBox()
         self.cmb_models.addItem(self.config.selected_model)
         self.lbl_device = QLabel(f"Hardware: {self.config.device.upper()} ({self.config.compute_type})")
-        self.lbl_device.setStyleSheet("color: #10b981; font-weight: bold;")
+        self.lbl_device.setStyleSheet("color: #9CA3AF; font-size: 12px;")
         row2.addWidget(QLabel("Model:"))
         row2.addWidget(self.cmb_models, 3)
         row2.addWidget(self.lbl_device, 1)
@@ -239,9 +250,11 @@ class MainWindow(QMainWindow):
         video_card = QFrame()
         video_card.setProperty("class", "Card")
         v_layout = QVBoxLayout(video_card)
+        v_layout.setContentsMargins(14, 12, 14, 12)
+        v_layout.setSpacing(10)
 
         v_lbl = QLabel("Input Video Ingestion (16:9 Long Form)")
-        v_lbl.setStyleSheet("font-weight: bold; color: #93c5fd;")
+        v_lbl.setProperty("class", "SectionHeader")
         v_layout.addWidget(v_lbl)
 
         self.input_tabs = QTabWidget()
@@ -249,6 +262,7 @@ class MainWindow(QMainWindow):
         # Tab 1: File Lokal
         tab_local = QWidget()
         tl_layout = QHBoxLayout(tab_local)
+        tl_layout.setContentsMargins(6, 6, 6, 6)
         self.txt_video = QLineEdit()
         self.txt_video.setPlaceholderText("Pilih file video MP4/MKV...")
         self.btn_browse = QPushButton("Browse...")
@@ -260,6 +274,7 @@ class MainWindow(QMainWindow):
         # Tab 2: Link Video yt-dlp
         tab_url = QWidget()
         tu_layout = QHBoxLayout(tab_url)
+        tu_layout.setContentsMargins(6, 6, 6, 6)
         self.txt_url = QLineEdit()
         self.txt_url.setPlaceholderText("Tempel URL video (YouTube, X, Instagram, TikTok)...")
         tu_layout.addWidget(self.txt_url, 1)
@@ -274,10 +289,11 @@ class MainWindow(QMainWindow):
         gen_card = QFrame()
         gen_card.setProperty("class", "Card")
         g_layout = QVBoxLayout(gen_card)
-        g_layout.setSpacing(8)
+        g_layout.setContentsMargins(14, 12, 14, 12)
+        g_layout.setSpacing(10)
 
         g_lbl = QLabel("Generation & Campaign Settings")
-        g_lbl.setStyleSheet("font-weight: bold; color: #93c5fd;")
+        g_lbl.setProperty("class", "SectionHeader")
         g_layout.addWidget(g_lbl)
 
         row_params = QHBoxLayout()
@@ -286,7 +302,7 @@ class MainWindow(QMainWindow):
         # Target clip count
         count_box = QVBoxLayout()
         count_lbl = QLabel("Target Clip Count:")
-        count_lbl.setStyleSheet("color: #d1d5db; font-size: 12px;")
+        count_lbl.setStyleSheet("color: #9CA3AF; font-size: 12px;")
         self.spn_clip_count = QSpinBox()
         self.spn_clip_count.setRange(1, 10)
         self.spn_clip_count.setValue(self.config.target_clip_count or 3)
@@ -297,7 +313,7 @@ class MainWindow(QMainWindow):
         # Clip Duration Range
         dur_box = QVBoxLayout()
         dur_lbl = QLabel("Clip Duration Range:")
-        dur_lbl.setStyleSheet("color: #d1d5db; font-size: 12px;")
+        dur_lbl.setStyleSheet("color: #9CA3AF; font-size: 12px;")
         self.cmb_duration = QComboBox()
         self.cmb_duration.addItems([
             "Auto / Optimal (30-60s)",
@@ -323,7 +339,7 @@ class MainWindow(QMainWindow):
 
         min_layout = QVBoxLayout()
         min_lbl = QLabel("Min (s):")
-        min_lbl.setStyleSheet("color: #9ca3af; font-size: 11px;")
+        min_lbl.setStyleSheet("color: #9CA3AF; font-size: 11px;")
         self.spn_min_dur = QSpinBox()
         self.spn_min_dur.setRange(5, 300)
         self.spn_min_dur.setValue(int(self.config.min_duration or 30))
@@ -333,7 +349,7 @@ class MainWindow(QMainWindow):
 
         max_layout = QVBoxLayout()
         max_lbl = QLabel("Max (s):")
-        max_lbl.setStyleSheet("color: #9ca3af; font-size: 11px;")
+        max_lbl.setStyleSheet("color: #9CA3AF; font-size: 11px;")
         self.spn_max_dur = QSpinBox()
         self.spn_max_dur.setRange(10, 600)
         self.spn_max_dur.setValue(int(self.config.max_duration or 60))
@@ -348,7 +364,7 @@ class MainWindow(QMainWindow):
 
         # Campaign Rules
         rules_lbl = QLabel("Campaign Rules / Custom Guidelines (Opsional):")
-        rules_lbl.setStyleSheet("color: #d1d5db; font-size: 12px;")
+        rules_lbl.setStyleSheet("color: #9CA3AF; font-size: 12px;")
         g_layout.addWidget(rules_lbl)
 
         self.txt_rules = QPlainTextEdit()
@@ -365,6 +381,8 @@ class MainWindow(QMainWindow):
         exec_card = QFrame()
         exec_card.setProperty("class", "Card")
         e_layout = QVBoxLayout(exec_card)
+        e_layout.setContentsMargins(14, 12, 14, 12)
+        e_layout.setSpacing(10)
 
         self.lbl_status = QLabel("Status: Siap memproses video...")
         self.lbl_status.setProperty("class", "Sub")
@@ -376,8 +394,10 @@ class MainWindow(QMainWindow):
 
         btn_row = QHBoxLayout()
         self.btn_start = QPushButton("Mulai Generate Klip 9:16")
+        self.btn_start.setFixedHeight(38)
         self.btn_start.clicked.connect(self._on_start)
         self.btn_cancel = QPushButton("Batal / Stop")
+        self.btn_cancel.setFixedHeight(38)
         self.btn_cancel.setProperty("class", "Danger")
         self.btn_cancel.setEnabled(False)
         self.btn_cancel.clicked.connect(self._on_cancel)
@@ -399,7 +419,7 @@ class MainWindow(QMainWindow):
         # Workspace Header
         top_bar = QHBoxLayout()
         w_title = QLabel("Staging & Review Workspace")
-        w_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #60a5fa;")
+        w_title.setProperty("class", "Title")
         
         self.btn_back = QPushButton("← Proses Video Baru")
         self.btn_back.setProperty("class", "Secondary")
@@ -413,21 +433,23 @@ class MainWindow(QMainWindow):
         # Main Splitter: Left Gallery, Right Player & Export
         splitter = QSplitter(Qt.Horizontal)
 
-        # Left: Scrollable Card Gallery
+        # Left: Scrollable Card Gallery (Minimum 360px)
         left_panel = QFrame()
         left_panel.setProperty("class", "Card")
+        left_panel.setMinimumWidth(360)
         lp_layout = QVBoxLayout(left_panel)
-        lp_layout.setContentsMargins(8, 8, 8, 8)
+        lp_layout.setContentsMargins(12, 12, 12, 12)
+        lp_layout.setSpacing(10)
 
         self.lbl_gallery_count = QLabel("Daftar Klip Terdeteksi (0 Klip)")
-        self.lbl_gallery_count.setStyleSheet("font-weight: bold; color: #93c5fd; margin-bottom: 4px;")
+        self.lbl_gallery_count.setProperty("class", "SectionHeader")
         lp_layout.addWidget(self.lbl_gallery_count)
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.gallery_container = QWidget()
         self.gallery_layout = QVBoxLayout(self.gallery_container)
-        self.gallery_layout.setContentsMargins(4, 4, 4, 4)
+        self.gallery_layout.setContentsMargins(2, 2, 2, 2)
         self.gallery_layout.setSpacing(8)
         self.gallery_layout.addStretch()
         self.scroll_area.setWidget(self.gallery_container)
@@ -439,20 +461,22 @@ class MainWindow(QMainWindow):
         right_panel = QFrame()
         right_panel.setProperty("class", "Card")
         rp_layout = QVBoxLayout(right_panel)
-        rp_layout.setContentsMargins(12, 12, 12, 12)
-        rp_layout.setSpacing(10)
+        rp_layout.setContentsMargins(16, 16, 16, 16)
+        rp_layout.setSpacing(12)
 
         # Player Container
         self.video_widget = QVideoWidget()
-        self.video_widget.setStyleSheet("background-color: #000000; border-radius: 8px;")
-        self.video_widget.setMinimumSize(270, 480)
+        self.video_widget.setStyleSheet("background-color: #181A1D; border: 1px solid #3B3F47; border-radius: 6px;")
+        self.video_widget.setMinimumSize(280, 480)
         self.player.setVideoOutput(self.video_widget)
         rp_layout.addWidget(self.video_widget, 1)
 
         # Playback Controls
         ctrl_layout = QHBoxLayout()
+        ctrl_layout.setSpacing(8)
         self.btn_play_pause = QPushButton("▶")
         self.btn_play_pause.setFixedSize(36, 36)
+        self.btn_play_pause.setProperty("class", "Secondary")
         self.btn_play_pause.clicked.connect(self._toggle_playback)
 
         self.slider_progress = QSlider(Qt.Horizontal)
@@ -460,24 +484,33 @@ class MainWindow(QMainWindow):
         self.slider_progress.sliderMoved.connect(self._on_seek)
 
         self.lbl_time = QLabel("00:00 / 00:00")
-        self.lbl_time.setStyleSheet("font-size: 11px; color: #9ca3af;")
+        self.lbl_time.setStyleSheet("font-size: 11px; color: #9CA3AF;")
 
         ctrl_layout.addWidget(self.btn_play_pause)
         ctrl_layout.addWidget(self.slider_progress, 1)
         ctrl_layout.addWidget(self.lbl_time)
         rp_layout.addLayout(ctrl_layout)
 
-        # Selected Clip Detail Label
+        # Selected Clip Detail Frame
+        info_frame = QFrame()
+        info_frame.setStyleSheet("background-color: #1E2024; border: 1px solid #363A42; border-radius: 6px; padding: 10px;")
+        info_frame_layout = QVBoxLayout(info_frame)
+        info_frame_layout.setContentsMargins(8, 8, 8, 8)
         self.lbl_clip_info = QLabel("Pilih klip di sebelah kiri untuk memutar pratinjau.")
-        self.lbl_clip_info.setStyleSheet("color: #e5e7eb; font-size: 12px;")
+        self.lbl_clip_info.setStyleSheet("color: #E4E7EB; font-size: 12px; line-height: 1.4;")
         self.lbl_clip_info.setWordWrap(True)
-        rp_layout.addWidget(self.lbl_clip_info)
+        info_frame_layout.addWidget(self.lbl_clip_info)
+        rp_layout.addWidget(info_frame)
 
         # Export Action Buttons
         act_layout = QHBoxLayout()
+        act_layout.setSpacing(10)
         self.btn_save_one = QPushButton("💾 Simpan Klip Ini")
+        self.btn_save_one.setFixedHeight(38)
         self.btn_save_one.clicked.connect(self._on_save_selected_clip)
+
         self.btn_save_all = QPushButton("📦 Simpan Semua Klip")
+        self.btn_save_all.setFixedHeight(38)
         self.btn_save_all.setProperty("class", "Success")
         self.btn_save_all.clicked.connect(self._on_save_all_clips)
 
@@ -661,9 +694,9 @@ class MainWindow(QMainWindow):
             mode_str = "🖼 Blurred Background (Screen / Slide Utuh)"
 
         self.lbl_clip_info.setText(
-            f"<b>{clip.title}</b> <span style='color: #a78bfa;'>[{mode_str}]</span><br/>"
-            f"<span style='color: #60a5fa;'>Hook: \"{clip.hook}\"</span> | Skor: <b>{clip.virality_score}</b> | Durasi: <b>{dur:.1f}s</b><br/>"
-            f"<span style='color: #9ca3af;'>{clip.reasoning}</span>"
+            f"<b>{clip.title}</b> &nbsp; <span style='color: #4A6FA5; font-size: 11px; font-weight: 600;'>[{mode_str}]</span><br/>"
+            f"<span style='color: #E4E7EB;'>Hook: \"{clip.hook}\"</span> &nbsp;•&nbsp; <span style='color: #9CA3AF;'>Skor: <b>{clip.virality_score}</b> &nbsp;•&nbsp; Durasi: <b>{dur:.1f}s</b></span><br/>"
+            f"<span style='color: #9CA3AF;'>{clip.reasoning}</span>"
         )
 
         if os.path.exists(clip.staging_path):
