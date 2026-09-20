@@ -35,6 +35,27 @@ def test_transcribe_audio_mocked(tmp_path):
         assert instance.transcribe.call_args.kwargs.get("word_timestamps") is True
         assert "Mobile Legends" in instance.transcribe.call_args.kwargs.get("initial_prompt")
 
+def test_transcribe_audio_float_timestamps(tmp_path):
+    wav_file = tmp_path / "timestamp_test.wav"
+    wav_file.touch()
+
+    mock_segment = MagicMock()
+    mock_segment.start = 754.20
+    mock_segment.end = 765.45
+    mock_segment.text = "Sisi Gelap Karangan Bunga"
+    mock_segment.words = []
+
+    with patch("faster_whisper.WhisperModel") as mock_model_cls, \
+         patch("clipmax.transcriber.cleanup_vram"):
+
+        instance = MagicMock()
+        instance.transcribe.return_value = ([mock_segment], MagicMock())
+        mock_model_cls.return_value = instance
+
+        words, full_text = transcribe_audio(str(wav_file))
+
+        assert "[754.20s - 765.45s] Sisi Gelap Karangan Bunga" in full_text
+
 def test_transcribe_audio_cuda_raises_error_without_silent_fallback(tmp_path):
     wav_file = tmp_path / "fake_cuda.wav"
     wav_file.touch()

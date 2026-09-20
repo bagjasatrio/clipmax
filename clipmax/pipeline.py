@@ -262,6 +262,7 @@ class PipelineOrchestrator:
                         default_cx = cut_scenes[0].crop_x if cut_scenes else "0"
                         cut_mode = cut_scenes[0].mode if cut_scenes else "CROP_TRACKING"
 
+                        print(f"[CUT] Memotong klip '{clip.title}' (Part {k+1}/{len(clip.cuts)}) dari detik {cut.start:.2f} sampai {cut.end:.2f} (durasi: {cut.end - cut.start:.2f}s)")
                         render_clip(
                             input_video=video_path,
                             output_clip=part_file,
@@ -454,6 +455,7 @@ class PipelineOrchestrator:
                     staging_clip_path = str((staging_dir / f"clipmax_{clip_num}_{int(clip.start_time)}.mp4").resolve())
                     self.staging_files.append(staging_clip_path)
 
+                    print(f"[CUT] Memotong klip '{clip.title}' dari detik {clip.start_time:.2f} sampai {clip.end_time:.2f} (durasi: {clip.end_time - clip.start_time:.2f}s)")
                     render_clip(
                         input_video=video_path,
                         output_clip=staging_clip_path,

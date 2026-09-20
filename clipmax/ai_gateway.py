@@ -110,12 +110,13 @@ Format output WAJIB berupa JSON array murni tanpa markdown wrapper:
   {
     "title": "Judul singkat klip",
     "hook": "Kalimat pembuka pemikat perhatian",
-    "start_time": "HH:MM:SS atau detik",
-    "end_time": "HH:MM:SS atau detik",
+    "start_time": 754.20,
+    "end_time": 784.50,
     "virality_score": 95,
     "reasoning": "Penjelasan mengapa klip ini viral"
   }
-]"""
+]
+PENTING: Gunakan stempel waktu 'start_time' dan 'end_time' presisi angka float detik dari penanda waktu transkrip (contoh: 754.20), JANGAN membulatkan ke integer agar pemotongan FFmpeg presisi frame-accurate."""
 
 MONTAGE_SYSTEM_PROMPT = """Anda adalah editor dan kurator video montage profesional untuk TikTok, Instagram Reels, dan YouTube Shorts.
 Tugas Anda adalah merangkai video Multi-Cut Montage dengan menggabungkan beberapa momen penting atau klimaks berbeda dari transkrip video.
@@ -244,8 +245,8 @@ Wajib patuhi CRITICAL CAMPAIGN RULES dan ATURAN UTAMA di atas. Jika ada syarat k
             for c in cuts_raw:
                 if not isinstance(c, dict):
                     continue
-                c_start = parse_to_seconds(c.get("start", c.get("start_time", 0)))
-                c_end = parse_to_seconds(c.get("end", c.get("end_time", 0)))
+                c_start = round(parse_to_seconds(c.get("start", c.get("start_time", 0))), 2)
+                c_end = round(parse_to_seconds(c.get("end", c.get("end_time", 0))), 2)
                 c_ev = str(c.get("event", c.get("title", "")))
                 if c_end > c_start and (c_end - c_start) >= 2.0:
                     valid_cuts.append(MontageCut(start=c_start, end=c_end, event=c_ev))
@@ -268,8 +269,8 @@ Wajib patuhi CRITICAL CAMPAIGN RULES dan ATURAN UTAMA di atas. Jika ada syarat k
                 continue
 
         # Single clip processing (Default)
-        start_sec = parse_to_seconds(item.get("start_time", 0))
-        end_sec = parse_to_seconds(item.get("end_time", 0))
+        start_sec = round(parse_to_seconds(item.get("start_time", 0)), 2)
+        end_sec = round(parse_to_seconds(item.get("end_time", 0)), 2)
         dur = end_sec - start_sec
 
         if end_sec <= start_sec or dur < 5.0:

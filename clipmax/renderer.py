@@ -46,6 +46,8 @@ def render_clip(
     # Force NVENC GPU encoder
     encoder = "h264_nvenc" if use_gpu else "libx264"
     preset = "p4" if encoder == "h264_nvenc" else "veryfast"
+    clip_dur = max(0.1, end_time - start_time)
+    print(f"[CUT] Memotong segmen dari detik {start_time:.2f} sampai {end_time:.2f} (durasi: {clip_dur:.2f}s)")
     print(f"[ClipMax Render] Rendering via FFmpeg using encoder={encoder}, preset={preset}, mode={reframe_mode}...")
 
     escaped_ass = sanitize_ffmpeg_path(ass_path) if (ass_path and os.path.exists(ass_path)) else None
@@ -90,9 +92,9 @@ def render_clip(
         cmd = [
             get_ffmpeg_bin(),
             "-y",
-            "-ss", str(start_time),
-            "-to", str(end_time),
+            "-ss", f"{start_time:.2f}",
             "-i", str(in_p.resolve()),
+            "-to", f"{clip_dur:.2f}",
             "-filter_complex", full_filter,
             "-map", "[outv]",
             "-map", "[outa]",
@@ -115,9 +117,9 @@ def render_clip(
         cmd = [
             get_ffmpeg_bin(),
             "-y",
-            "-ss", str(start_time),
-            "-to", str(end_time),
+            "-ss", f"{start_time:.2f}",
             "-i", str(in_p.resolve()),
+            "-to", f"{clip_dur:.2f}",
             "-filter_complex", filter_str,
             "-map", "[outv]",
             "-map", "0:a?",
@@ -142,9 +144,9 @@ def render_clip(
         cmd = [
             get_ffmpeg_bin(),
             "-y",
-            "-ss", str(start_time),
-            "-to", str(end_time),
+            "-ss", f"{start_time:.2f}",
             "-i", str(in_p.resolve()),
+            "-to", f"{clip_dur:.2f}",
             "-vf", vf_chain,
             "-c:v", encoder,
             "-preset", preset,

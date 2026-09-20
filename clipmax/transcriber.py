@@ -59,7 +59,12 @@ def transcribe_audio(
         )
 
         for segment in segments:
-            text_segments.append(segment.text.strip())
+            t_text = segment.text.strip()
+            if t_text:
+                if hasattr(segment, "start") and hasattr(segment, "end") and isinstance(segment.start, (int, float)):
+                    text_segments.append(f"[{segment.start:.2f}s - {segment.end:.2f}s] {t_text}")
+                else:
+                    text_segments.append(t_text)
             if segment.words:
                 for w in segment.words:
                     clean_w = w.word.strip()
@@ -67,8 +72,8 @@ def transcribe_audio(
                         all_words.append(
                             WordSegment(
                                 word=clean_w,
-                                start=float(w.start),
-                                end=float(w.end),
+                                start=round(float(w.start), 2),
+                                end=round(float(w.end), 2),
                                 probability=float(w.probability)
                             )
                         )
@@ -81,5 +86,5 @@ def transcribe_audio(
             del whisper_model
         cleanup_vram()
 
-    full_transcript = " ".join(text_segments)
+    full_transcript = "\n".join(text_segments)
     return all_words, full_transcript
