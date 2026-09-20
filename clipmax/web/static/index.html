@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClipMax Studio</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            canvas: '#0B0E14',
+            surface: '#151923',
+            surfaceHover: '#1E2330',
+            borderSubtle: '#222938',
+            indigoAccent: '#6366F1',
+            indigoHover: '#4F46E5',
+            emeraldAccent: '#10B981',
+            amberAccent: '#F59E0B',
+            roseAlert: '#F43F5E'
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#0B0E14] text-gray-200 antialiased h-screen flex flex-col select-none">
+
+  <!-- Top Header Bar (42px) -->
+  <header class="h-[42px] bg-[#10141D] border-b border-[#222938] px-4 flex items-center justify-between shrink-0 z-50">
+    <!-- Left: App Brand -->
+    <div class="flex items-center space-x-2.5">
+      <div class="w-6 h-6 rounded-md bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-sm shadow-indigo-500/30">
+        <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M4 4h4v16H4V4zm6 0h4v16h-4V4zm6 0h4v16h-4V4z"/>
+        </svg>
+      </div>
+      <span class="font-semibold text-sm tracking-wide text-white">ClipMax Studio</span>
+      <span class="text-[10px] px-1.5 py-0.5 rounded font-mono bg-indigo-950/60 border border-indigo-700/40 text-indigo-300">v2.4</span>
+    </div>
+
+    <!-- Right: Hardware Status Pill & Window Controls -->
+    <div class="flex items-center space-x-3">
+      <div id="hwPill" class="flex items-center space-x-2 px-2.5 py-1 rounded-full bg-[#151923] border border-[#222938] text-[11px] font-medium text-gray-300 shadow-inner">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 pulsing-dot"></span>
+        <span id="hwPillText">NVIDIA RTX 3050 | CUDA Active</span>
+      </div>
+
+      <!-- Window controls (for desktop app) -->
+      <div class="flex items-center space-x-1 pl-1">
+        <button id="btnMin" title="Minimize" class="w-7 h-7 flex items-center justify-center rounded hover:bg-[#222938] text-gray-400 hover:text-white transition">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+        </button>
+        <button id="btnClose" title="Close" class="w-7 h-7 flex items-center justify-center rounded hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 transition">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Body Grid: Left Sidebar (380px) + Right Main Stage -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- LEFT SIDEBAR (Controls & Ingestion) -->
+    <aside class="w-[380px] shrink-0 border-r border-[#222938] bg-[#121620] flex flex-col h-full overflow-y-auto">
+      <div class="p-4 space-y-5">
+
+        <!-- 1. Source Ingestion Segmented Control -->
+        <div class="space-y-2">
+          <label class="text-[11px] font-semibold tracking-wider uppercase text-gray-400">Source Ingestion</label>
+          
+          <!-- Segmented Tab -->
+          <div class="grid grid-cols-2 p-1 bg-[#0B0E14] border border-[#222938] rounded-lg">
+            <button id="tabUrl" class="py-1.5 text-xs font-medium rounded-md transition-all text-white bg-[#1E2330] shadow-sm">
+              YouTube URL
+            </button>
+            <button id="tabLocal" class="py-1.5 text-xs font-medium rounded-md transition-all text-gray-400 hover:text-gray-200">
+              File Video Lokal
+            </button>
+          </div>
+
+          <!-- YouTube View -->
+          <div id="viewUrl" class="space-y-2.5 pt-1">
+            <input type="text" id="inputUrl" placeholder="https://www.youtube.com/watch?v=..." 
+              class="w-full px-3 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-md focus:outline-none transition text-gray-100 placeholder-gray-500">
+            
+            <!-- Cookies file row -->
+            <div class="flex items-center justify-between text-xs pt-0.5">
+              <button id="btnImportCookie" class="px-2.5 py-1 text-[11px] font-medium rounded border border-[#2A3345] hover:border-indigo-500 bg-[#151923] hover:bg-[#1C2230] text-gray-300 transition">
+                Import cookies.txt
+              </button>
+              <span id="cookieBadge" class="text-[11px] text-gray-500">No cookies loaded</span>
+              <input type="file" id="fileCookieInput" accept=".txt" class="hidden">
+            </div>
+          </div>
+
+          <!-- Local File View -->
+          <div id="viewLocal" class="space-y-2.5 pt-1 hidden">
+            <div id="dropZone" class="border border-dashed border-[#2A3345] hover:border-indigo-500 rounded-lg p-3 text-center cursor-pointer bg-[#0B0E14] transition">
+              <svg class="w-6 h-6 mx-auto mb-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+              </svg>
+              <span id="lblLocalFile" class="text-xs text-gray-400 block truncate">Pilih atau Drag File Video</span>
+            </div>
+            <input type="file" id="fileVideoInput" accept="video/mp4,video/mkv,video/mov,video/webm" class="hidden">
+          </div>
+        </div>
+
+        <div class="border-t border-[#1C2333]"></div>
+
+        <!-- 2. AI Provider & Models -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-[11px] font-semibold tracking-wider uppercase text-gray-400">AI Engine Parameters</label>
+            <button id="btnRefreshModels" title="Refresh Model Discovery" class="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center space-x-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-[10px] text-gray-400 font-medium">API Endpoint Gateway</label>
+            <input type="text" id="inputEndpoint" value="http://localhost:20128/v1" 
+              class="w-full px-2.5 py-1.5 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-md focus:outline-none text-gray-200">
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-[10px] text-gray-400 font-medium">API Key (Opsional / Gateway)</label>
+            <input type="password" id="inputApiKey" placeholder="sk-..." 
+              class="w-full px-2.5 py-1.5 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-md focus:outline-none text-gray-200">
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-[10px] text-gray-400 font-medium">Model LLM Selection</label>
+            <select id="selectModel" class="w-full px-2.5 py-1.5 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-md focus:outline-none text-gray-200 cursor-pointer">
+              <option value="default">default (auto-gateway)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="border-t border-[#1C2333]"></div>
+
+        <!-- 3. Curation Directives -->
+        <div class="space-y-3">
+          <label class="text-[11px] font-semibold tracking-wider uppercase text-gray-400">Curation Directives</label>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div class="space-y-1">
+              <label class="text-[10px] text-gray-400 font-medium">Target Klip (1-10)</label>
+              <input type="number" id="inputTargetClips" min="1" max="10" value="3" 
+                class="w-full px-2.5 py-1.5 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-md focus:outline-none text-gray-200">
+            </div>
+            <div class="space-y-1">
+              <label class="text-[10px] text-gray-400 font-medium">Durasi Preset</label>
+              <select id="selectDuration" class="w-full px-2 py-1.5 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-md focus:outline-none text-gray-200 cursor-pointer">
+                <option value="auto">Auto / 30-60s</option>
+                <option value="short">Short (<30s)</option>
+                <option value="long">Long (60-90s)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-[10px] text-gray-400 font-medium">Campaign Brief & Custom Rules</label>
+            <textarea id="inputRules" rows="3" placeholder="Fokus pada momen punchline, insight bisnis, dan tips praktis..." 
+              class="w-full p-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-md focus:outline-none text-gray-200 resize-none"></textarea>
+          </div>
+        </div>
+
+        <!-- 4. Action Buttons -->
+        <div class="pt-2 space-y-2">
+          <button id="btnGenerate" class="w-full py-3 px-4 rounded-lg font-semibold text-sm text-white btn-primary-glow flex items-center justify-center space-x-2">
+            <svg class="w-4 h-4 text-indigo-200" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
+            </svg>
+            <span>Mulai Generate Klip 9:16</span>
+          </button>
+
+          <button id="btnCancel" class="w-full py-2 px-4 rounded-lg font-medium text-xs text-rose-300 border border-rose-900/50 hover:bg-rose-900/30 transition hidden">
+            Batalkan Proses
+          </button>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- RIGHT MAIN STAGE -->
+    <main class="flex-1 flex flex-col h-full bg-[#0B0E14] overflow-hidden relative">
+
+      <!-- 1. STANDBY STATE -->
+      <section id="stageStandby" class="flex-1 flex flex-col items-center justify-center p-8 text-center">
+        <div class="w-20 h-20 rounded-2xl bg-gradient-to-b from-[#151923] to-[#0E121A] border border-[#222938] flex items-center justify-center shadow-xl mb-4">
+          <svg class="w-10 h-10 text-indigo-400/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <h2 class="text-base font-semibold text-gray-200 mb-1">Studio Workspace Standby</h2>
+        <p class="text-xs text-gray-400 max-w-sm">Masukkan URL YouTube atau pilih file video horizontal di sidebar kiri untuk memulai kurasi otomatis.</p>
+      </section>
+
+      <!-- 2. PROCESSING STATE (Live Pipeline Stepper) -->
+      <section id="stageProcessing" class="flex-1 flex flex-col items-center justify-center p-8 hidden">
+        <div class="w-full max-w-lg card-glow rounded-xl p-6 space-y-6">
+          
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+              <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 pulsing-dot"></span>
+              <h3 class="text-sm font-semibold text-white">Pipeline AI Sedang Berjalan</h3>
+            </div>
+            <span id="processPct" class="text-sm font-bold font-mono text-indigo-400">0%</span>
+          </div>
+
+          <!-- Gradient Progress Bar -->
+          <div class="w-full h-2 bg-[#0E121A] rounded-full overflow-hidden border border-[#222938]">
+            <div id="progressBar" class="h-full bg-gradient-to-r from-indigo-500 via-indigo-600 to-emerald-400 transition-all duration-300" style="width: 0%"></div>
+          </div>
+
+          <!-- Real-time Status Message -->
+          <p id="processMsg" class="text-xs text-gray-300 text-center font-mono">Mempersiapkan pipeline...</p>
+
+          <!-- Stepper Grid -->
+          <div class="grid grid-cols-3 gap-2 text-[11px] pt-2">
+            <div id="step-ingest" class="p-2 rounded bg-[#0E121A] border border-[#222938] text-center text-gray-400">
+              1. Ingestion
+            </div>
+            <div id="step-transcribe" class="p-2 rounded bg-[#0E121A] border border-[#222938] text-center text-gray-400">
+              2. Whisper CUDA
+            </div>
+            <div id="step-ai" class="p-2 rounded bg-[#0E121A] border border-[#222938] text-center text-gray-400">
+              3. LLM Curation
+            </div>
+            <div id="step-reframe" class="p-2 rounded bg-[#0E121A] border border-[#222938] text-center text-gray-400">
+              4. Scene Reframe
+            </div>
+            <div id="step-render" class="p-2 rounded bg-[#0E121A] border border-[#222938] text-center text-gray-400">
+              5. NVENC Render
+            </div>
+            <div id="step-complete" class="p-2 rounded bg-[#0E121A] border border-[#222938] text-center text-gray-400">
+              6. Completed
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 3. REVIEW WORKSPACE (When Finished) -->
+      <section id="stageReview" class="flex-1 flex overflow-hidden hidden">
+        
+        <!-- Left: Centered Video Player & Controls -->
+        <div class="flex-1 flex flex-col items-center justify-center p-4 overflow-y-auto">
+          
+          <!-- 9:16 Video Canvas Box -->
+          <div class="relative bg-black rounded-lg overflow-hidden border border-[#222938] shadow-2xl h-[480px] aspect-9-16 flex items-center justify-center">
+            <video id="mainVideo" class="w-full h-full object-contain" preload="metadata" playsinline></video>
+          </div>
+
+          <!-- Video Controls Bar -->
+          <div class="w-full max-w-[360px] mt-3 space-y-2">
+            <!-- Scrubber Timeline -->
+            <input type="range" id="videoScrubber" min="0" max="1000" value="0" class="w-full">
+            
+            <div class="flex items-center justify-between">
+              <!-- Play / Pause -->
+              <div class="flex items-center space-x-2">
+                <button id="btnPlayPause" class="w-8 h-8 rounded-full bg-[#1A202C] hover:bg-indigo-600 text-white flex items-center justify-center transition shadow">
+                  <svg id="iconPlay" class="w-3.5 h-3.5 fill-current ml-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                  <svg id="iconPause" class="w-3.5 h-3.5 fill-current hidden" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+                <span id="timeDisplay" class="text-xs font-mono text-gray-400">00:00 / 00:00</span>
+              </div>
+
+              <!-- Volume Controls -->
+              <div class="flex items-center space-x-1.5">
+                <button id="btnMute" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white transition">
+                  <span id="muteIcon" class="text-sm">🔊</span>
+                </button>
+                <input type="range" id="volumeSlider" min="0" max="100" value="40" class="w-20" title="Volume: 40%">
+              </div>
+            </div>
+
+            <!-- Active Clip Info -->
+            <div class="p-3 bg-[#131722] border border-[#222938] rounded-lg mt-2 text-xs space-y-1">
+              <div class="flex items-center justify-between">
+                <span id="activeClipTitle" class="font-semibold text-gray-200 truncate max-w-[240px]">Judul Klip</span>
+                <span id="activeClipScore" class="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">95 Score</span>
+              </div>
+              <p id="activeClipHook" class="text-indigo-300 italic text-[11px] line-clamp-1"></p>
+              <p id="activeClipReason" class="text-gray-400 text-[11px] line-clamp-2"></p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right: Curated Clips Gallery Strip -->
+        <div class="w-[360px] shrink-0 border-l border-[#222938] bg-[#121620] flex flex-col h-full">
+          <div class="p-3 border-b border-[#222938] flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-gray-300">Curated Clips (<span id="clipsCount">0</span>)</span>
+            <button id="btnNewTask" class="text-xs text-gray-400 hover:text-indigo-300 transition">Reset</button>
+          </div>
+
+          <!-- Cards List -->
+          <div id="clipsGallery" class="flex-1 p-3 space-y-2.5 overflow-y-auto">
+            <!-- Dynamically injected cards -->
+          </div>
+
+          <!-- Bottom Export Bar -->
+          <div class="p-3 border-t border-[#222938] bg-[#0E121A] space-y-2">
+            <button id="btnExportSingle" class="w-full py-2 px-3 rounded-md text-xs font-semibold text-white btn-emerald-glow flex items-center justify-center space-x-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <span>Export Selected Clip</span>
+            </button>
+            <button id="btnExportAll" class="w-full py-2 px-3 rounded-md text-xs font-semibold text-white btn-primary-glow flex items-center justify-center space-x-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+              <span>Export All Clips</span>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

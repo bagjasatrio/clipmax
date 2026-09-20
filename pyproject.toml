@@ -19,6 +19,11 @@ dependencies = [
     "nvidia-cublas-cu12>=12.1.0",
     "nvidia-cudnn-cu12>=9.0.0",
     "scenedetect>=0.7.1",
+    "pywebview>=6.2.1",
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.53.0",
+    "websockets>=17.1",
+    "python-multipart>=0.0.32",
 ]
 
 [tool.pytest.ini_options]

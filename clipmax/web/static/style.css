@@ -1,0 +1,119 @@
+/* ClipMax Studio Modern Dark Theme */
+:root {
+  --bg-canvas: #0B0E14;
+  --bg-surface: #151923;
+  --bg-surface-hover: #1E2330;
+  --border-subtle: #222938;
+  --border-focus: #6366F1;
+  --primary-accent: #6366F1;
+  --primary-hover: #4F46E5;
+  --secondary-emerald: #10B981;
+  --amber-highlight: #F59E0B;
+  --rose-alert: #F43F5E;
+  --text-primary: #F3F4F6;
+  --text-muted: #9CA3AF;
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0E121A;
+}
+::-webkit-scrollbar-thumb {
+  background: #222938;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}
+
+/* Glass & Glow */
+.card-glow {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.2s ease-in-out;
+}
+.card-glow:hover {
+  border-color: #374151;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+}
+
+.btn-primary-glow {
+  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.35);
+  transition: all 0.2s ease-in-out;
+}
+.btn-primary-glow:hover {
+  box-shadow: 0 6px 20px 0 rgba(99, 102, 241, 0.55);
+  transform: translateY(-1px);
+}
+.btn-primary-glow:active {
+  transform: translateY(0);
+}
+
+.btn-emerald-glow {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.3);
+  transition: all 0.2s ease-in-out;
+}
+.btn-emerald-glow:hover {
+  box-shadow: 0 6px 20px 0 rgba(16, 185, 129, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Custom Range Inputs (Scrubber & Volume) */
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+input[type=range]:focus {
+  outline: none;
+}
+input[type=range]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #222938;
+  border-radius: 2px;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #F3F4F6;
+  border-radius: 50%;
+  margin-top: -4px;
+  box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  transition: transform 0.1s ease;
+}
+input[type=range]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: #FFFFFF;
+}
+
+/* 9:16 Responsive Container */
+.aspect-9-16 {
+  aspect-ratio: 9 / 16;
+}
+
+/* Pulse Glow Animation */
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 0.4; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+.pulsing-dot {
+  animation: pulse-ring 2s infinite ease-in-out;
+}
