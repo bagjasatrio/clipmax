@@ -148,7 +148,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.resize(1040, 740)
+        self.resize(1080, 780)
 
         self.config = AppConfig.load()
         self.orchestrator = PipelineOrchestrator(self.config)
@@ -174,21 +174,36 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         root_layout = QVBoxLayout(central)
         root_layout.setContentsMargins(20, 16, 20, 20)
-        root_layout.setSpacing(12)
+        root_layout.setSpacing(14)
 
-        # Custom Frameless Titlebar
+        # Baris 1: Header Minimalis (Title + Subtitle + Hardware Badge + Close)
         title_bar = QHBoxLayout()
-        title_lbl = QLabel("ClipMax — Autonomous Desktop Clipper")
+        title_bar.setContentsMargins(0, 0, 0, 2)
+        title_bar.setSpacing(12)
+
+        header_info = QVBoxLayout()
+        header_info.setSpacing(2)
+        title_lbl = QLabel("ClipMax")
         title_lbl.setProperty("class", "Title")
+        sub_lbl = QLabel("Autonomous Desktop Clipper")
+        sub_lbl.setProperty("class", "Sub")
+        header_info.addWidget(title_lbl)
+        header_info.addWidget(sub_lbl)
+        title_bar.addLayout(header_info)
+
+        title_bar.addStretch()
+
+        # Hardware Badge
+        self.lbl_hw_badge = QLabel("RTX 3050 • CUDA")
+        self.lbl_hw_badge.setProperty("class", "BadgeHardware")
+        title_bar.addWidget(self.lbl_hw_badge)
 
         btn_close = QPushButton("✕")
-        btn_close.setFixedSize(30, 30)
+        btn_close.setFixedSize(32, 32)
         btn_close.setProperty("class", "Secondary")
         btn_close.clicked.connect(self.close)
-
-        title_bar.addWidget(title_lbl)
-        title_bar.addStretch()
         title_bar.addWidget(btn_close)
+
         root_layout.addLayout(title_bar)
 
         # Stacked Widget (Page 0: Input/Queue, Page 1: Review Workspace)
@@ -206,114 +221,85 @@ class MainWindow(QMainWindow):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setSpacing(14)
 
-        # Card 1: AI Provider Gateway
-        provider_card = QFrame()
-        provider_card.setProperty("class", "Card")
-        p_layout = QVBoxLayout(provider_card)
-        p_layout.setContentsMargins(14, 12, 14, 12)
-        p_layout.setSpacing(10)
+        # Baris 2: Split 2 Kolom (Kiri: AI Gateway, Kanan: Campaign & Target)
+        row2_layout = QHBoxLayout()
+        row2_layout.setSpacing(14)
 
-        p_lbl = QLabel("AI Provider & Dynamic Model Discovery")
-        p_lbl.setProperty("class", "SectionHeader")
-        p_layout.addWidget(p_lbl)
+        # Kolom Kiri: AI Provider & Model Discovery
+        card_provider = QFrame()
+        card_provider.setProperty("class", "Card")
+        cp_layout = QVBoxLayout(card_provider)
+        cp_layout.setContentsMargins(16, 14, 16, 14)
+        cp_layout.setSpacing(8)
 
-        row1 = QHBoxLayout()
+        lbl_p_title = QLabel("AI PROVIDER & GATEWAY")
+        lbl_p_title.setProperty("class", "SectionHeader")
+        cp_layout.addWidget(lbl_p_title)
+
+        lbl_ep = QLabel("Endpoint URL:")
+        lbl_ep.setProperty("class", "FormLabel")
         self.txt_endpoint = QLineEdit(self.config.endpoint_url)
-        self.txt_endpoint.setPlaceholderText("Endpoint URL (e.g. http://localhost:20128/v1)")
+        self.txt_endpoint.setPlaceholderText("http://localhost:20128/v1")
+        cp_layout.addWidget(lbl_ep)
+        cp_layout.addWidget(self.txt_endpoint)
+
+        lbl_key = QLabel("API Key (Opsional):")
+        lbl_key.setProperty("class", "FormLabel")
         self.txt_key = QLineEdit(self.config.api_key)
-        self.txt_key.setPlaceholderText("API Key (opsional)")
+        self.txt_key.setPlaceholderText("Bearer token / sk-...")
         self.txt_key.setEchoMode(QLineEdit.Password)
-        self.btn_discover = QPushButton("Discover Models")
-        self.btn_discover.setProperty("class", "Secondary")
-        self.btn_discover.clicked.connect(self._on_discover_models)
+        cp_layout.addWidget(lbl_key)
+        cp_layout.addWidget(self.txt_key)
 
-        row1.addWidget(self.txt_endpoint, 3)
-        row1.addWidget(self.txt_key, 2)
-        row1.addWidget(self.btn_discover, 1)
-        p_layout.addLayout(row1)
+        lbl_model = QLabel("Model:")
+        lbl_model.setProperty("class", "FormLabel")
+        cp_layout.addWidget(lbl_model)
 
-        row2 = QHBoxLayout()
+        model_row = QHBoxLayout()
+        model_row.setSpacing(8)
         self.cmb_models = QComboBox()
         self.cmb_models.addItem(self.config.selected_model)
-        self.lbl_device = QLabel(f"Hardware: {self.config.device.upper()} ({self.config.compute_type})")
-        self.lbl_device.setStyleSheet("color: #9CA3AF; font-size: 12px;")
-        row2.addWidget(QLabel("Model:"))
-        row2.addWidget(self.cmb_models, 3)
-        row2.addWidget(self.lbl_device, 1)
-        p_layout.addLayout(row2)
+        self.btn_discover = QPushButton("Discover")
+        self.btn_discover.setProperty("class", "Secondary")
+        self.btn_discover.clicked.connect(self._on_discover_models)
+        model_row.addWidget(self.cmb_models, 1)
+        model_row.addWidget(self.btn_discover)
+        cp_layout.addLayout(model_row)
 
-        layout.addWidget(provider_card)
+        cp_layout.addStretch()
+        row2_layout.addWidget(card_provider, 1)
 
-        # Card 2: Input Video Source (Tabs: File Lokal vs Link Video)
-        video_card = QFrame()
-        video_card.setProperty("class", "Card")
-        v_layout = QVBoxLayout(video_card)
-        v_layout.setContentsMargins(14, 12, 14, 12)
-        v_layout.setSpacing(10)
+        # Kolom Kanan: Generation & Campaign Settings
+        card_campaign = QFrame()
+        card_campaign.setProperty("class", "Card")
+        cc_layout = QVBoxLayout(card_campaign)
+        cc_layout.setContentsMargins(16, 14, 16, 14)
+        cc_layout.setSpacing(8)
 
-        v_lbl = QLabel("Input Video Ingestion (16:9 Long Form)")
-        v_lbl.setProperty("class", "SectionHeader")
-        v_layout.addWidget(v_lbl)
+        lbl_c_title = QLabel("CAMPAIGN & TARGET RULES")
+        lbl_c_title.setProperty("class", "SectionHeader")
+        cc_layout.addWidget(lbl_c_title)
 
-        self.input_tabs = QTabWidget()
+        param_row = QHBoxLayout()
+        param_row.setSpacing(10)
 
-        # Tab 1: File Lokal
-        tab_local = QWidget()
-        tl_layout = QHBoxLayout(tab_local)
-        tl_layout.setContentsMargins(6, 6, 6, 6)
-        self.txt_video = QLineEdit()
-        self.txt_video.setPlaceholderText("Pilih file video MP4/MKV...")
-        self.btn_browse = QPushButton("Browse...")
-        self.btn_browse.setProperty("class", "Secondary")
-        self.btn_browse.clicked.connect(self._on_browse_video)
-        tl_layout.addWidget(self.txt_video, 4)
-        tl_layout.addWidget(self.btn_browse, 1)
-
-        # Tab 2: Link Video yt-dlp
-        tab_url = QWidget()
-        tu_layout = QHBoxLayout(tab_url)
-        tu_layout.setContentsMargins(6, 6, 6, 6)
-        self.txt_url = QLineEdit()
-        self.txt_url.setPlaceholderText("Tempel URL video (YouTube, X, Instagram, TikTok)...")
-        tu_layout.addWidget(self.txt_url, 1)
-
-        self.input_tabs.addTab(tab_local, "📁 File Video Lokal")
-        self.input_tabs.addTab(tab_url, "🌐 Video Link (yt-dlp)")
-        v_layout.addWidget(self.input_tabs)
-
-        layout.addWidget(video_card)
-
-        # Card 3: Generation & Campaign Settings
-        gen_card = QFrame()
-        gen_card.setProperty("class", "Card")
-        g_layout = QVBoxLayout(gen_card)
-        g_layout.setContentsMargins(14, 12, 14, 12)
-        g_layout.setSpacing(10)
-
-        g_lbl = QLabel("Generation & Campaign Settings")
-        g_lbl.setProperty("class", "SectionHeader")
-        g_layout.addWidget(g_lbl)
-
-        row_params = QHBoxLayout()
-        row_params.setSpacing(12)
-
-        # Target clip count
         count_box = QVBoxLayout()
-        count_lbl = QLabel("Target Clip Count:")
-        count_lbl.setStyleSheet("color: #9CA3AF; font-size: 12px;")
+        count_box.setSpacing(4)
+        lbl_count = QLabel("Target Klip:")
+        lbl_count.setProperty("class", "FormLabel")
         self.spn_clip_count = QSpinBox()
         self.spn_clip_count.setRange(1, 10)
         self.spn_clip_count.setValue(self.config.target_clip_count or 3)
-        count_box.addWidget(count_lbl)
+        count_box.addWidget(lbl_count)
         count_box.addWidget(self.spn_clip_count)
-        row_params.addLayout(count_box, 1)
+        param_row.addLayout(count_box, 1)
 
-        # Clip Duration Range
         dur_box = QVBoxLayout()
-        dur_lbl = QLabel("Clip Duration Range:")
-        dur_lbl.setStyleSheet("color: #9CA3AF; font-size: 12px;")
+        dur_box.setSpacing(4)
+        lbl_dur = QLabel("Rentang Durasi:")
+        lbl_dur.setProperty("class", "FormLabel")
         self.cmb_duration = QComboBox()
         self.cmb_duration.addItems([
             "Auto / Optimal (30-60s)",
@@ -326,87 +312,131 @@ class MainWindow(QMainWindow):
         if preset_idx >= 0:
             self.cmb_duration.setCurrentIndex(preset_idx)
         self.cmb_duration.currentIndexChanged.connect(self._on_duration_preset_changed)
-
-        dur_box.addWidget(dur_lbl)
+        dur_box.addWidget(lbl_dur)
         dur_box.addWidget(self.cmb_duration)
-        row_params.addLayout(dur_box, 2)
+        param_row.addLayout(dur_box, 2)
+
+        cc_layout.addLayout(param_row)
 
         # Custom duration container
         self.custom_dur_widget = QWidget()
         custom_layout = QHBoxLayout(self.custom_dur_widget)
         custom_layout.setContentsMargins(0, 0, 0, 0)
-        custom_layout.setSpacing(6)
+        custom_layout.setSpacing(8)
 
-        min_layout = QVBoxLayout()
-        min_lbl = QLabel("Min (s):")
-        min_lbl.setStyleSheet("color: #9CA3AF; font-size: 11px;")
+        min_box = QVBoxLayout()
+        min_box.setSpacing(2)
+        lbl_min = QLabel("Min (s):")
+        lbl_min.setProperty("class", "FormLabel")
         self.spn_min_dur = QSpinBox()
         self.spn_min_dur.setRange(5, 300)
         self.spn_min_dur.setValue(int(self.config.min_duration or 30))
-        min_layout.addWidget(min_lbl)
-        min_layout.addWidget(self.spn_min_dur)
-        custom_layout.addLayout(min_layout)
+        min_box.addWidget(lbl_min)
+        min_box.addWidget(self.spn_min_dur)
+        custom_layout.addLayout(min_box)
 
-        max_layout = QVBoxLayout()
-        max_lbl = QLabel("Max (s):")
-        max_lbl.setStyleSheet("color: #9CA3AF; font-size: 11px;")
+        max_box = QVBoxLayout()
+        max_box.setSpacing(2)
+        lbl_max = QLabel("Max (s):")
+        lbl_max.setProperty("class", "FormLabel")
         self.spn_max_dur = QSpinBox()
         self.spn_max_dur.setRange(10, 600)
         self.spn_max_dur.setValue(int(self.config.max_duration or 60))
-        max_layout.addWidget(max_lbl)
-        max_layout.addWidget(self.spn_max_dur)
-        custom_layout.addLayout(max_layout)
+        max_box.addWidget(lbl_max)
+        max_box.addWidget(self.spn_max_dur)
+        custom_layout.addLayout(max_box)
 
-        row_params.addWidget(self.custom_dur_widget, 2)
+        cc_layout.addWidget(self.custom_dur_widget)
         self.custom_dur_widget.setVisible(self.cmb_duration.currentText() == "Custom")
 
-        g_layout.addLayout(row_params)
-
-        # Campaign Rules
-        rules_lbl = QLabel("Campaign Rules / Custom Guidelines (Opsional):")
-        rules_lbl.setStyleSheet("color: #9CA3AF; font-size: 12px;")
-        g_layout.addWidget(rules_lbl)
+        lbl_rules = QLabel("Brief / Aturan Kampanye (Opsional):")
+        lbl_rules.setProperty("class", "FormLabel")
+        cc_layout.addWidget(lbl_rules)
 
         self.txt_rules = QPlainTextEdit()
         self.txt_rules.setPlaceholderText(
-            "Contoh: Fokus pada pembahasan produk X, pastikan klip memiliki call to action di akhir, hindari topik politik..."
+            "Contoh: Fokus pada hook solusi, sertakan call-to-action di akhir, hindari topik sensitif..."
         )
         self.txt_rules.setPlainText(self.config.campaign_rules or "")
-        self.txt_rules.setFixedHeight(65)
-        g_layout.addWidget(self.txt_rules)
+        self.txt_rules.setFixedHeight(75)
+        cc_layout.addWidget(self.txt_rules)
 
-        layout.addWidget(gen_card)
+        row2_layout.addWidget(card_campaign, 1)
+        layout.addLayout(row2_layout)
 
-        # Card 4: Execution & Progress
-        exec_card = QFrame()
-        exec_card.setProperty("class", "Card")
-        e_layout = QVBoxLayout(exec_card)
-        e_layout.setContentsMargins(14, 12, 14, 12)
-        e_layout.setSpacing(10)
+        # Baris 3 (Full Width): Input Video Ingestion
+        card_video = QFrame()
+        card_video.setProperty("class", "Card")
+        cv_layout = QVBoxLayout(card_video)
+        cv_layout.setContentsMargins(16, 14, 16, 14)
+        cv_layout.setSpacing(10)
+
+        lbl_v_title = QLabel("INPUT VIDEO INGESTION (16:9)")
+        lbl_v_title.setProperty("class", "SectionHeader")
+        cv_layout.addWidget(lbl_v_title)
+
+        self.input_tabs = QTabWidget()
+
+        # Tab 1: File Lokal
+        tab_local = QWidget()
+        tl_layout = QHBoxLayout(tab_local)
+        tl_layout.setContentsMargins(8, 8, 8, 8)
+        tl_layout.setSpacing(10)
+        self.txt_video = QLineEdit()
+        self.txt_video.setPlaceholderText("Pilih file video MP4, MKV, MOV...")
+        self.btn_browse = QPushButton("Browse File...")
+        self.btn_browse.setProperty("class", "Secondary")
+        self.btn_browse.clicked.connect(self._on_browse_video)
+        tl_layout.addWidget(self.txt_video, 1)
+        tl_layout.addWidget(self.btn_browse)
+
+        # Tab 2: Link Video yt-dlp
+        tab_url = QWidget()
+        tu_layout = QHBoxLayout(tab_url)
+        tu_layout.setContentsMargins(8, 8, 8, 8)
+        tu_layout.setSpacing(10)
+        self.txt_url = QLineEdit()
+        self.txt_url.setPlaceholderText("Tempel tautan video YouTube, X, Instagram, TikTok...")
+        tu_layout.addWidget(self.txt_url, 1)
+
+        self.input_tabs.addTab(tab_local, "📁 File Video Lokal")
+        self.input_tabs.addTab(tab_url, "🌐 Video Link (yt-dlp)")
+        cv_layout.addWidget(self.input_tabs)
+
+        layout.addWidget(card_video)
+
+        # Baris 4 (Full Width): Progress Section & Tombol Aksi Utama
+        card_exec = QFrame()
+        card_exec.setProperty("class", "Card")
+        ce_layout = QVBoxLayout(card_exec)
+        ce_layout.setContentsMargins(16, 14, 16, 14)
+        ce_layout.setSpacing(12)
 
         self.lbl_status = QLabel("Status: Siap memproses video...")
         self.lbl_status.setProperty("class", "Sub")
+        ce_layout.addWidget(self.lbl_status)
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
+        ce_layout.addWidget(self.progress_bar)
 
-        e_layout.addWidget(self.lbl_status)
-        e_layout.addWidget(self.progress_bar)
+        btn_action_row = QHBoxLayout()
+        btn_action_row.setSpacing(12)
 
-        btn_row = QHBoxLayout()
         self.btn_start = QPushButton("Mulai Generate Klip 9:16")
-        self.btn_start.setFixedHeight(38)
+        self.btn_start.setProperty("class", "PrimaryAction")
         self.btn_start.clicked.connect(self._on_start)
+
         self.btn_cancel = QPushButton("Batal / Stop")
-        self.btn_cancel.setFixedHeight(38)
         self.btn_cancel.setProperty("class", "Danger")
         self.btn_cancel.setEnabled(False)
         self.btn_cancel.clicked.connect(self._on_cancel)
 
-        btn_row.addWidget(self.btn_start, 3)
-        btn_row.addWidget(self.btn_cancel, 1)
-        e_layout.addLayout(btn_row)
+        btn_action_row.addWidget(self.btn_start, 4)
+        btn_action_row.addWidget(self.btn_cancel, 1)
+        ce_layout.addLayout(btn_action_row)
 
-        layout.addWidget(exec_card)
+        layout.addWidget(card_exec)
         layout.addStretch()
         return page
 
