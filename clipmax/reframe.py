@@ -94,10 +94,15 @@ def get_face_detector_model() -> Optional[str]:
 def merge_scene_intervals(
     raw_samples: List[Tuple[float, bool, float]],
     min_scene_sec: float = 2.0,
-    clip_duration: float = 0.0
+    clip_duration: float = 0.0,
+    visual_cuts: Optional[List[float]] = None,
+    padding_sec: float = 0.2
 ) -> List[Dict[str, Any]]:
     if not raw_samples:
         return []
+
+    if visual_cuts is None:
+        visual_cuts = []
 
     # 1. Group contiguous identical states into raw chunks
     chunks: List[Dict[str, Any]] = []
@@ -128,27 +133,64 @@ def merge_scene_intervals(
         "faces": cur_faces
     })
 
-    # 2. Merge short flickers (< min_scene_sec) into preceding chunk
+    # 2. Iteratively merge short flickers (< min_scene_sec, anti-micro cut)
+    changed = True
+    while changed and len(chunks) > 1:
+        changed = False
+        for i in range(len(chunks)):
+            dur = chunks[i]["end"] - chunks[i]["start"]
+            if dur < min_scene_sec:
+                if i == 0:
+                    chunks[1]["start"] = chunks[0]["start"]
+                    if chunks[0].get("faces"):
+                        chunks[1].setdefault("faces", []).extend(chunks[0]["faces"])
+                    chunks.pop(0)
+                else:
+                    chunks[i - 1]["end"] = chunks[i]["end"]
+                    if chunks[i].get("faces"):
+                        chunks[i - 1].setdefault("faces", []).extend(chunks[i]["faces"])
+                    chunks.pop(i)
+                changed = True
+                break
+
+    # 3. Merge adjacent chunks that have identical mode
     merged: List[Dict[str, Any]] = []
     for c in chunks:
-        dur = c["end"] - c["start"]
-        if dur < min_scene_sec and merged:
+        if merged and merged[-1]["mode"] == c["mode"]:
             merged[-1]["end"] = c["end"]
-            if c["faces"]:
-                merged[-1]["faces"].extend(c["faces"])
+            if c.get("faces"):
+                merged[-1].setdefault("faces", []).extend(c["faces"])
         else:
             merged.append(c)
 
-    # 3. Merge adjacent chunks that have identical mode
-    final_segments: List[Dict[str, Any]] = []
-    for m in merged:
-        if final_segments and final_segments[-1]["mode"] == m["mode"]:
-            final_segments[-1]["end"] = m["end"]
-            final_segments[-1]["faces"].extend(m["faces"])
-        else:
-            final_segments.append(m)
+    # 4. Snap boundaries to closest visual scene cut within +/- 0.8s
+    for i in range(len(merged) - 1):
+        b = merged[i]["end"]
+        nearby_cuts = [c for c in visual_cuts if abs(c - b) <= 0.8]
+        if nearby_cuts:
+            best_cut = min(nearby_cuts, key=lambda c: abs(c - b))
+            if merged[i]["start"] + 0.8 < best_cut < merged[i + 1]["end"] - 0.8:
+                merged[i]["end"] = best_cut
+                merged[i + 1]["start"] = best_cut
 
-    return final_segments
+    # 5. Apply padding (+/- 0.2s) for CROP_TRACKING (Talking Head)
+    for i in range(len(merged) - 1):
+        curr_mode = merged[i]["mode"]
+        next_mode = merged[i + 1]["mode"]
+        b = merged[i]["end"]
+
+        if curr_mode == "CROP_TRACKING" and next_mode == "BLURRED_BACKGROUND":
+            # Extend talking head by +padding_sec
+            new_b = min(final_end, b + padding_sec)
+            merged[i]["end"] = new_b
+            merged[i + 1]["start"] = new_b
+        elif curr_mode == "BLURRED_BACKGROUND" and next_mode == "CROP_TRACKING":
+            # Start talking head padding_sec earlier
+            new_b = max(0.0, b - padding_sec)
+            merged[i]["end"] = new_b
+            merged[i + 1]["start"] = new_b
+
+    return merged
 
 def segment_clip_scenes(
     video_path: str,
@@ -203,6 +245,10 @@ def segment_clip_scenes(
     default_center = width / 2.0
     last_center = default_center
     raw_samples: List[Tuple[float, bool, float]] = []
+    visual_cuts: List[float] = []
+    prev_gray = None
+    cut_diff_threshold = 28.0
+
     min_face_area = 0.015 * (detect_w * detect_h)  # >= 1.5% frame area (excludes small corner webcams)
 
     frame_idx = 0
@@ -219,6 +265,15 @@ def segment_clip_scenes(
 
             if ret and frame is not None:
                 small_frame = cv2.resize(frame, (detect_w, detect_h))
+
+                # Visual scene boundary cut detection
+                gray = cv2.cvtColor(small_frame, cv2.COLOR_BGR2GRAY)
+                if prev_gray is not None:
+                    diff_val = float(np.mean(cv2.absdiff(gray, prev_gray)))
+                    if diff_val >= cut_diff_threshold:
+                        visual_cuts.append(t_rel)
+                prev_gray = gray
+
                 if detector is not None:
                     try:
                         _, faces = detector.detect(small_frame)
@@ -256,8 +311,14 @@ def segment_clip_scenes(
             )
         ]
 
-    # Merge into stable scene intervals
-    chunks = merge_scene_intervals(raw_samples, min_scene_sec=min_scene_sec, clip_duration=clip_dur)
+    # Merge into stable scene intervals with visual cut snapping and padding
+    chunks = merge_scene_intervals(
+        raw_samples,
+        min_scene_sec=min_scene_sec,
+        clip_duration=clip_dur,
+        visual_cuts=visual_cuts,
+        padding_sec=padding_sec
+    )
     scenes: List[SceneSegment] = []
 
     for c in chunks:

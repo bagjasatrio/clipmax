@@ -59,35 +59,55 @@ def test_build_dynamic_crop_expression_moving():
     assert "if(lt(t,2.00)" in expr
     assert "max(0,min(1312" in expr
 
-def test_merge_scene_intervals():
-    # 0-5s: face
-    # 5-6s: flicker (1s no face)
-    # 6-10s: face
-    # 10-25s: screen share (15s no face)
+def test_merge_scene_intervals_anti_micro_cut():
+    # 0-10s: face
+    # 10-11.2s: short 1.2s screen share switch (under 1.8s threshold)
+    # 11.2-20s: face
+    samples = []
+    for s in range(21):
+        if s == 10:
+            samples.append((float(s), False, 960.0))
+        else:
+            samples.append((float(s), True, 600.0))
+
+    segments = merge_scene_intervals(samples, min_scene_sec=1.8, clip_duration=20.0, padding_sec=0.0)
+    # The 1s micro-cut must be completely absorbed
+    assert len(segments) == 1
+    assert segments[0]["mode"] == "CROP_TRACKING"
+    assert segments[0]["start"] == 0.0
+    assert segments[0]["end"] == 20.0
+
+def test_merge_scene_intervals_visual_cut_snapping_and_padding():
+    # 0-10s: face
+    # 10-25s: screen share
     # 25-30s: face
     samples = []
     for s in range(31):
-        if 0 <= s < 5:
+        if 0 <= s < 10 or 25 <= s <= 30:
             samples.append((float(s), True, 600.0))
-        elif s == 5:
-            samples.append((float(s), False, 960.0))
-        elif 6 <= s < 10:
-            samples.append((float(s), True, 600.0))
-        elif 10 <= s < 25:
-            samples.append((float(s), False, 960.0))
         else:
-            samples.append((float(s), True, 650.0))
+            samples.append((float(s), False, 960.0))
 
-    segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=30.0)
+    visual_cuts = [9.8, 24.9]
+    segments = merge_scene_intervals(
+        samples,
+        min_scene_sec=2.0,
+        clip_duration=30.0,
+        visual_cuts=visual_cuts,
+        padding_sec=0.2
+    )
     assert len(segments) == 3
+    # Seg 0 is CROP_TRACKING: snapped to 9.8s + 0.2s padding = 10.00s
     assert segments[0]["mode"] == "CROP_TRACKING"
-    assert segments[0]["start"] == 0.0
-    assert segments[0]["end"] == 10.0  # Absorbed 1s flicker at s=5
+    assert abs(segments[0]["end"] - 10.00) < 0.05
+
+    # Seg 1 is BLURRED_BACKGROUND: starts at 10.0s, ends where next CROP starts (24.9 - 0.2 = 24.7s)
     assert segments[1]["mode"] == "BLURRED_BACKGROUND"
-    assert segments[1]["start"] == 10.0
-    assert segments[1]["end"] == 25.0
+    assert abs(segments[1]["end"] - 24.70) < 0.05
+
+    # Seg 2 is CROP_TRACKING: starts with 0.2s padding before visual cut at 24.9s
     assert segments[2]["mode"] == "CROP_TRACKING"
-    assert segments[2]["start"] == 25.0
+    assert abs(segments[2]["start"] - 24.70) < 0.05
     assert segments[2]["end"] == 30.0
 
 def test_segment_clip_scenes_file_not_found():
