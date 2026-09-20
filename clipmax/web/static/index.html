@@ -88,13 +88,20 @@
             <input type="text" id="inputUrl" placeholder="https://www.youtube.com/watch?v=..." 
               class="w-full px-3 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-md focus:outline-none transition text-gray-100 placeholder-gray-500">
             
-            <!-- Cookies file row -->
-            <div class="flex items-center justify-between text-xs pt-0.5">
-              <button id="btnImportCookie" class="px-2.5 py-1 text-[11px] font-medium rounded border border-[#2A3345] hover:border-indigo-500 bg-[#151923] hover:bg-[#1C2230] text-gray-300 transition">
-                Import cookies.txt
+            <!-- YouTube OAuth2 Status & Connect Button -->
+            <div class="pt-0.5 space-y-1.5">
+              <div id="oauthConnectedBadge" class="hidden flex items-center justify-between px-2.5 py-1.5 rounded-md bg-emerald-950/40 border border-emerald-700/40 text-[11px] text-emerald-300">
+                <div class="flex items-center space-x-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span class="font-medium">✓ Akun YouTube Terhubung</span>
+                </div>
+                <button id="btnReauthOauth" title="Hubungkan Ulang" class="text-[10px] text-emerald-400/70 hover:text-emerald-300 underline">Ganti</button>
+              </div>
+
+              <button id="btnConnectOauth" class="w-full py-1.5 px-2.5 text-[11px] font-medium rounded-md border border-[#2A3345] hover:border-indigo-500 bg-[#151923] hover:bg-[#1C2230] text-gray-300 transition flex items-center justify-center space-x-1.5">
+                <svg class="w-3.5 h-3.5 text-rose-500 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                <span>Hubungkan Akun YouTube (OAuth2)</span>
               </button>
-              <span id="cookieBadge" class="text-[11px] text-gray-500">No cookies loaded</span>
-              <input type="file" id="fileCookieInput" accept=".txt" class="hidden">
             </div>
           </div>
 
@@ -324,6 +331,44 @@
 
     </main>
 
+  </div>
+
+  <!-- OAuth2 Modal Dialog -->
+  <div id="oauthModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center hidden p-4">
+    <div class="card-glow rounded-xl max-w-md w-full p-6 space-y-4 border border-[#2A3345] shadow-2xl bg-[#131722]">
+      <div class="flex items-center justify-between border-b border-[#222938] pb-3">
+        <div class="flex items-center space-x-2">
+          <svg class="w-5 h-5 text-rose-500 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          <h3 class="text-sm font-semibold text-white">Hubungkan Akun YouTube (OAuth2)</h3>
+        </div>
+        <button id="btnCloseOauthModal" class="text-gray-400 hover:text-white transition">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs text-gray-300">
+        <p>Ikuti 2 langkah mudah berikut untuk menghubungkan akun secara resmi:</p>
+        
+        <div class="p-3 bg-[#0B0E14] rounded-lg border border-[#222938] space-y-1.5">
+          <span class="text-gray-400 block font-medium">1. Buka halaman otorisasi Google:</span>
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-indigo-400 text-xs select-all" id="oauthVerifyUrl">https://www.google.com/device</span>
+            <button id="btnOpenDeviceUrl" class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-[11px] transition">Buka Browser</button>
+          </div>
+        </div>
+
+        <div class="p-3 bg-[#0B0E14] rounded-lg border border-[#222938] space-y-1.5">
+          <span class="text-gray-400 block font-medium">2. Masukkan kode perangkat:</span>
+          <div class="flex items-center justify-between">
+            <span id="oauthUserCode" class="font-mono text-lg font-bold text-amber-300 tracking-wider select-all">MEMUAT...</span>
+            <button id="btnCopyOauthCode" class="px-2.5 py-1 rounded border border-[#2A3345] hover:bg-[#1E2330] text-gray-200 text-[11px] transition">Salin Kode</button>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2 pt-2 text-indigo-300 text-[11px]">
+          <span class="w-2 h-2 rounded-full bg-indigo-400 pulsing-dot"></span>
+          <span id="oauthPollingStatus">Menunggu konfirmasi dari Google...</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

@@ -15,7 +15,13 @@ from pydantic import BaseModel
 from clipmax.config import AppConfig, is_cuda_available
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
 from clipmax.ai_gateway import discover_models
-from clipmax.downloader import find_manual_cookie_file, is_valid_video_url, clean_error_message
+from clipmax.downloader import (
+    is_valid_video_url,
+    clean_error_message,
+    is_youtube_oauth_authenticated,
+    initiate_youtube_oauth,
+    poll_youtube_oauth_token
+)
 
 class PipelineStartRequest(BaseModel):
     input_source: str
@@ -52,15 +58,9 @@ class AppState:
         self.progress: int = 0
         self.message: str = "Masukkan video untuk memulai kurasi klip 9:16."
         self.clips: List[ClipResult] = []
-        self.active_cookie_path: Optional[str] = None
         self.window_holder: Dict[str, Any] = {"window": None}
         self.active_websockets: List[WebSocket] = []
         self.loop: Optional[asyncio.AbstractEventLoop] = None
-
-        # Auto-detect cookie file at startup
-        detected = find_manual_cookie_file()
-        if detected and os.path.isfile(detected):
-            self.active_cookie_path = detected
 
     def broadcast_sync(self, payload: Dict[str, Any]):
         if self.loop and self.active_websockets:
@@ -110,13 +110,6 @@ def get_system_status():
 
 @app.get("/api/config")
 def get_config():
-    # Re-check cookies if not explicitly set
-    if not state.active_cookie_path:
-        detected = find_manual_cookie_file()
-        if detected and os.path.isfile(detected):
-            state.active_cookie_path = detected
-
-    has_cookie = bool(state.active_cookie_path and os.path.isfile(state.active_cookie_path))
     return {
         "endpoint_url": state.config.endpoint_url,
         "api_key": state.config.api_key,
@@ -126,8 +119,7 @@ def get_config():
         "min_duration": state.config.min_duration,
         "max_duration": state.config.max_duration,
         "campaign_rules": state.config.campaign_rules,
-        "cookie_file": state.active_cookie_path,
-        "cookie_active": has_cookie
+        "youtube_authenticated": is_youtube_oauth_authenticated()
     }
 
 @app.post("/api/config")
@@ -148,8 +140,6 @@ def update_config(req: ConfigUpdateRequest):
         state.config.max_duration = req.max_duration
     if req.campaign_rules is not None:
         state.config.campaign_rules = req.campaign_rules
-    if req.cookie_file is not None:
-        state.active_cookie_path = req.cookie_file
 
     state.config.save()
     state.orchestrator = PipelineOrchestrator(state.config)
@@ -160,19 +150,25 @@ def get_models():
     models = discover_models(state.config.endpoint_url, state.config.api_key)
     return {"models": models}
 
-@app.post("/api/cookies/import")
-async def import_cookies(file: Optional[UploadFile] = File(None), path: Optional[str] = Form(None)):
-    target_path = Path("cookies.txt").resolve()
-    if file:
-        content = await file.read()
-        with open(target_path, "wb") as f:
-            f.write(content)
-        state.active_cookie_path = str(target_path)
-        return {"status": "ok", "path": str(target_path), "active": True}
-    elif path and os.path.isfile(path):
-        state.active_cookie_path = str(Path(path).resolve())
-        return {"status": "ok", "path": state.active_cookie_path, "active": True}
-    raise HTTPException(status_code=400, detail="No valid cookie file provided")
+@app.get("/api/youtube/oauth/status")
+def get_oauth_status():
+    return {"authenticated": is_youtube_oauth_authenticated()}
+
+@app.post("/api/youtube/oauth/initiate")
+def oauth_initiate():
+    try:
+        data = initiate_youtube_oauth()
+        return {"status": "ok", "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=clean_error_message(str(e)))
+
+class OAuthPollRequest(BaseModel):
+    device_code: str
+
+@app.post("/api/youtube/oauth/poll")
+def oauth_poll(req: OAuthPollRequest):
+    res = poll_youtube_oauth_token(req.device_code)
+    return res
 
 @app.post("/api/pipeline/start")
 def start_pipeline(req: PipelineStartRequest):
@@ -197,15 +193,13 @@ def start_pipeline(req: PipelineStartRequest):
                     "message": msg
                 })
 
-            active_cookie = req.cookie_file or state.active_cookie_path
             results = state.orchestrator.run(
                 input_source=req.input_source,
                 progress_callback=on_progress,
                 target_clip_count=req.target_clip_count,
                 min_duration=req.min_duration,
                 max_duration=req.max_duration,
-                campaign_rules=req.campaign_rules,
-                cookie_file=active_cookie
+                campaign_rules=req.campaign_rules
             )
 
             if state.orchestrator.cancel_requested.is_set():
@@ -313,24 +307,6 @@ def dialog_choose_video():
         except Exception:
             pass
     return {"path": None}
-
-@app.post("/api/dialog/cookie")
-def dialog_choose_cookie():
-    window = state.window_holder.get("window")
-    if window:
-        try:
-            import webview
-            res = window.create_file_dialog(
-                webview.FileDialog.OPEN,
-                allow_multiple=False,
-                file_types=('Netscape Cookie (*.txt)', 'All files (*.*)')
-            )
-            if res and len(res) > 0:
-                state.active_cookie_path = res[0]
-                return {"path": res[0], "active": True}
-        except Exception:
-            pass
-    return {"path": None, "active": False}
 
 @app.post("/api/dialog/save-clip")
 def dialog_save_clip(clip_id: int, default_name: str):

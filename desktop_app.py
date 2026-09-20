@@ -55,21 +55,9 @@ class DesktopJsApi:
                 print(f"[Desktop Dialog Error]: {e}")
         return None
 
-    def choose_cookie_file(self) -> Optional[str]:
-        w = self.window_holder.get("window")
-        if w:
-            try:
-                res = w.create_file_dialog(
-                    webview.FileDialog.OPEN,
-                    allow_multiple=False,
-                    file_types=('Netscape Cookie (*.txt)', 'All files (*.*)')
-                )
-                if res and len(res) > 0:
-                    state.active_cookie_path = res[0]
-                    return res[0]
-            except Exception as e:
-                print(f"[Desktop Dialog Error]: {e}")
-        return None
+    def open_external_url(self, url: str):
+        import webbrowser
+        webbrowser.open(url)
 
     def save_clip_dialog(self, clip_id: int, default_filename: str) -> Optional[str]:
         w = self.window_holder.get("window")

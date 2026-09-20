@@ -18,9 +18,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const lblLocalFile = document.getElementById("lblLocalFile");
   const fileVideoInput = document.getElementById("fileVideoInput");
 
-  const btnImportCookie = document.getElementById("btnImportCookie");
-  const cookieBadge = document.getElementById("cookieBadge");
-  const fileCookieInput = document.getElementById("fileCookieInput");
+  const btnConnectOauth = document.getElementById("btnConnectOauth");
+  const oauthConnectedBadge = document.getElementById("oauthConnectedBadge");
+  const btnReauthOauth = document.getElementById("btnReauthOauth");
+  const oauthModal = document.getElementById("oauthModal");
+  const btnCloseOauthModal = document.getElementById("btnCloseOauthModal");
+  const oauthVerifyUrl = document.getElementById("oauthVerifyUrl");
+  const oauthUserCode = document.getElementById("oauthUserCode");
+  const btnOpenDeviceUrl = document.getElementById("btnOpenDeviceUrl");
+  const btnCopyOauthCode = document.getElementById("btnCopyOauthCode");
+  const oauthPollingStatus = document.getElementById("oauthPollingStatus");
 
   const inputEndpoint = document.getElementById("inputEndpoint");
   const inputApiKey = document.getElementById("inputApiKey");
@@ -95,49 +102,108 @@ document.addEventListener("DOMContentLoaded", () => {
     viewUrl.classList.add("hidden");
   });
 
-  // 2. Cookie Handling
-  function updateCookieBadge(active, path) {
-    if (active) {
-      cookieBadge.textContent = "✓ cookies.txt active";
-      cookieBadge.className = "text-[11px] font-medium text-emerald-400";
-    } else {
-      cookieBadge.textContent = "No cookies loaded";
-      cookieBadge.className = "text-[11px] text-gray-500";
+  // 2. YouTube OAuth2 Handling
+  let oauthPollTimer = null;
+
+  async function checkOauthStatus() {
+    try {
+      const res = await fetch("/api/youtube/oauth/status");
+      const data = await res.json();
+      if (data.authenticated) {
+        oauthConnectedBadge.classList.remove("hidden");
+        btnConnectOauth.classList.add("hidden");
+      } else {
+        oauthConnectedBadge.classList.add("hidden");
+        btnConnectOauth.classList.remove("hidden");
+      }
+    } catch (e) {
+      console.warn("OAuth status check failed:", e);
     }
   }
 
-  btnImportCookie.addEventListener("click", async () => {
-    // Check if running in PyWebView
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.choose_cookie_file) {
-      try {
-        const picked = await window.pywebview.api.choose_cookie_file();
-        if (picked) {
-          updateCookieBadge(true, picked);
-          return;
-        }
-      } catch (e) {
-        console.warn("Desktop cookie dialog error:", e);
-      }
+  function openOauthUrl(url) {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.open_external_url) {
+      window.pywebview.api.open_external_url(url);
+    } else {
+      window.open(url, "_blank");
     }
-    // Fallback to browser file input
-    fileCookieInput.click();
+  }
+
+  async function startOauthFlow() {
+    try {
+      btnConnectOauth.disabled = true;
+      btnConnectOauth.textContent = "Menghubungkan...";
+      const res = await fetch("/api/youtube/oauth/initiate", { method: "POST" });
+      const data = await res.json();
+      if (data.status !== "ok") {
+        throw new Error(data.message || "Gagal menginisialisasi OAuth");
+      }
+      const oauthData = data.data;
+      oauthVerifyUrl.textContent = oauthData.verification_url || "https://www.google.com/device";
+      oauthUserCode.textContent = oauthData.user_code || "";
+      oauthPollingStatus.textContent = "Menunggu otorisasi akun di Google...";
+      oauthModal.classList.remove("hidden");
+
+      if (navigator.clipboard && oauthData.user_code) {
+        navigator.clipboard.writeText(oauthData.user_code).catch(() => {});
+      }
+
+      openOauthUrl(oauthData.verification_url || "https://www.google.com/device");
+
+      if (oauthPollTimer) clearInterval(oauthPollTimer);
+      oauthPollTimer = setInterval(async () => {
+        try {
+          const pRes = await fetch("/api/youtube/oauth/poll", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ device_code: oauthData.device_code })
+          });
+          const pData = await pRes.json();
+          if (pData.status === "success") {
+            clearInterval(oauthPollTimer);
+            oauthPollTimer = null;
+            oauthModal.classList.add("hidden");
+            checkOauthStatus();
+            alert("✓ Akun YouTube berhasil terhubung via OAuth2!");
+          } else if (pData.status === "error") {
+            clearInterval(oauthPollTimer);
+            oauthPollTimer = null;
+            oauthPollingStatus.textContent = "Otorisasi gagal: " + pData.message;
+          }
+        } catch (err) {
+          console.warn("Polling error:", err);
+        }
+      }, (oauthData.interval || 5) * 1000);
+
+    } catch (err) {
+      alert("Gagal memulai otorisasi YouTube: " + err.message);
+    } finally {
+      btnConnectOauth.disabled = false;
+      btnConnectOauth.innerHTML = `
+        <svg class="w-3.5 h-3.5 text-rose-500 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        <span>Hubungkan Akun YouTube (OAuth2)</span>
+      `;
+    }
+  }
+
+  btnConnectOauth.addEventListener("click", startOauthFlow);
+  btnReauthOauth.addEventListener("click", startOauthFlow);
+  btnOpenDeviceUrl.addEventListener("click", () => openOauthUrl(oauthVerifyUrl.textContent));
+  btnCopyOauthCode.addEventListener("click", () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(oauthUserCode.textContent).then(() => {
+        btnCopyOauthCode.textContent = "Tersalin!";
+        setTimeout(() => { btnCopyOauthCode.textContent = "Salin Kode"; }, 2000);
+      });
+    }
   });
 
-  fileCookieInput.addEventListener("change", async (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const formData = new FormData();
-      formData.append("file", file);
-      try {
-        const res = await fetch("/api/cookies/import", { method: "POST", body: formData });
-        const data = await res.json();
-        if (data.status === "ok") {
-          updateCookieBadge(true, data.path);
-        }
-      } catch (err) {
-        alert("Gagal mengimpor cookies: " + err.message);
-      }
+  btnCloseOauthModal.addEventListener("click", () => {
+    if (oauthPollTimer) {
+      clearInterval(oauthPollTimer);
+      oauthPollTimer = null;
     }
+    oauthModal.classList.add("hidden");
   });
 
   // 3. Local Video Picker
@@ -184,8 +250,8 @@ document.addEventListener("DOMContentLoaded", () => {
       inputApiKey.value = cfg.api_key || "";
       inputTargetClips.value = cfg.target_clip_count || 3;
       inputRules.value = cfg.campaign_rules || "";
-      updateCookieBadge(cfg.cookie_active, cfg.cookie_file);
 
+      await checkOauthStatus();
       await refreshModels(cfg.selected_model);
     } catch (e) {
       console.warn("Error loading config:", e);

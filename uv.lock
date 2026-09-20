@@ -175,6 +175,7 @@ dependencies = [
     { name = "uvicorn", extra = ["standard"] },
     { name = "websockets" },
     { name = "yt-dlp" },
+    { name = "yt-dlp-youtube-oauth2" },
 ]
 
 [package.metadata]
@@ -199,6 +200,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.53.0" },
     { name = "websockets", specifier = ">=17.1" },
     { name = "yt-dlp", specifier = ">=2024.0.0" },
+    { name = "yt-dlp-youtube-oauth2", specifier = ">=1.0.10" },
 ]
 
 [[package]]
@@ -1662,4 +1664,13 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/1e/e0/832fa4ca334b766a06933a196066edc3dba37cdb6f14cd98d59bcc69a4b4/yt_dlp-2026.8.19.tar.gz", hash = "sha256:9e213e48cea35c66b378e4447903f118f6392a5fa380a2b6d7070ec86f4e0af1", size = 3052025, upload-time = "2026-08-19T23:48:59.291Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/69/b2/8cd1613f56eed7ceb64fbd4df3f1c01246bfb098e6f398228bafda22b80b/yt_dlp-2026.8.19-py3-none-any.whl", hash = "sha256:1d57897e94c6665a0a6f9bc54b34e584284e32c034ffab3a7df25d8f7b24eedf", size = 3185533, upload-time = "2026-08-19T23:48:56.925Z" },
+]
+
+[[package]]
+name = "yt-dlp-youtube-oauth2"
+version = "1.0.10"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/31/483f9d292fe2d5b724f22e4a7b306334dfcbf68600efbe5b2d24f59b50d5/yt_dlp_youtube_oauth2-1.0.10.tar.gz", hash = "sha256:48da2eda3da52511a65cd45e642a62f335de80f2bb5dc2c46766cadefdd82224", size = 4802, upload-time = "2024-08-15T14:40:29.151Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/82/ef211abddb27bacb998490aebe01077dcac8dbff448b613bb48270108df4/yt_dlp_youtube_oauth2-1.0.10-py3-none-any.whl", hash = "sha256:2c83364e0800db3455d83f2380fe344be1fc9e02f4174d7b732ebe553b94e097", size = 4458, upload-time = "2024-08-15T14:40:26.894Z" },
 ]

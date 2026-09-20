@@ -24,6 +24,7 @@ dependencies = [
     "uvicorn[standard]>=0.53.0",
     "websockets>=17.1",
     "python-multipart>=0.0.32",
+    "yt-dlp-youtube-oauth2>=1.0.10",
 ]
 
 [tool.pytest.ini_options]
