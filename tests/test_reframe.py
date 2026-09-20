@@ -9,17 +9,41 @@ from clipmax.reframe import (
     build_dynamic_crop_expression,
     merge_scene_intervals,
     segment_clip_scenes,
-    SceneSegment
+    SceneSegment,
+    determine_segment_layout
 )
 
+def test_determine_segment_layout_rules():
+    # Test Standalone Universal Evaluator:
+    # A1. Multi-person (>= 2 faces in some frames) -> BLURRED_BG
+    frames_multi = [(1, 450.0)] * 10 + [(2, 450.0)] * 2
+    assert determine_segment_layout(frames_multi) == "BLURRED_BG"
+
+    # A2. Zero face detected throughout -> BLURRED_BG
+    frames_zero = [(0, None)] * 15
+    assert determine_segment_layout(frames_zero) == "BLURRED_BG"
+
+    # A3. Single face on left edge (X=450, norm=0.234 < 0.38) -> BLURRED_BG
+    frames_left_edge = [(1, 450.0)] * 20
+    assert determine_segment_layout(frames_left_edge, frame_width=1920) == "BLURRED_BG"
+
+    # A4. Single face on right edge (X=1450, norm=0.755 > 0.62) -> BLURRED_BG
+    frames_right_edge = [(1, 1450.0)] * 20
+    assert determine_segment_layout(frames_right_edge, frame_width=1920) == "BLURRED_BG"
+
+    # B. Single face centered (X=960, norm=0.50 within [0.38, 0.62]) -> CROP_9_16
+    frames_centered = [(1, 960.0)] * 20
+    assert determine_segment_layout(frames_centered, frame_width=1920) == "CROP_9_16"
+
+    # B2. Slightly off-center presenter (X=864, norm=0.45 within [0.38, 0.62]) -> CROP_9_16
+    frames_off_center = [(1, 864.0)] * 20
+    assert determine_segment_layout(frames_off_center, frame_width=1920) == "CROP_9_16"
+
 def test_fixed_scene_crop_median_calculation():
-    # If a talking head segment contains fluctuating face detections,
-    # it must compute the MEDIAN face X position and lock crop_x to that exact fixed value.
     detected_faces = [940.0, 960.0, 950.0, 980.0, 955.0]
     median_val = float(np.median(detected_faces))
     crop_x, crop_w, crop_h = calculate_crop_box(1920, 1080, median_val)
     assert crop_x == int(round(median_val - crop_w / 2.0))
-    # Must be a fixed integer string, not a dynamic expression
     assert str(crop_x).isdigit()
 
 def test_aggregated_face_voting_podcast_partial_turn():
@@ -35,23 +59,17 @@ def test_aggregated_face_voting_podcast_partial_turn():
     assert segments[0]["end"] == 30.0
 
 def test_asymmetric_edge_anchor_blurred_bg():
-    # User's edge anchor case:
-    # Only 1 face detected throughout the segment, but person sits on far left (X=450, X/W=0.23)
-    # The system must recognize this as an asymmetric edge anchor (podcast partner undetected)
-    # and assign BLURRED_BACKGROUND, never a lopsided 9:16 crop.
     samples_left = [(i * 0.2, 1, 450.0) for i in range(50)]
     seg_left = merge_scene_intervals(samples_left, min_scene_sec=2.0, clip_duration=10.0, frame_width=1920)
     assert len(seg_left) == 1
     assert seg_left[0]["mode"] == "BLURRED_BACKGROUND"
 
-    # Same for far right edge (X=1500, X/W=0.78)
     samples_right = [(i * 0.2, 1, 1500.0) for i in range(50)]
     seg_right = merge_scene_intervals(samples_right, min_scene_sec=2.0, clip_duration=10.0, frame_width=1920)
     assert len(seg_right) == 1
     assert seg_right[0]["mode"] == "BLURRED_BACKGROUND"
 
 def test_face_count_rule_single_face_centered_crop_916():
-    # Single presenter centered (X=960, X/W=0.50) -> CROP_TRACKING (Fixed 9:16 crop)
     samples = [(i * 0.2, 1, 960.0 + (i % 3) * 5) for i in range(50)]
     segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=10.0, frame_width=1920)
     assert len(segments) == 1
@@ -60,7 +78,6 @@ def test_face_count_rule_single_face_centered_crop_916():
     assert segments[0]["end"] == 10.0
 
 def test_face_count_rule_multi_person_blurred_bg():
-    # Condition 2: >= 2 Faces (Multi-person podcast / two-shot) -> BLURRED_BACKGROUND (16:9 full fit in center)
     samples = [(i * 0.2, 2, 500.0) for i in range(50)]
     segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=10.0)
     assert len(segments) == 1
@@ -69,7 +86,6 @@ def test_face_count_rule_multi_person_blurred_bg():
     assert segments[0]["end"] == 10.0
 
 def test_face_count_rule_zero_face_blurred_bg():
-    # Condition 3: 0 Faces (Screen record / slide / B-roll) -> BLURRED_BACKGROUND (16:9 full fit in center)
     samples = [(i * 0.2, 0, None) for i in range(50)]
     segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=10.0)
     assert len(segments) == 1
@@ -78,10 +94,6 @@ def test_face_count_rule_zero_face_blurred_bg():
     assert segments[0]["end"] == 10.0
 
 def test_face_count_rule_mixed_timeline():
-    # 0s-6s: Single centered talking head (fc=1, x=960) -> CROP_TRACKING
-    # 6s-12s: Two-shot podcast (fc=2) -> BLURRED_BACKGROUND
-    # 12s-16s: Screen share (fc=0) -> BLURRED_BACKGROUND (merged seamlessly)
-    # 16s-20s: Single centered talking head (fc=1, x=960) -> CROP_TRACKING
     samples = (
         [(i * 0.2, 1, 960.0) for i in range(30)] +
         [(6.0 + i * 0.2, 2, 800.0) for i in range(30)] +
@@ -94,7 +106,6 @@ def test_face_count_rule_mixed_timeline():
     assert segments[0]["start"] == 0.0
     assert segments[0]["end"] == 6.0
 
-    # Multi-person (6-12s) + Screen share (12-16s) seamlessly merged as one BLURRED_BACKGROUND block
     assert segments[1]["mode"] == "BLURRED_BACKGROUND"
     assert segments[1]["start"] == 6.0
     assert segments[1]["end"] == 16.0

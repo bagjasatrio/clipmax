@@ -99,6 +99,74 @@ def get_face_detector_model() -> Optional[str]:
         return str(model_p)
     return None
 
+def determine_segment_layout(
+    segment_frames: List[Any],
+    frame_width: int = 1920
+) -> str:
+    """
+    Universal Standalone Segment Layout Evaluator:
+    
+    A. BLURRED_BG (16:9 Fit in center + blurred background):
+       - If in this segment max_detected_faces >= 2 (even if only in a few sample frames).
+       - OR if 0 faces are detected throughout the segment (screen share / slide / presentation / B-roll).
+       - OR if only 1 face detected, but average/median X-center is on screen edge (X < 0.38 or X > 0.62),
+         indicating a two-person podcast shot where the partner is sitting on the opposite side.
+    
+    B. CROP_9_16:
+       - ONLY if throughout the segment consistently max_detected_faces <= 1 (and at least 1 valid face),
+         AND median X-center is in the centered region (0.38 <= X <= 0.62).
+    
+    Returns: 'CROP_9_16' or 'BLURRED_BG'.
+    """
+    if not segment_frames:
+        return "BLURRED_BG"
+
+    face_counts: List[int] = []
+    face_xs: List[float] = []
+
+    for item in segment_frames:
+        # Support various formats: (t, fc, cx) or (fc, cx) or dict or raw int
+        if isinstance(item, (tuple, list)):
+            if len(item) == 3:
+                fc, cx = item[1], item[2]
+            elif len(item) == 2:
+                fc, cx = item[0], item[1]
+            else:
+                fc, cx = item[0], None
+        elif isinstance(item, dict):
+            fc = item.get("face_count", item.get("faces", 0))
+            cx = item.get("cx", item.get("center_x", None))
+        elif isinstance(item, (int, float)):
+            fc, cx = int(item), None
+        else:
+            fc, cx = 0, None
+
+        if isinstance(fc, bool):
+            fc = 1 if fc else 0
+        face_counts.append(int(fc))
+        if int(fc) == 1 and cx is not None:
+            face_xs.append(float(cx))
+
+    max_detected_faces = max(face_counts) if face_counts else 0
+
+    # Condition A1: Multi-person frame detected (max_detected_faces >= 2)
+    if max_detected_faces >= 2:
+        return "BLURRED_BG"
+
+    # Condition A2: No face detected throughout the segment
+    if not face_xs:
+        return "BLURRED_BG"
+
+    median_x = float(np.median(face_xs))
+    x_norm = median_x / float(frame_width)
+
+    # Condition A3: Asymmetric edge position (X < 0.38 or X > 0.62)
+    if x_norm < 0.38 or x_norm > 0.62:
+        return "BLURRED_BG"
+
+    # Condition B: Centered single talking head (0.38 <= X <= 0.62)
+    return "CROP_9_16"
+
 def merge_scene_intervals(
     raw_samples: List[Tuple[float, Any, float]],
     min_scene_sec: float = 2.0,
@@ -108,13 +176,8 @@ def merge_scene_intervals(
     frame_width: int = 1920
 ) -> List[Dict[str, Any]]:
     """
-    Aggregated Face Voting & Asymmetric Edge Anchor Logic:
-    1. Multi-person voting: If in this segment >= 2 faces detected in >= 15% of frames or >= 2 samples,
-       lock the entire segment to BLURRED_BACKGROUND (prevents jumping when one person turns head).
-    2. Asymmetric Edge Position Check: If only 1 face detected, but X < 0.40 or X > 0.60 (sitting on far edge),
-       assume wide 2-shot podcast with partner not detected -> lock to BLURRED_BACKGROUND.
-    3. Centered Single Speaker: Only use CROP_TRACKING (9:16 full crop) if face is centered (0.35 <= X <= 0.65).
-    4. 0 Faces: Lock to BLURRED_BACKGROUND (screen record, slide, B-roll).
+    Evaluates segment candidate intervals using determine_segment_layout.
+    Absorbs micro-flickers, snaps cuts to visual changes, and pads transitions.
     """
     if not raw_samples:
         return []
@@ -127,47 +190,13 @@ def merge_scene_intervals(
 
     final_end = clip_duration if clip_duration > 0 else raw_samples[-1][0]
 
-    def classify_samples(samples: List[Tuple[float, Any, float]]) -> Tuple[str, List[float]]:
-        if not samples:
-            return "BLURRED_BACKGROUND", []
-
-        face_counts = [s[1] for s in samples if isinstance(s[1], int) and not isinstance(s[1], bool)]
-        if not face_counts:
-            # Handle legacy bool indicators
-            face_counts = [1 if s[1] else 0 for s in samples]
-
-        max_faces = max(face_counts) if face_counts else 0
-        multi_face_count = sum(1 for fc in face_counts if fc >= 2)
-        multi_face_ratio = (multi_face_count / len(face_counts)) if face_counts else 0.0
-
-        # 1. Multi-person voting: If in this segment >= 2 faces detected in >= 15% of frames or >= 2 samples
-        if max_faces >= 2 and (multi_face_ratio >= 0.15 or multi_face_count >= 2):
-            return "BLURRED_BACKGROUND", []
-
-        # 2. Extract 1-face samples
-        face_xs = [s[2] for s in samples if (s[1] == 1 or s[1] is True) and s[2] is not None]
-        if not face_xs:
-            # 0 faces -> Screen record / slide / B-roll
-            return "BLURRED_BACKGROUND", []
-
-        median_x = float(np.median(face_xs))
-        x_ratio = median_x / float(frame_width)
-
-        # 3. Asymmetric Edge Position (Edge Anchor Check):
-        # If X < 0.40 or X > 0.60, assume wide 2-shot podcast with partner not detected
-        if x_ratio < 0.40 or x_ratio > 0.60:
-            return "BLURRED_BACKGROUND", []
-
-        # 4. Centered Single Presenter (0.35 <= x_ratio <= 0.65)
-        return "CROP_TRACKING", face_xs
-
-    # Group contiguous raw samples into candidate blocks
-    chunks: List[Dict[str, Any]] = []
     def to_state(ind):
         if isinstance(ind, bool):
             return 1 if ind else 0
         return 2 if ind >= 2 else (1 if ind == 1 else 0)
 
+    # 1. Group contiguous raw samples into candidate blocks
+    chunks: List[Dict[str, Any]] = []
     cur_state = to_state(raw_samples[0][1])
     cur_start = raw_samples[0][0]
     cur_chunk_samples = [raw_samples[0]]
@@ -193,7 +222,7 @@ def merge_scene_intervals(
         "samples": cur_chunk_samples
     })
 
-    # Absorb micro-flickers (< min_scene_sec)
+    # 2. Absorb micro-flickers (< min_scene_sec)
     changed = True
     while changed and len(chunks) > 1:
         changed = False
@@ -211,28 +240,33 @@ def merge_scene_intervals(
                 changed = True
                 break
 
-    # Classify each chunk with aggregated voting and edge position
+    # 3. Classify each chunk using the standalone determine_segment_layout evaluator
     classified: List[Dict[str, Any]] = []
     for c in chunks:
-        mode, faces = classify_samples(c["samples"])
+        layout = determine_segment_layout(c["samples"], frame_width=frame_width)
+        mode = "CROP_TRACKING" if layout == "CROP_9_16" else "BLURRED_BACKGROUND"
+        faces = [s[2] for s in c["samples"] if (s[1] == 1 or s[1] is True) and s[2] is not None]
         classified.append({
             "start": c["start"],
             "end": c["end"],
             "mode": mode,
-            "faces": faces
+            "faces": faces,
+            "samples": c["samples"]
         })
 
-    # Merge adjacent chunks with identical mode
+    # 4. Merge adjacent chunks with identical mode
     merged: List[Dict[str, Any]] = []
     for c in classified:
         if merged and merged[-1]["mode"] == c["mode"]:
             merged[-1]["end"] = c["end"]
             if c.get("faces"):
                 merged[-1].setdefault("faces", []).extend(c["faces"])
+            if c.get("samples"):
+                merged[-1].setdefault("samples", []).extend(c["samples"])
         else:
             merged.append(c)
 
-    # Snap boundaries to closest visual cut within +/- 0.8s
+    # 5. Snap boundaries to closest visual cut within +/- 0.8s
     for i in range(len(merged) - 1):
         b = merged[i]["end"]
         nearby_cuts = [c for c in visual_cuts if abs(c - b) <= 0.8]
@@ -242,7 +276,7 @@ def merge_scene_intervals(
                 merged[i]["end"] = best_cut
                 merged[i + 1]["start"] = best_cut
 
-    # Apply padding (+/- 0.2s) for CROP_TRACKING (Talking Head)
+    # 6. Apply padding (+/- 0.2s) for CROP_TRACKING (Talking Head)
     for i in range(len(merged) - 1):
         curr_mode = merged[i]["mode"]
         next_mode = merged[i + 1]["mode"]
@@ -263,19 +297,18 @@ def segment_clip_scenes(
     video_path: str,
     clip_start: float,
     clip_end: float,
-    sample_step: int = 6,
+    sample_step: int = 15,
     detect_width: int = 640,
     min_scene_sec: float = 2.0,
     padding_sec: float = 0.2
 ) -> List[SceneSegment]:
     """
-    Fixed Scene Logic (Aggregated Face Voting + Edge Anchor Check):
-    - Multi-person podcast (>= 2 faces in >= 15% frames or asymmetric edge person):
-      Mode: BLURRED_BACKGROUND (16:9 full fit in center).
-    - Centered Single Talking Head (0.35 <= X <= 0.65):
-      Mode: CROP_TRACKING (Fixed full 9:16 crop on median X position, completely stationary).
-    - Screen Record / Slide / B-Roll (0 faces):
-      Mode: BLURRED_BACKGROUND (16:9 full fit in center).
+    Universal Video Segmenter:
+    - Samples frames periodically (~0.5s interval).
+    - Runs Face Detection on each sample.
+    - Evaluates every segment with determine_segment_layout:
+      * CROP_9_16: Locked static crop 9:16 on median X position (0.38 <= X <= 0.62).
+      * BLURRED_BG: 16:9 full view fit in center with blurred background (>= 2 faces, 0 faces, or edge anchor).
     """
     if padding_sec is None:
         padding_sec = 0.2
@@ -300,6 +333,9 @@ def segment_clip_scenes(
     if end_frame < start_frame:
         end_frame = start_frame
     cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+
+    # 0.5s periodic sampling interval
+    step = max(1, int(round(fps * 0.5))) if sample_step is None or sample_step <= 0 else sample_step
 
     detect_w = min(width, detect_width)
     detect_h = int(round(height * (detect_w / float(width)))) if width > 0 else 360
@@ -335,7 +371,7 @@ def segment_clip_scenes(
         if not cap.grab():
             break
 
-        if frame_idx % sample_step == 0:
+        if frame_idx % step == 0:
             t_rel = (current_frame - start_frame) / fps
             ret, frame = cap.retrieve()
             face_count = 0
@@ -389,7 +425,7 @@ def segment_clip_scenes(
             )
         ]
 
-    # Merge into stable scene intervals based on Aggregated Face Voting & Edge Anchor Check
+    # Merge into stable scene intervals using determine_segment_layout
     chunks = merge_scene_intervals(
         raw_samples,
         min_scene_sec=min_scene_sec,
@@ -406,10 +442,12 @@ def segment_clip_scenes(
         if s_end <= s_start:
             continue
 
-        if c["mode"] == "CROP_TRACKING":
-            # Condition 1: Centered Single Talking Head (0.35 <= X <= 0.65)
-            # Use MEDIAN of dominant face X-center as the SINGLE FIXED crop X value for whole segment (zero camera motion)
-            faces = c.get("faces", [])
+        # Universal evaluator called on every segment
+        seg_samples = c.get("samples", [])
+        layout = determine_segment_layout(seg_samples, frame_width=width)
+
+        if layout == "CROP_9_16":
+            faces = [s[2] for s in seg_samples if (s[1] == 1 or s[1] is True) and s[2] is not None]
             if faces:
                 median_cx = float(np.median(faces))
             else:
@@ -425,9 +463,6 @@ def segment_clip_scenes(
                 )
             )
         else:
-            # Condition 2: Multi-person podcast (>= 2 faces in >= 15% frames or asymmetric edge person)
-            # Condition 3: Screen Record / Slide / B-Roll (0 faces)
-            # Use BLURRED_BACKGROUND (16:9 full fit in center)
             scenes.append(
                 SceneSegment(
                     start_time=s_start,
@@ -450,7 +485,7 @@ def detect_face_centers(
     video_path: str,
     start_time: float,
     end_time: float,
-    sample_step: int = 6,
+    sample_step: int = 15,
     detect_width: int = 640
 ) -> Tuple[List[float], ReframeStrategy]:
     scenes = segment_clip_scenes(
