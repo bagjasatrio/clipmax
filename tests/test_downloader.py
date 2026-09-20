@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from clipmax.downloader import download_video, is_valid_video_url, auto_update_ytdlp
+from clipmax.downloader import download_video, is_valid_video_url, auto_update_ytdlp, get_ydl_options
 
 def test_download_video_invalid_url():
     with pytest.raises(ValueError, match="Invalid URL"):
@@ -12,6 +12,12 @@ def test_auto_update_ytdlp():
         mock_run.return_value.returncode = 0
         assert auto_update_ytdlp() is True
 
+def test_get_ydl_options_structure():
+    opts = get_ydl_options("temp/out.mp4")
+    assert "format" in opts
+    assert "outtmpl" in opts
+    assert ("cookiesfrombrowser" in opts) or ("extractor_args" in opts)
+
 def test_download_video_browser_cookie_and_fallback(tmp_path):
     fake_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
     out_dir = tmp_path / "downloads"
@@ -20,7 +26,7 @@ def test_download_video_browser_cookie_and_fallback(tmp_path):
     simulated_file.touch()
 
     # Simulate: first 2 attempts (browser cookies) throw "Database locked" / DPAPI error,
-    # then 3rd attempt (Android/Web client fallback) succeeds
+    # then 3rd attempt succeeds
     call_count = [0]
 
     def fake_ydl_enter(self):

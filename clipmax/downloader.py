@@ -24,12 +24,48 @@ def is_valid_video_url(url: str) -> bool:
     u = url.strip().lower()
     return u.startswith("http://") or u.startswith("https://")
 
+def get_ydl_options(output_path: str) -> Dict[str, Any]:
+    """
+    Returns yt-dlp options prioritizing local browser cookies (chrome -> edge -> firefox -> brave)
+    with seamless fallback to Android client extractor.
+    """
+    browsers = ["chrome", "edge", "firefox", "brave"]
+    for b in browsers:
+        try:
+            return {
+                "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "outtmpl": output_path,
+                "cookiesfrombrowser": (b, ),
+                "quiet": True,
+                "no_warnings": True,
+                "nocheckcertificate": True
+            }
+        except Exception:
+            continue
+
+    return {
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "outtmpl": output_path,
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "quiet": True,
+        "no_warnings": True,
+        "nocheckcertificate": True
+    }
+
 def download_video(
     url: str,
     output_dir: str,
     cancel_event: Optional[threading.Event] = None,
     progress_callback: Optional[Callable[[int, str], None]] = None
 ) -> str:
+    """
+    Downloads video using a safe download wrapper loop:
+    1. Check for manual cookies.txt.
+    2. Sequentially attempt browser cookie extraction (Chrome -> Edge -> Firefox -> Brave).
+    3. Fallback to Android client extractor args.
+    4. Fallback to TV / Safari client extractor args.
+    5. Fallback to default extractor.
+    """
     import yt_dlp
 
     if not is_valid_video_url(url):
@@ -53,7 +89,7 @@ def download_video(
 
     ffmpeg_bin = get_ffmpeg_bin()
 
-    base_opts: Dict[str, Any] = {
+    base_shared: Dict[str, Any] = {
         "outtmpl": out_template,
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "merge_output_format": "mp4",
@@ -74,29 +110,22 @@ def download_video(
         Path.home() / "cookies.txt"
     ]
     cookie_file = next((str(p) for p in cookie_candidates if p.exists()), None)
-    if cookie_file:
-        base_opts["cookiefile"] = cookie_file
 
-    # Build fallback strategies in order:
-    # 1. Browser cookies (Chrome, Edge, Firefox, Brave)
-    # 2. Android + Web player client fallback (bypasses bot verification)
-    # 3. TV + Web Safari player client fallback
-    # 4. Standard extractor
     strategies: List[Tuple[str, Dict[str, Any]]] = []
 
-    if not cookie_file:
-        for browser in ["chrome", "edge", "firefox", "brave"]:
-            b_opts = dict(base_opts)
-            b_opts["cookiesfrombrowser"] = (browser, )
-            b_opts["extractor_args"] = {
-                "youtube": {
-                    "player_client": ["android", "web"]
-                }
-            }
-            strategies.append((f"Browser Cookie ({browser})", b_opts))
+    if cookie_file:
+        c_opts = dict(base_shared)
+        c_opts["cookiefile"] = cookie_file
+        strategies.append(("Manual Cookies File", c_opts))
+    else:
+        # Browser cookies loop (Chrome -> Edge -> Firefox -> Brave)
+        for b in ["chrome", "edge", "firefox", "brave"]:
+            b_opts = dict(base_shared)
+            b_opts["cookiesfrombrowser"] = (b, )
+            strategies.append((f"Browser Cookies ({b})", b_opts))
 
-    # Android & Web player client fallback
-    android_opts = dict(base_opts)
+    # Android & Web player client fallback (no cookies to avoid mismatch)
+    android_opts = dict(base_shared)
     android_opts["extractor_args"] = {
         "youtube": {
             "player_client": ["android", "web"]
@@ -105,7 +134,7 @@ def download_video(
     strategies.append(("Android/Web Client Fallback", android_opts))
 
     # TV & Web Safari client fallback
-    tv_opts = dict(base_opts)
+    tv_opts = dict(base_shared)
     tv_opts["extractor_args"] = {
         "youtube": {
             "player_client": ["tv", "web_safari"]
@@ -113,14 +142,19 @@ def download_video(
     }
     strategies.append(("TV/Safari Client Fallback", tv_opts))
 
-    # Default options fallback
-    strategies.append(("Default Strategy", dict(base_opts)))
+    # Generic default fallback
+    strategies.append(("Default Strategy", dict(base_shared)))
 
     last_error: Optional[Exception] = None
 
+    # Safe Download Wrapper Loop:
+    # If a browser DB is locked or challenged, immediately catch and advance to the next strategy
     for strategy_name, opts in strategies:
         if cancel_event and cancel_event.is_set():
             raise RuntimeError("Download dibatalkan oleh pengguna.")
+
+        if progress_callback:
+            progress_callback(0, f"Menghubungkan ({strategy_name})...")
 
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
@@ -143,7 +177,7 @@ def download_video(
             last_error = e
             if cancel_event and cancel_event.is_set():
                 raise RuntimeError("Download dibatalkan oleh pengguna.") from e
-            # Continue to next strategy (e.g., if browser DB is locked or decryption fails)
+            # Continue to next strategy in wrapper loop
             continue
 
     if last_error:
