@@ -147,11 +147,34 @@ class ClipCardWidget(QFrame):
         self.style().unpolish(self)
         self.style().polish(self)
 
+class ResponsivePlayerArea(QFrame):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.video_widget: Optional[QVideoWidget] = None
+        self.setStyleSheet("background-color: #121417; border: 1px solid #282C35; border-radius: 8px;")
+
+    def set_video_widget(self, widget: QVideoWidget):
+        self.video_widget = widget
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.video_widget:
+            avail_w = max(100, self.width() - 36)
+            avail_h = max(100, self.height() - 180)
+            target_w = int(avail_h * (9.0 / 16.0))
+            if target_w <= avail_w:
+                target_h = avail_h
+            else:
+                target_w = avail_w
+                target_h = int(avail_w * (16.0 / 9.0))
+            self.video_widget.setFixedSize(max(180, target_w), max(320, target_h))
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setMinimumSize(1024, 680)
         self.resize(1180, 780)
 
         self.config = AppConfig.load()
@@ -187,7 +210,7 @@ class MainWindow(QMainWindow):
         header_frame.setObjectName("AppHeader")
         h_layout = QHBoxLayout(header_frame)
         h_layout.setContentsMargins(16, 0, 16, 0)
-        h_layout.setSpacing(12)
+        h_layout.setSpacing(8)
 
         # Left: App Brand
         brand_lbl = QLabel("ClipMax Studio")
@@ -201,7 +224,19 @@ class MainWindow(QMainWindow):
         self.lbl_hw_pill.setObjectName("HardwarePill")
         h_layout.addWidget(self.lbl_hw_pill)
 
-        # Window Close Button
+        # Window Controls: Minimize, Maximize/Restore, Close
+        btn_min = QPushButton("—")
+        btn_min.setFixedSize(28, 28)
+        btn_min.setProperty("class", "Secondary")
+        btn_min.clicked.connect(self.showMinimized)
+        h_layout.addWidget(btn_min)
+
+        self.btn_max = QPushButton("□")
+        self.btn_max.setFixedSize(28, 28)
+        self.btn_max.setProperty("class", "Secondary")
+        self.btn_max.clicked.connect(self._toggle_maximize)
+        h_layout.addWidget(self.btn_max)
+
         btn_close = QPushButton("✕")
         btn_close.setFixedSize(28, 28)
         btn_close.setProperty("class", "Secondary")
@@ -210,19 +245,19 @@ class MainWindow(QMainWindow):
 
         root_layout.addWidget(header_frame)
 
-        # 2. Main Studio Body (Split View)
-        body_widget = QWidget()
-        body_layout = QHBoxLayout(body_widget)
-        body_layout.setContentsMargins(0, 0, 0, 0)
-        body_layout.setSpacing(0)
+        # 2. Main Studio Body (Responsive Splitter View)
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        self.main_splitter.setHandleWidth(1)
+        self.main_splitter.setStyleSheet("QSplitter::handle { background-color: #282C35; }")
 
-        # Panel Kiri (Sidebar Controls - Fixed 380px)
+        # Panel Kiri (Sidebar Controls - 360px to 450px)
         sidebar = self._build_sidebar()
-        body_layout.addWidget(sidebar)
+        self.main_splitter.addWidget(sidebar)
 
-        # Panel Kanan (Studio Stage / Canvas Area)
+        # Panel Kanan (Studio Stage / Canvas Area - Expanding)
         self.stage_stack = QStackedWidget()
         self.stage_stack.setObjectName("StageCanvas")
+        self.stage_stack.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.view_standby = self._build_standby_stage()
         self.view_processing = self._build_processing_stage()
@@ -233,8 +268,13 @@ class MainWindow(QMainWindow):
         self.stage_stack.addWidget(self.view_review)       # Index 2
         self.stage_stack.setCurrentIndex(0)
 
-        body_layout.addWidget(self.stage_stack, 1)
-        root_layout.addWidget(body_widget, 1)
+        self.main_splitter.addWidget(self.stage_stack)
+        self.main_splitter.setStretchFactor(0, 0)
+        self.main_splitter.setStretchFactor(1, 1)
+        self.main_splitter.setCollapsible(0, False)
+        self.main_splitter.setCollapsible(1, False)
+
+        root_layout.addWidget(self.main_splitter, 1)
 
     def _build_divider(self) -> QFrame:
         div = QFrame()
@@ -242,10 +282,25 @@ class MainWindow(QMainWindow):
         return div
 
     def _build_sidebar(self) -> QWidget:
-        sidebar = QFrame()
-        sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(380)
-        layout = QVBoxLayout(sidebar)
+        sidebar_frame = QFrame()
+        sidebar_frame.setObjectName("Sidebar")
+        sidebar_frame.setMinimumWidth(360)
+        sidebar_frame.setMaximumWidth(450)
+        sidebar_frame.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+
+        outer_layout = QVBoxLayout(sidebar_frame)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("background: transparent; border: none;")
+
+        content_widget = QWidget()
+        content_widget.setStyleSheet("background: transparent;")
+        layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(18, 16, 18, 18)
         layout.setSpacing(12)
 
@@ -430,7 +485,9 @@ class MainWindow(QMainWindow):
         self.btn_cancel.clicked.connect(self._on_cancel)
         layout.addWidget(self.btn_cancel)
 
-        return sidebar
+        scroll_area.setWidget(content_widget)
+        outer_layout.addWidget(scroll_area)
+        return sidebar_frame
 
     def _build_standby_stage(self) -> QWidget:
         stage = QWidget()
@@ -556,9 +613,8 @@ class MainWindow(QMainWindow):
         # Review Body (Left: 9:16 Center Player, Right: Clip Strip Gallery)
         splitter = QSplitter(Qt.Horizontal)
 
-        # Center Studio Player Area
-        player_area = QFrame()
-        player_area.setStyleSheet("background-color: #121417; border: 1px solid #282C35; border-radius: 8px;")
+        # Center Studio Player Area (Responsive 9:16 Aspect Ratio)
+        player_area = ResponsivePlayerArea()
         p_layout = QVBoxLayout(player_area)
         p_layout.setContentsMargins(16, 16, 16, 16)
         p_layout.setSpacing(10)
@@ -567,6 +623,7 @@ class MainWindow(QMainWindow):
         self.video_widget = QVideoWidget()
         self.video_widget.setStyleSheet("background-color: #0B0D0F; border-radius: 6px;")
         self.video_widget.setFixedSize(270, 480)
+        player_area.set_video_widget(self.video_widget)
         self.player.setVideoOutput(self.video_widget)
         p_layout.addWidget(self.video_widget, 0, Qt.AlignCenter)
 
@@ -652,6 +709,19 @@ class MainWindow(QMainWindow):
         self.player.positionChanged.connect(self._on_position_changed)
         self.player.durationChanged.connect(self._on_duration_changed)
         self.player.playbackStateChanged.connect(self._on_state_changed)
+
+    def _toggle_maximize(self):
+        if self.isMaximized():
+            self.showNormal()
+            self.btn_max.setText("□")
+        else:
+            self.showMaximized()
+            self.btn_max.setText("❐")
+
+    def mouseDoubleClickEvent(self, event):
+        if event.position().y() < 42:
+            self._toggle_maximize()
+            event.accept()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and event.position().y() < 42:
