@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from clipmax.web.server import app, state
 from clipmax.pipeline import ClipResult
@@ -67,3 +67,75 @@ def test_static_index_html():
     assert "Reset &amp; Clear Cache" in res.text or "Reset & Clear Cache" in res.text
     assert "Subtitle Style" in res.text
     assert "inputHighlightColor" in res.text
+
+def test_api_export_direct_download(tmp_path):
+    clip_file = tmp_path / "clipmax_1_10.mp4"
+    clip_file.write_text("dummy video content")
+
+    dummy_clip = ClipResult(
+        clip_id=1,
+        title="Test Clip",
+        hook="Awesome",
+        virality_score=95,
+        reasoning="Good",
+        start_time=10.0,
+        end_time=30.0,
+        staging_path=str(clip_file)
+    )
+    state.clips = [dummy_clip]
+
+    res = client.get("/api/export/1")
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "video/mp4"
+    assert "clipmax_1_10.mp4" in res.headers.get("content-disposition", "")
+
+def test_export_single_clip_tuple_safety(tmp_path):
+    source_file = tmp_path / "source.mp4"
+    source_file.write_text("source content")
+    dest_file = tmp_path / "saved.mp4"
+
+    dummy_clip = ClipResult(
+        clip_id=2,
+        title="Clip 2",
+        hook="Hook",
+        virality_score=80,
+        reasoning="Ok",
+        start_time=0.0,
+        end_time=10.0,
+        staging_path=str(source_file)
+    )
+    state.clips = [dummy_clip]
+
+    # Test with string path
+    res = client.post("/api/clips/export-single", json={"clip_id": 2, "dest_path": str(dest_file)})
+    assert res.status_code == 200
+    assert dest_file.exists()
+
+def test_desktop_js_api_tuple_handling(tmp_path):
+    from desktop_app import DesktopJsApi
+    source_file = tmp_path / "source_desktop.mp4"
+    source_file.write_text("source desktop")
+    dest_file = tmp_path / "saved_desktop.mp4"
+
+    dummy_clip = ClipResult(
+        clip_id=3,
+        title="Clip 3",
+        hook="Hook 3",
+        virality_score=90,
+        reasoning="Ok",
+        start_time=0.0,
+        end_time=15.0,
+        staging_path=str(source_file)
+    )
+    state.clips = [dummy_clip]
+
+    mock_window = MagicMock()
+    # Mock create_file_dialog returning a tuple ('C:/path/file.mp4',) as pywebview does
+    mock_window.create_file_dialog.return_value = (str(dest_file),)
+
+    api = DesktopJsApi({"window": mock_window})
+    saved = api.save_clip_dialog(3, "clipmax_3_0.mp4")
+
+    assert saved == str(dest_file)
+    assert dest_file.exists()
+

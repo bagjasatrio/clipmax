@@ -51,8 +51,10 @@ class DesktopJsApi:
                     allow_multiple=False,
                     file_types=('Video Files (*.mp4;*.mkv;*.mov;*.avi;*.webm)', 'All files (*.*)')
                 )
-                if res and len(res) > 0:
-                    return res[0]
+                if res:
+                    save_path = res[0] if isinstance(res, (tuple, list)) else res
+                    if save_path and isinstance(save_path, str) and save_path.strip():
+                        return save_path
             except Exception as e:
                 print(f"[Desktop Dialog Error]: {e}")
         return None
@@ -71,10 +73,13 @@ class DesktopJsApi:
                     file_types=('MP4 Video (*.mp4)', 'All files (*.*)')
                 )
                 if res:
+                    save_path = res[0] if isinstance(res, (tuple, list)) else res
+                    if not save_path or not isinstance(save_path, str) or not save_path.strip():
+                        return None
                     clip = next((c for c in state.clips if c.clip_id == clip_id), None)
                     if clip and os.path.exists(clip.staging_path):
                         import shutil
-                        dest = Path(res)
+                        dest = Path(save_path)
                         dest.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(clip.staging_path, str(dest))
                         return str(dest)
@@ -87,9 +92,12 @@ class DesktopJsApi:
         if w:
             try:
                 res = w.create_file_dialog(webview.FileDialog.FOLDER)
-                if res and len(res) > 0:
+                if res:
+                    dest_dir_str = res[0] if isinstance(res, (tuple, list)) else res
+                    if not dest_dir_str or not isinstance(dest_dir_str, str) or not dest_dir_str.strip():
+                        return None
                     import shutil
-                    dest_dir = Path(res[0])
+                    dest_dir = Path(dest_dir_str)
                     dest_dir.mkdir(parents=True, exist_ok=True)
                     for c in state.clips:
                         if os.path.exists(c.staging_path):

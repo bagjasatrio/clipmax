@@ -1122,12 +1122,17 @@ class MainWindow(QMainWindow):
             return
 
         default_name = f"clipmax_{self.selected_clip.clip_id}_{int(self.selected_clip.start_time)}.mp4"
-        dest_path, _ = QFileDialog.getSaveFileName(
+        result = QFileDialog.getSaveFileName(
             self, "Export 9:16 Clip", default_name, "Video Files (*.mp4)"
         )
-        if dest_path:
+        if isinstance(result, (tuple, list)):
+            dest_path = result[0]
+        else:
+            dest_path = result
+
+        if dest_path and isinstance(dest_path, str) and dest_path.strip():
             try:
-                shutil.copy2(self.selected_clip.staging_path, dest_path)
+                shutil.copy2(self.selected_clip.staging_path, dest_path.strip())
                 QMessageBox.information(self, "Export Successful", f"Clip saved to:\n{dest_path}")
             except Exception as e:
                 QMessageBox.critical(self, "Export Failed", f"Failed to save file: {str(e)}")
@@ -1137,9 +1142,14 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Export All", "No clips available to export.")
             return
 
-        dest_dir = QFileDialog.getExistingDirectory(self, "Select Destination Folder for All Clips")
-        if dest_dir:
-            dest_dir_path = Path(dest_dir)
+        result = QFileDialog.getExistingDirectory(self, "Select Destination Folder for All Clips")
+        if isinstance(result, (tuple, list)):
+            dest_dir = result[0]
+        else:
+            dest_dir = result
+
+        if dest_dir and isinstance(dest_dir, str) and dest_dir.strip():
+            dest_dir_path = Path(dest_dir.strip())
             copied_count = 0
             for clip in self.current_clips:
                 if os.path.exists(clip.staging_path):

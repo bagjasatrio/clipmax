@@ -563,21 +563,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (window.pywebview && window.pywebview.api && window.pywebview.api.save_clip_dialog) {
       try {
-        const saved = await window.pywebview.api.save_clip_dialog(selectedClip.clip_id, defName);
-        if (saved) {
+        let saved = await window.pywebview.api.save_clip_dialog(selectedClip.clip_id, defName);
+        if (Array.isArray(saved)) saved = saved[0];
+        if (saved && typeof saved === "string" && saved.trim() !== "") {
           alert(`Klip berhasil disimpan ke:\n${saved}`);
           return;
         }
       } catch (e) {
-        console.warn("Save dialog error:", e);
+        console.warn("Save dialog error, using direct download:", e);
       }
     }
-    // Fallback: direct browser download
-    const vidName = selectedClip.staging_path.split(/[\\/]/).pop();
+    // Fallback: direct browser download via /api/export/{clip_id}
     const a = document.createElement("a");
-    a.href = `/staging/${vidName}`;
+    a.href = `/api/export/${selectedClip.clip_id}`;
     a.download = defName;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   });
 
   btnExportAll.addEventListener("click", async () => {
@@ -585,23 +587,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (window.pywebview && window.pywebview.api && window.pywebview.api.export_all_dialog) {
       try {
-        const exportedDir = await window.pywebview.api.export_all_dialog();
-        if (exportedDir) {
+        let exportedDir = await window.pywebview.api.export_all_dialog();
+        if (Array.isArray(exportedDir)) exportedDir = exportedDir[0];
+        if (exportedDir && typeof exportedDir === "string" && exportedDir.trim() !== "") {
           alert(`Seluruh klip (${currentClips.length}) berhasil diexport ke folder:\n${exportedDir}`);
           return;
         }
       } catch (e) {
-        console.warn("Export all dialog error:", e);
+        console.warn("Export all dialog error, using direct download:", e);
       }
     }
 
-    // Direct download trigger for each
+    // Direct download trigger for each via /api/export/{clip_id}
     currentClips.forEach((c) => {
-      const vidName = c.staging_path.split(/[\\/]/).pop();
       const a = document.createElement("a");
-      a.href = `/staging/${vidName}`;
+      a.href = `/api/export/${c.clip_id}`;
       a.download = `clipmax_${c.clip_id}_${Math.round(c.start_time)}.mp4`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
     });
   });
 

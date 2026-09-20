@@ -45,7 +45,7 @@ class ClipResult(BaseModel):
     start_time: float
     end_time: float
     staging_path: str
-    thumbnail_path: str
+    thumbnail_path: str = ""
     reframe_mode: str = "CROP_TRACKING"
 
 def kill_process_tree(pid: int) -> None:

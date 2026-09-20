@@ -274,13 +274,45 @@ def get_pipeline_status():
         "clips": [c.model_dump() for c in state.clips]
     }
 
+@app.get("/api/export/{clip_id}")
+def download_clip_direct(clip_id: str):
+    """Direct file download response for browser export fallback."""
+    target_clip = None
+    try:
+        cid_int = int(clip_id)
+        target_clip = next((c for c in state.clips if c.clip_id == cid_int), None)
+    except ValueError:
+        target_clip = next((c for c in state.clips if str(c.clip_id) == clip_id or c.title == clip_id), None)
+
+    if not target_clip or not os.path.exists(target_clip.staging_path):
+        staging_dir = Path(state.config.temp_dir) / "staging"
+        possible_files = list(staging_dir.glob(f"*{clip_id}*.mp4"))
+        if possible_files:
+            return FileResponse(
+                path=str(possible_files[0]),
+                filename=possible_files[0].name,
+                media_type="video/mp4"
+            )
+        raise HTTPException(status_code=404, detail="Clip not found in staging")
+
+    clean_filename = f"clipmax_{target_clip.clip_id}_{int(target_clip.start_time)}.mp4"
+    return FileResponse(
+        path=target_clip.staging_path,
+        filename=clean_filename,
+        media_type="video/mp4"
+    )
+
 @app.post("/api/clips/export-single")
 def export_single_clip(req: ExportSingleRequest):
     clip = next((c for c in state.clips if c.clip_id == req.clip_id), None)
     if not clip or not os.path.exists(clip.staging_path):
         raise HTTPException(status_code=404, detail="Clip not found in staging")
 
-    dest = Path(req.dest_path)
+    dest_str = req.dest_path[0] if isinstance(req.dest_path, (tuple, list)) else req.dest_path
+    if not dest_str or not isinstance(dest_str, str) or not dest_str.strip():
+        return {"status": "cancelled"}
+
+    dest = Path(dest_str)
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(clip.staging_path, str(dest))
     return {"status": "ok", "path": str(dest)}
@@ -290,7 +322,11 @@ def export_all_clips(req: ExportAllRequest):
     if not state.clips:
         raise HTTPException(status_code=400, detail="No clips to export")
 
-    dest_dir = Path(req.dest_dir)
+    dest_dir_str = req.dest_dir[0] if isinstance(req.dest_dir, (tuple, list)) else req.dest_dir
+    if not dest_dir_str or not isinstance(dest_dir_str, str) or not dest_dir_str.strip():
+        return {"status": "cancelled"}
+
+    dest_dir = Path(dest_dir_str)
     dest_dir.mkdir(parents=True, exist_ok=True)
     exported = []
     for c in state.clips:
@@ -313,8 +349,10 @@ def dialog_choose_video():
                 allow_multiple=False,
                 file_types=('Video Files (*.mp4;*.mkv;*.mov;*.avi;*.webm)', 'All files (*.*)')
             )
-            if res and len(res) > 0:
-                return {"path": res[0]}
+            if res:
+                path_str = res[0] if isinstance(res, (tuple, list)) else res
+                if path_str and isinstance(path_str, str) and path_str.strip():
+                    return {"path": path_str}
         except Exception:
             pass
     return {"path": None}
@@ -331,11 +369,16 @@ def dialog_save_clip(clip_id: int, default_name: str):
                 file_types=('MP4 Video (*.mp4)', 'All files (*.*)')
             )
             if res:
+                save_path = res[0] if isinstance(res, (tuple, list)) else res
+                if not save_path or not isinstance(save_path, str) or not save_path.strip():
+                    return {"path": None, "success": False, "status": "cancelled"}
                 # Copy file
                 clip = next((c for c in state.clips if c.clip_id == clip_id), None)
                 if clip and os.path.exists(clip.staging_path):
-                    shutil.copy2(clip.staging_path, res)
-                    return {"path": res, "success": True}
+                    dest = Path(save_path)
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(clip.staging_path, str(dest))
+                    return {"path": str(dest), "success": True}
         except Exception as e:
             return {"error": str(e), "success": False}
     return {"path": None, "success": False}
@@ -347,8 +390,10 @@ def dialog_choose_folder():
         try:
             import webview
             res = window.create_file_dialog(webview.FileDialog.FOLDER)
-            if res and len(res) > 0:
-                return {"path": res[0]}
+            if res:
+                folder_str = res[0] if isinstance(res, (tuple, list)) else res
+                if folder_str and isinstance(folder_str, str) and folder_str.strip():
+                    return {"path": folder_str}
         except Exception:
             pass
     return {"path": None}
