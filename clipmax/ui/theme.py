@@ -1,206 +1,198 @@
 DARK_THEME_QSS = """
+/* ClipMax Studio - Professional Desktop Multimedia Theme */
+
 QMainWindow {
-    background-color: #181A1E;
-    border: 1px solid #2F333B;
-    border-radius: 10px;
+    background-color: #14161A;
+    border: 1px solid #23272F;
+    border-radius: 8px;
 }
 
 QWidget#CentralWidget {
-    background-color: #181A1E;
-    border-radius: 10px;
+    background-color: #14161A;
+    border-radius: 8px;
 }
 
 /* Base Typography */
 QWidget {
     font-family: 'Segoe UI', -apple-system, sans-serif;
-    color: #E4E7EB;
+    color: #E6E9EE;
     font-size: 13px;
 }
 
 QLabel {
-    color: #E4E7EB;
+    color: #E6E9EE;
     font-size: 13px;
 }
 
-QLabel.Title {
-    font-size: 16px;
+QLabel.AppBrand {
+    font-size: 14px;
     font-weight: 700;
-    color: #E4E7EB;
-    letter-spacing: 0.2px;
+    color: #E6E9EE;
+    letter-spacing: 0.3px;
 }
 
 QLabel.SectionHeader {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    color: #9CA3AF;
-    letter-spacing: 0.4px;
+    color: #8B949E;
+    letter-spacing: 0.8px;
 }
 
 QLabel.FormLabel {
     font-size: 12px;
     font-weight: 600;
-    color: #9CA3AF;
+    color: #8B949E;
 }
 
-QLabel.Sub {
+QLabel.Muted {
     font-size: 12px;
-    color: #9CA3AF;
+    color: #8B949E;
 }
 
-/* Card Containers */
-QFrame.Card {
-    background-color: #21242A;
-    border: 1px solid #2F333B;
-    border-radius: 10px;
-    padding: 14px;
+/* Top App Header (42px) */
+QFrame#AppHeader {
+    background-color: #14161A;
+    border-bottom: 1px solid #23272F;
+    min-height: 42px;
+    max-height: 42px;
 }
 
-/* Clip Gallery Card */
-QFrame.ClipCard {
-    background-color: #21242A;
-    border: 1px solid #2F333B;
-    border-radius: 8px;
-    padding: 12px;
+/* Sidebar Container (380px fixed) */
+QFrame#Sidebar {
+    background-color: #1B1E24;
+    border-right: 1px solid #282C35;
 }
 
-QFrame.ClipCard:hover {
-    background-color: #2A2E36;
-    border: 1px solid #3563A9;
+/* Stage / Canvas Container */
+QFrame#StageCanvas {
+    background-color: #14161A;
 }
 
-QFrame.ClipCardActive {
-    background-color: #2A2E36;
-    border: 1px solid #3563A9;
-    border-radius: 8px;
-    padding: 12px;
+/* Hairline Dividers */
+QFrame.Divider {
+    background-color: #282C35;
+    max-height: 1px;
+    min-height: 1px;
+    border: none;
 }
 
-/* Minimalist Pill Badges */
-QLabel.BadgePill {
-    background-color: #181A1E;
-    color: #E4E7EB;
-    font-size: 11px;
-    font-weight: 600;
-    border-radius: 10px;
-    padding: 3px 8px;
-    border: 1px solid #2F333B;
-}
-
-QLabel.BadgeHardware {
-    background-color: #181A1E;
-    color: #9CA3AF;
-    font-size: 11px;
-    font-weight: 600;
+/* Monochrome Hardware Status Pill */
+QLabel#HardwarePill {
+    background-color: #1B1E24;
+    border: 1px solid #282C35;
     border-radius: 12px;
-    padding: 4px 12px;
-    border: 1px solid #2F333B;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #E6E9EE;
 }
 
-/* Inputs & Form Controls (Fixed Truncation, 40px min-height, centered) */
+/* Inputs & Form Controls (#121417 surface) */
 QLineEdit, QComboBox, QSpinBox {
-    background-color: #141619;
-    border: 1px solid #2F333B;
+    background-color: #121417;
+    border: 1px solid #282C35;
     border-radius: 6px;
-    color: #E4E7EB;
-    padding: 8px 12px;
-    min-height: 40px;
+    color: #E6E9EE;
+    padding: 8px 10px;
+    min-height: 38px;
     font-size: 13px;
-    selection-background-color: #3563A9;
+    selection-background-color: #386FA4;
 }
 
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QPlainTextEdit:focus {
-    border: 1px solid #3563A9;
-    background-color: #141619;
+    border: 1px solid #386FA4;
+    background-color: #121417;
 }
 
 QComboBox::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: top right;
-    width: 28px;
-    border-left: 1px solid #2F333B;
+    width: 24px;
+    border-left: 1px solid #282C35;
 }
 
 QComboBox QAbstractItemView {
-    background-color: #141619;
-    border: 1px solid #2F333B;
-    color: #E4E7EB;
-    selection-background-color: #21242A;
+    background-color: #121417;
+    border: 1px solid #282C35;
+    color: #E6E9EE;
+    selection-background-color: #1B1E24;
     padding: 4px;
 }
 
 QSpinBox::up-button, QSpinBox::down-button {
-    background-color: #21242A;
-    border: 1px solid #2F333B;
+    background-color: #1B1E24;
+    border: 1px solid #282C35;
     border-radius: 3px;
-    width: 22px;
+    width: 20px;
     margin: 1px;
 }
 
 QSpinBox::up-button:hover, QSpinBox::down-button:hover {
-    background-color: #2A2E36;
-    border-color: #3563A9;
+    background-color: #282C35;
+    border-color: #386FA4;
 }
 
 QPlainTextEdit {
-    background-color: #141619;
-    border: 1px solid #2F333B;
+    background-color: #121417;
+    border: 1px solid #282C35;
     border-radius: 6px;
-    color: #E4E7EB;
-    padding: 8px 12px;
-    font-size: 13px;
-    selection-background-color: #3563A9;
+    color: #E6E9EE;
+    padding: 8px 10px;
+    font-size: 12px;
+    selection-background-color: #386FA4;
 }
 
-/* Buttons */
+/* PushButtons */
 QPushButton {
     background-color: #21242A;
-    color: #E4E7EB;
+    color: #E6E9EE;
     font-weight: 600;
-    border: 1px solid #2F333B;
+    border: 1px solid #282C35;
     border-radius: 6px;
-    padding: 8px 16px;
-    min-height: 40px;
+    padding: 8px 14px;
+    min-height: 36px;
     font-size: 13px;
 }
 
 QPushButton:hover {
-    background-color: #2A2E36;
-    border-color: #3563A9;
+    background-color: #282C35;
+    border-color: #386FA4;
 }
 
 QPushButton:pressed {
-    background-color: #181A1E;
+    background-color: #121417;
 }
 
-QPushButton.PrimaryAction {
-    background-color: #3563A9;
+/* Primary Action Button (Generate Clips) */
+QPushButton#BtnGenerate {
+    background-color: #386FA4;
     color: #FFFFFF;
-    font-size: 14px;
-    font-weight: bold;
-    border: 1px solid #4175C7;
-    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid #437EB7;
+    border-radius: 6px;
     min-height: 44px;
-    padding: 10px 24px;
+    letter-spacing: 0.3px;
 }
 
-QPushButton.PrimaryAction:hover {
-    background-color: #4175C7;
-    border-color: #5289DE;
+QPushButton#BtnGenerate:hover {
+    background-color: #437EB7;
+    border-color: #4F8DC8;
 }
 
-QPushButton.PrimaryAction:pressed {
-    background-color: #2A4F87;
+QPushButton#BtnGenerate:pressed {
+    background-color: #2A547D;
 }
 
 QPushButton.Secondary {
-    background-color: #21242A;
-    color: #E4E7EB;
-    border: 1px solid #2F333B;
+    background-color: #121417;
+    color: #E6E9EE;
+    border: 1px solid #282C35;
 }
 
 QPushButton.Secondary:hover {
-    background-color: #2A2E36;
-    border-color: #3563A9;
+    background-color: #1B1E24;
+    border-color: #386FA4;
 }
 
 QPushButton.Success {
@@ -218,7 +210,7 @@ QPushButton.Danger {
     color: #FFFFFF;
     border: 1px solid #A35050;
     min-height: 44px;
-    border-radius: 8px;
+    border-radius: 6px;
 }
 
 QPushButton.Danger:hover {
@@ -226,76 +218,77 @@ QPushButton.Danger:hover {
 }
 
 QPushButton:disabled {
-    background-color: #1E2024;
-    color: #6B7280;
-    border: 1px solid #2F333B;
+    background-color: #1B1E24;
+    color: #555D68;
+    border: 1px solid #23272F;
 }
 
 /* Progress Bar */
 QProgressBar {
-    background-color: #141619;
-    border: 1px solid #2F333B;
-    border-radius: 6px;
+    background-color: #121417;
+    border: 1px solid #282C35;
+    border-radius: 4px;
     text-align: center;
-    color: #E4E7EB;
+    color: #E6E9EE;
     font-weight: 600;
     font-size: 11px;
-    min-height: 18px;
+    min-height: 12px;
+    max-height: 12px;
 }
 
 QProgressBar::chunk {
-    background-color: #3563A9;
-    border-radius: 5px;
+    background-color: #386FA4;
+    border-radius: 3px;
 }
 
 /* Segmented Control / Flat Tabs */
 QTabWidget::pane {
-    border: 1px solid #2F333B;
-    background: #21242A;
-    border-radius: 8px;
-    padding: 10px;
+    border: 1px solid #282C35;
+    background: #1B1E24;
+    border-radius: 6px;
+    padding: 8px;
     top: -1px;
 }
 
 QTabBar::tab {
     background: transparent;
-    color: #9CA3AF;
-    padding: 8px 18px;
+    color: #8B949E;
+    padding: 6px 14px;
     border: 1px solid transparent;
     border-top-left-radius: 6px;
     border-top-right-radius: 6px;
-    margin-right: 4px;
+    margin-right: 2px;
     font-size: 12px;
     font-weight: 600;
 }
 
 QTabBar::tab:selected {
-    background: #21242A;
-    color: #E4E7EB;
-    border: 1px solid #2F333B;
-    border-bottom: 1px solid #21242A;
+    background: #1B1E24;
+    color: #E6E9EE;
+    border: 1px solid #282C35;
+    border-bottom: 1px solid #1B1E24;
 }
 
 QTabBar::tab:hover:!selected {
-    color: #E4E7EB;
-    background: #181A1E;
+    color: #E6E9EE;
+    background: #14161A;
 }
 
-/* Minimalist Flat Video Slider */
+/* Flat Studio Slider */
 QSlider::groove:horizontal {
     border: none;
     height: 4px;
-    background: #2F333B;
+    background: #282C35;
     border-radius: 2px;
 }
 
 QSlider::sub-page:horizontal {
-    background: #3563A9;
+    background: #386FA4;
     border-radius: 2px;
 }
 
 QSlider::handle:horizontal {
-    background: #E4E7EB;
+    background: #E6E9EE;
     border: none;
     width: 12px;
     margin-top: -4px;
@@ -314,23 +307,54 @@ QScrollArea {
 }
 
 QScrollBar:vertical {
-    background: #181A1E;
-    width: 8px;
+    background: #14161A;
+    width: 6px;
     margin: 0px;
-    border-radius: 4px;
+    border-radius: 3px;
 }
 
 QScrollBar::handle:vertical {
-    background: #2F333B;
-    min-height: 24px;
-    border-radius: 4px;
+    background: #282C35;
+    min-height: 20px;
+    border-radius: 3px;
 }
 
 QScrollBar::handle:vertical:hover {
-    background: #3563A9;
+    background: #386FA4;
 }
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0px;
+}
+
+/* Strip Card for Clips */
+QFrame.ClipCard {
+    background-color: #1B1E24;
+    border: 1px solid #282C35;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+QFrame.ClipCard:hover {
+    background-color: #21242A;
+    border: 1px solid #386FA4;
+}
+
+QFrame.ClipCardActive {
+    background-color: #21242A;
+    border: 1px solid #386FA4;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+/* Badge Pills */
+QLabel.BadgePill {
+    background-color: #121417;
+    color: #E6E9EE;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 4px;
+    padding: 2px 6px;
+    border: 1px solid #282C35;
 }
 """

@@ -2,9 +2,9 @@ import os
 import sys
 import shutil
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 from PySide6.QtCore import Qt, QThread, Signal, QPoint, QUrl
-from PySide6.QtGui import QPixmap, QIcon
+from PySide6.QtGui import QPixmap
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtWidgets import (
@@ -67,44 +67,45 @@ class ClipCardWidget(QFrame):
         self.setProperty("class", "ClipCard")
         self.setCursor(Qt.PointingHandCursor)
         self.setMouseTracking(True)
+        self.setFixedHeight(94)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(12)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(10)
 
         # Thumbnail
         self.thumb_lbl = QLabel()
-        self.thumb_lbl.setFixedSize(68, 100)
-        self.thumb_lbl.setStyleSheet("background-color: #181A1D; border: 1px solid #3B3F47; border-radius: 4px;")
+        self.thumb_lbl.setFixedSize(48, 76)
+        self.thumb_lbl.setStyleSheet("background-color: #121417; border: 1px solid #282C35; border-radius: 4px;")
         self.thumb_lbl.setAlignment(Qt.AlignCenter)
         if clip.thumbnail_path and os.path.exists(clip.thumbnail_path):
             pix = QPixmap(clip.thumbnail_path)
-            self.thumb_lbl.setPixmap(pix.scaled(68, 100, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+            self.thumb_lbl.setPixmap(pix.scaled(48, 76, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
         else:
             self.thumb_lbl.setText("9:16")
-            self.thumb_lbl.setStyleSheet("color: #9CA3AF; font-size: 11px;")
+            self.thumb_lbl.setStyleSheet("color: #8B949E; font-size: 10px;")
         layout.addWidget(self.thumb_lbl)
 
         # Info container
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(4)
+        info_layout.setSpacing(2)
+        info_layout.setAlignment(Qt.AlignVCenter)
 
         # Top row: title + score badge
         top_row = QHBoxLayout()
         title_lbl = QLabel(clip.title)
-        title_lbl.setStyleSheet("font-weight: 600; font-size: 13px; color: #E4E7EB;")
+        title_lbl.setStyleSheet("font-weight: 600; font-size: 12px; color: #E6E9EE;")
         title_lbl.setWordWrap(True)
         top_row.addWidget(title_lbl, 1)
 
         score_lbl = QLabel(f"{clip.virality_score} pts")
         score_lbl.setProperty("class", "BadgePill")
-        score_lbl.setFixedHeight(20)
         top_row.addWidget(score_lbl)
         info_layout.addLayout(top_row)
 
         # Hook
         hook_lbl = QLabel(f'"{clip.hook}"')
-        hook_lbl.setStyleSheet("color: #9CA3AF; font-style: italic; font-size: 11px;")
+        hook_lbl.setStyleSheet("color: #8B949E; font-style: italic; font-size: 11px;")
         hook_lbl.setWordWrap(True)
         info_layout.addWidget(hook_lbl)
 
@@ -112,21 +113,21 @@ class ClipCardWidget(QFrame):
         dur = max(0.0, clip.end_time - clip.start_time)
         mode_val = getattr(clip, "reframe_mode", "DYNAMIC_SCENE")
         if mode_val == "DYNAMIC_SCENE":
-            mode_tag = "🔄 Dynamic Split"
+            mode_tag = "Dynamic Split"
         elif mode_val == "CROP_TRACKING":
-            mode_tag = "👤 Face Crop"
+            mode_tag = "Face Crop 9:16"
         else:
-            mode_tag = "🖼 Blurred BG"
+            mode_tag = "Blurred BG"
 
         time_row = QHBoxLayout()
         time_row.setSpacing(6)
-        time_lbl = QLabel(f"⏱ {int(clip.start_time)}s - {int(clip.end_time)}s ({dur:.1f}s)")
-        time_lbl.setStyleSheet("color: #9CA3AF; font-size: 11px;")
+        time_lbl = QLabel(f"{int(clip.start_time)}s - {int(clip.end_time)}s ({dur:.1f}s)")
+        time_lbl.setStyleSheet("color: #8B949E; font-size: 11px;")
         time_row.addWidget(time_lbl)
 
         mode_lbl = QLabel(mode_tag)
         mode_lbl.setProperty("class", "BadgePill")
-        mode_lbl.setStyleSheet("font-size: 10px; padding: 1px 6px;")
+        mode_lbl.setStyleSheet("font-size: 10px; color: #8B949E;")
         time_row.addWidget(mode_lbl)
         time_row.addStretch()
 
@@ -148,7 +149,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.resize(1080, 780)
+        self.resize(1180, 780)
 
         self.config = AppConfig.load()
         self.orchestrator = PipelineOrchestrator(self.config)
@@ -173,89 +174,114 @@ class MainWindow(QMainWindow):
         central.setObjectName("CentralWidget")
         self.setCentralWidget(central)
         root_layout = QVBoxLayout(central)
-        root_layout.setContentsMargins(20, 16, 20, 20)
-        root_layout.setSpacing(14)
+        root_layout.setContentsMargins(1, 1, 1, 1)
+        root_layout.setSpacing(0)
 
-        # Baris 1: Header Minimalis (Title + Subtitle + Hardware Badge + Close)
-        title_bar = QHBoxLayout()
-        title_bar.setContentsMargins(0, 0, 0, 2)
-        title_bar.setSpacing(12)
+        # 1. Top App Header (42px)
+        header_frame = QFrame()
+        header_frame.setObjectName("AppHeader")
+        h_layout = QHBoxLayout(header_frame)
+        h_layout.setContentsMargins(16, 0, 16, 0)
+        h_layout.setSpacing(12)
 
-        header_info = QVBoxLayout()
-        header_info.setSpacing(2)
-        title_lbl = QLabel("ClipMax")
-        title_lbl.setProperty("class", "Title")
-        sub_lbl = QLabel("Autonomous Desktop Clipper")
-        sub_lbl.setProperty("class", "Sub")
-        header_info.addWidget(title_lbl)
-        header_info.addWidget(sub_lbl)
-        title_bar.addLayout(header_info)
+        # Left: App Brand
+        brand_lbl = QLabel("ClipMax Studio")
+        brand_lbl.setProperty("class", "AppBrand")
+        h_layout.addWidget(brand_lbl)
 
-        title_bar.addStretch()
+        h_layout.addStretch()
 
-        # Hardware Badge
-        self.lbl_hw_badge = QLabel("RTX 3050 • CUDA")
-        self.lbl_hw_badge.setProperty("class", "BadgeHardware")
-        title_bar.addWidget(self.lbl_hw_badge)
+        # Right: Monochrome System Pill (Hardware status)
+        self.lbl_hw_pill = QLabel("<span style='color: #10B981;'>●</span> &nbsp;NVIDIA RTX 3050 | CUDA Active")
+        self.lbl_hw_pill.setObjectName("HardwarePill")
+        h_layout.addWidget(self.lbl_hw_pill)
 
+        # Window Close Button
         btn_close = QPushButton("✕")
-        btn_close.setFixedSize(32, 32)
+        btn_close.setFixedSize(28, 28)
         btn_close.setProperty("class", "Secondary")
         btn_close.clicked.connect(self.close)
-        title_bar.addWidget(btn_close)
+        h_layout.addWidget(btn_close)
 
-        root_layout.addLayout(title_bar)
+        root_layout.addWidget(header_frame)
 
-        # Stacked Widget (Page 0: Input/Queue, Page 1: Review Workspace)
-        self.stack = QStackedWidget()
-        root_layout.addWidget(self.stack, 1)
+        # 2. Main Studio Body (Split View)
+        body_widget = QWidget()
+        body_layout = QHBoxLayout(body_widget)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(0)
 
-        # Build Pages
-        self.page_input = self._build_input_page()
-        self.page_review = self._build_review_page()
-        self.stack.addWidget(self.page_input)
-        self.stack.addWidget(self.page_review)
-        self.stack.setCurrentIndex(0)
+        # Panel Kiri (Sidebar Controls - Fixed 380px)
+        sidebar = self._build_sidebar()
+        body_layout.addWidget(sidebar)
 
-    def _build_input_page(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(14)
+        # Panel Kanan (Studio Stage / Canvas Area)
+        self.stage_stack = QStackedWidget()
+        self.stage_stack.setObjectName("StageCanvas")
 
-        # Baris 2: Split 2 Kolom (Kiri: AI Gateway, Kanan: Campaign & Target)
-        row2_layout = QHBoxLayout()
-        row2_layout.setSpacing(14)
+        self.view_standby = self._build_standby_stage()
+        self.view_processing = self._build_processing_stage()
+        self.view_review = self._build_review_stage()
 
-        # Kolom Kiri: AI Provider & Model Discovery
-        card_provider = QFrame()
-        card_provider.setProperty("class", "Card")
-        cp_layout = QVBoxLayout(card_provider)
-        cp_layout.setContentsMargins(16, 14, 16, 14)
-        cp_layout.setSpacing(8)
+        self.stage_stack.addWidget(self.view_standby)      # Index 0
+        self.stage_stack.addWidget(self.view_processing)   # Index 1
+        self.stage_stack.addWidget(self.view_review)       # Index 2
+        self.stage_stack.setCurrentIndex(0)
 
-        lbl_p_title = QLabel("AI PROVIDER & GATEWAY")
-        lbl_p_title.setProperty("class", "SectionHeader")
-        cp_layout.addWidget(lbl_p_title)
+        body_layout.addWidget(self.stage_stack, 1)
+        root_layout.addWidget(body_widget, 1)
 
-        lbl_ep = QLabel("Endpoint URL:")
-        lbl_ep.setProperty("class", "FormLabel")
-        self.txt_endpoint = QLineEdit(self.config.endpoint_url)
-        self.txt_endpoint.setPlaceholderText("http://localhost:20128/v1")
-        cp_layout.addWidget(lbl_ep)
-        cp_layout.addWidget(self.txt_endpoint)
+    def _build_divider(self) -> QFrame:
+        div = QFrame()
+        div.setProperty("class", "Divider")
+        return div
 
-        lbl_key = QLabel("API Key (Opsional):")
-        lbl_key.setProperty("class", "FormLabel")
-        self.txt_key = QLineEdit(self.config.api_key)
-        self.txt_key.setPlaceholderText("Bearer token / sk-...")
-        self.txt_key.setEchoMode(QLineEdit.Password)
-        cp_layout.addWidget(lbl_key)
-        cp_layout.addWidget(self.txt_key)
+    def _build_sidebar(self) -> QWidget:
+        sidebar = QFrame()
+        sidebar.setObjectName("Sidebar")
+        sidebar.setFixedWidth(380)
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(18, 16, 18, 18)
+        layout.setSpacing(12)
 
-        lbl_model = QLabel("Model:")
-        lbl_model.setProperty("class", "FormLabel")
-        cp_layout.addWidget(lbl_model)
+        # Section 1: Ingestion Source
+        lbl_s1 = QLabel("SOURCE INGESTION")
+        lbl_s1.setProperty("class", "SectionHeader")
+        layout.addWidget(lbl_s1)
+
+        self.input_tabs = QTabWidget()
+
+        # Tab YouTube URL
+        tab_url = QWidget()
+        tu_layout = QVBoxLayout(tab_url)
+        tu_layout.setContentsMargins(6, 6, 6, 6)
+        self.txt_url = QLineEdit()
+        self.txt_url.setPlaceholderText("Paste YouTube / X / web video URL...")
+        tu_layout.addWidget(self.txt_url)
+
+        # Tab Local File
+        tab_local = QWidget()
+        tl_layout = QHBoxLayout(tab_local)
+        tl_layout.setContentsMargins(6, 6, 6, 6)
+        tl_layout.setSpacing(6)
+        self.txt_video = QLineEdit()
+        self.txt_video.setPlaceholderText("Select video (MP4, MKV)...")
+        self.btn_browse = QPushButton("Browse")
+        self.btn_browse.setProperty("class", "Secondary")
+        self.btn_browse.clicked.connect(self._on_browse_video)
+        tl_layout.addWidget(self.txt_video, 1)
+        tl_layout.addWidget(self.btn_browse)
+
+        self.input_tabs.addTab(tab_url, "🌐 YouTube URL")
+        self.input_tabs.addTab(tab_local, "📁 Local File")
+        layout.addWidget(self.input_tabs)
+
+        layout.addWidget(self._build_divider())
+
+        # Section 2: AI & Model Engine
+        lbl_s2 = QLabel("AI INFERENCE ENGINE")
+        lbl_s2.setProperty("class", "SectionHeader")
+        layout.addWidget(lbl_s2)
 
         model_row = QHBoxLayout()
         model_row.setSpacing(8)
@@ -266,40 +292,47 @@ class MainWindow(QMainWindow):
         self.btn_discover.clicked.connect(self._on_discover_models)
         model_row.addWidget(self.cmb_models, 1)
         model_row.addWidget(self.btn_discover)
-        cp_layout.addLayout(model_row)
+        layout.addLayout(model_row)
 
-        cp_layout.addStretch()
-        row2_layout.addWidget(card_provider, 1)
+        # Optional Endpoint & Key container (compact)
+        ep_row = QHBoxLayout()
+        ep_row.setSpacing(6)
+        self.txt_endpoint = QLineEdit(self.config.endpoint_url)
+        self.txt_endpoint.setPlaceholderText("Gateway endpoint...")
+        self.txt_key = QLineEdit(self.config.api_key)
+        self.txt_key.setPlaceholderText("API Key (optional)...")
+        self.txt_key.setEchoMode(QLineEdit.Password)
+        ep_row.addWidget(self.txt_endpoint, 1)
+        ep_row.addWidget(self.txt_key, 1)
+        layout.addLayout(ep_row)
 
-        # Kolom Kanan: Generation & Campaign Settings
-        card_campaign = QFrame()
-        card_campaign.setProperty("class", "Card")
-        cc_layout = QVBoxLayout(card_campaign)
-        cc_layout.setContentsMargins(16, 14, 16, 14)
-        cc_layout.setSpacing(8)
+        layout.addWidget(self._build_divider())
 
-        lbl_c_title = QLabel("CAMPAIGN & TARGET RULES")
-        lbl_c_title.setProperty("class", "SectionHeader")
-        cc_layout.addWidget(lbl_c_title)
+        # Section 3: Campaign & Rules
+        lbl_s3 = QLabel("CURATION & RULES")
+        lbl_s3.setProperty("class", "SectionHeader")
+        layout.addWidget(lbl_s3)
 
-        param_row = QHBoxLayout()
-        param_row.setSpacing(10)
+        row_params = QHBoxLayout()
+        row_params.setSpacing(8)
 
+        # Target clip count
         count_box = QVBoxLayout()
-        count_box.setSpacing(4)
-        lbl_count = QLabel("Target Klip:")
-        lbl_count.setProperty("class", "FormLabel")
+        count_box.setSpacing(3)
+        lbl_cnt = QLabel("Target Clips:")
+        lbl_cnt.setProperty("class", "FormLabel")
         self.spn_clip_count = QSpinBox()
         self.spn_clip_count.setRange(1, 10)
         self.spn_clip_count.setValue(self.config.target_clip_count or 3)
-        count_box.addWidget(lbl_count)
+        count_box.addWidget(lbl_cnt)
         count_box.addWidget(self.spn_clip_count)
-        param_row.addLayout(count_box, 1)
+        row_params.addLayout(count_box, 1)
 
+        # Duration range
         dur_box = QVBoxLayout()
-        dur_box.setSpacing(4)
-        lbl_dur = QLabel("Rentang Durasi:")
-        lbl_dur.setProperty("class", "FormLabel")
+        dur_box.setSpacing(3)
+        lbl_dr = QLabel("Clip Duration:")
+        lbl_dr.setProperty("class", "FormLabel")
         self.cmb_duration = QComboBox()
         self.cmb_duration.addItems([
             "Auto / Optimal (30-60s)",
@@ -312,17 +345,16 @@ class MainWindow(QMainWindow):
         if preset_idx >= 0:
             self.cmb_duration.setCurrentIndex(preset_idx)
         self.cmb_duration.currentIndexChanged.connect(self._on_duration_preset_changed)
-        dur_box.addWidget(lbl_dur)
+        dur_box.addWidget(lbl_dr)
         dur_box.addWidget(self.cmb_duration)
-        param_row.addLayout(dur_box, 2)
-
-        cc_layout.addLayout(param_row)
+        row_params.addLayout(dur_box, 2)
+        layout.addLayout(row_params)
 
         # Custom duration container
         self.custom_dur_widget = QWidget()
         custom_layout = QHBoxLayout(self.custom_dur_widget)
         custom_layout.setContentsMargins(0, 0, 0, 0)
-        custom_layout.setSpacing(8)
+        custom_layout.setSpacing(6)
 
         min_box = QVBoxLayout()
         min_box.setSpacing(2)
@@ -346,162 +378,176 @@ class MainWindow(QMainWindow):
         max_box.addWidget(self.spn_max_dur)
         custom_layout.addLayout(max_box)
 
-        cc_layout.addWidget(self.custom_dur_widget)
+        layout.addWidget(self.custom_dur_widget)
         self.custom_dur_widget.setVisible(self.cmb_duration.currentText() == "Custom")
 
-        lbl_rules = QLabel("Brief / Aturan Kampanye (Opsional):")
-        lbl_rules.setProperty("class", "FormLabel")
-        cc_layout.addWidget(lbl_rules)
+        # Campaign brief
+        lbl_brief = QLabel("Campaign Brief & Directives:")
+        lbl_brief.setProperty("class", "FormLabel")
+        layout.addWidget(lbl_brief)
 
         self.txt_rules = QPlainTextEdit()
-        self.txt_rules.setPlaceholderText(
-            "Contoh: Fokus pada hook solusi, sertakan call-to-action di akhir, hindari topik sensitif..."
-        )
+        self.txt_rules.setPlaceholderText("Optional: focus on key solutions, exclude intros, highlight call-to-actions...")
         self.txt_rules.setPlainText(self.config.campaign_rules or "")
         self.txt_rules.setFixedHeight(75)
-        cc_layout.addWidget(self.txt_rules)
+        layout.addWidget(self.txt_rules)
 
-        row2_layout.addWidget(card_campaign, 1)
-        layout.addLayout(row2_layout)
+        layout.addStretch()
+        layout.addWidget(self._build_divider())
 
-        # Baris 3 (Full Width): Input Video Ingestion
-        card_video = QFrame()
-        card_video.setProperty("class", "Card")
-        cv_layout = QVBoxLayout(card_video)
-        cv_layout.setContentsMargins(16, 14, 16, 14)
-        cv_layout.setSpacing(10)
+        # Bottom Action: Generate Clips
+        self.btn_start = QPushButton("Generate Clips")
+        self.btn_start.setObjectName("BtnGenerate")
+        self.btn_start.clicked.connect(self._on_start)
+        layout.addWidget(self.btn_start)
 
-        lbl_v_title = QLabel("INPUT VIDEO INGESTION (16:9)")
-        lbl_v_title.setProperty("class", "SectionHeader")
-        cv_layout.addWidget(lbl_v_title)
+        self.btn_cancel = QPushButton("Stop Process")
+        self.btn_cancel.setProperty("class", "Danger")
+        self.btn_cancel.setVisible(False)
+        self.btn_cancel.clicked.connect(self._on_cancel)
+        layout.addWidget(self.btn_cancel)
 
-        self.input_tabs = QTabWidget()
+        return sidebar
 
-        # Tab 1: File Lokal
-        tab_local = QWidget()
-        tl_layout = QHBoxLayout(tab_local)
-        tl_layout.setContentsMargins(8, 8, 8, 8)
-        tl_layout.setSpacing(10)
-        self.txt_video = QLineEdit()
-        self.txt_video.setPlaceholderText("Pilih file video MP4, MKV, MOV...")
-        self.btn_browse = QPushButton("Browse File...")
-        self.btn_browse.setProperty("class", "Secondary")
-        self.btn_browse.clicked.connect(self._on_browse_video)
-        tl_layout.addWidget(self.txt_video, 1)
-        tl_layout.addWidget(self.btn_browse)
+    def _build_standby_stage(self) -> QWidget:
+        stage = QWidget()
+        layout = QVBoxLayout(stage)
+        layout.setAlignment(Qt.AlignCenter)
+        layout.setSpacing(14)
 
-        # Tab 2: Link Video yt-dlp
-        tab_url = QWidget()
-        tu_layout = QHBoxLayout(tab_url)
-        tu_layout.setContentsMargins(8, 8, 8, 8)
-        tu_layout.setSpacing(10)
-        self.txt_url = QLineEdit()
-        self.txt_url.setPlaceholderText("Tempel tautan video YouTube, X, Instagram, TikTok...")
-        tu_layout.addWidget(self.txt_url, 1)
+        # Minimalist 9:16 aspect ratio placeholder frame
+        frame_box = QFrame()
+        frame_box.setFixedSize(160, 260)
+        frame_box.setStyleSheet(
+            "background-color: #121417; border: 2px dashed #282C35; border-radius: 8px;"
+        )
+        fb_layout = QVBoxLayout(frame_box)
+        fb_layout.setAlignment(Qt.AlignCenter)
 
-        self.input_tabs.addTab(tab_local, "📁 File Video Lokal")
-        self.input_tabs.addTab(tab_url, "🌐 Video Link (yt-dlp)")
-        cv_layout.addWidget(self.input_tabs)
+        icon_lbl = QLabel("🎬")
+        icon_lbl.setStyleSheet("font-size: 36px; color: #8B949E; background: transparent; border: none;")
+        icon_lbl.setAlignment(Qt.AlignCenter)
+        fb_layout.addWidget(icon_lbl)
 
-        layout.addWidget(card_video)
+        sub_916 = QLabel("9:16 Canvas")
+        sub_916.setStyleSheet("color: #8B949E; font-size: 11px; font-weight: 600; background: transparent; border: none;")
+        sub_916.setAlignment(Qt.AlignCenter)
+        fb_layout.addWidget(sub_916)
 
-        # Baris 4 (Full Width): Progress Section & Tombol Aksi Utama
-        card_exec = QFrame()
-        card_exec.setProperty("class", "Card")
-        ce_layout = QVBoxLayout(card_exec)
-        ce_layout.setContentsMargins(16, 14, 16, 14)
-        ce_layout.setSpacing(12)
+        layout.addWidget(frame_box, 0, Qt.AlignCenter)
 
-        self.lbl_status = QLabel("Status: Siap memproses video...")
-        self.lbl_status.setProperty("class", "Sub")
-        ce_layout.addWidget(self.lbl_status)
+        main_prompt = QLabel("Masukkan video untuk memulai kurasi klip")
+        main_prompt.setStyleSheet("font-size: 15px; font-weight: 600; color: #E6E9EE;")
+        main_prompt.setAlignment(Qt.AlignCenter)
+        layout.addWidget(main_prompt)
+
+        sub_prompt = QLabel(
+            "ClipMax Studio mentranskrip ucapan (CUDA), mengevaluasi viralitas via AI Gateway,\n"
+            "dan mereframe ke vertikal 9:16 dengan pelacakan wajah aktif."
+        )
+        sub_prompt.setStyleSheet("font-size: 12px; color: #8B949E; line-height: 1.4;")
+        sub_prompt.setAlignment(Qt.AlignCenter)
+        layout.addWidget(sub_prompt)
+
+        return stage
+
+    def _build_processing_stage(self) -> QWidget:
+        stage = QWidget()
+        layout = QVBoxLayout(stage)
+        layout.setAlignment(Qt.AlignCenter)
+        layout.setSpacing(20)
+
+        tracker_frame = QFrame()
+        tracker_frame.setFixedWidth(520)
+        tracker_frame.setStyleSheet(
+            "background-color: #1B1E24; border: 1px solid #282C35; border-radius: 8px; padding: 20px;"
+        )
+        t_layout = QVBoxLayout(tracker_frame)
+        t_layout.setSpacing(14)
+
+        top_header = QHBoxLayout()
+        title_proc = QLabel("PROCESSING PIPELINE")
+        title_proc.setProperty("class", "SectionHeader")
+        self.lbl_proc_pct = QLabel("0%")
+        self.lbl_proc_pct.setStyleSheet("font-size: 13px; font-weight: 700; color: #386FA4;")
+        top_header.addWidget(title_proc)
+        top_header.addStretch()
+        top_header.addWidget(self.lbl_proc_pct)
+        t_layout.addLayout(top_header)
+
+        # Visual Step Tracker Bertingkat
+        self.step_widgets: Dict[str, QLabel] = {}
+        steps = [
+            ("STEP_AUDIO", "1. Ingestion & Audio Extraction"),
+            ("STEP_WHISPER", "2. Transcribing Speech (Faster-Whisper CUDA)"),
+            ("STEP_LLM", "3. Curating Viral Hooks (AI Gateway)"),
+            ("STEP_REFRAME", "4. Visual Reframing & Face Tracking (9:16)"),
+            ("STEP_RENDER", "5. Burning Subtitles & Hardware NVENC Export"),
+        ]
+
+        for key, name in steps:
+            row = QHBoxLayout()
+            row.setSpacing(10)
+            dot = QLabel("○")
+            dot.setStyleSheet("color: #8B949E; font-size: 14px; font-weight: bold;")
+            text = QLabel(name)
+            text.setStyleSheet("color: #8B949E; font-size: 12px;")
+            row.addWidget(dot)
+            row.addWidget(text, 1)
+            t_layout.addLayout(row)
+            self.step_widgets[key] = dot
+
+        t_layout.addWidget(self._build_divider())
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
-        ce_layout.addWidget(self.progress_bar)
+        t_layout.addWidget(self.progress_bar)
 
-        btn_action_row = QHBoxLayout()
-        btn_action_row.setSpacing(12)
+        self.lbl_stage_log = QLabel("Inisialisasi pipeline...")
+        self.lbl_stage_log.setStyleSheet("color: #8B949E; font-size: 11px;")
+        t_layout.addWidget(self.lbl_stage_log)
 
-        self.btn_start = QPushButton("Mulai Generate Klip 9:16")
-        self.btn_start.setProperty("class", "PrimaryAction")
-        self.btn_start.clicked.connect(self._on_start)
+        layout.addWidget(tracker_frame, 0, Qt.AlignCenter)
+        return stage
 
-        self.btn_cancel = QPushButton("Batal / Stop")
-        self.btn_cancel.setProperty("class", "Danger")
-        self.btn_cancel.setEnabled(False)
-        self.btn_cancel.clicked.connect(self._on_cancel)
-
-        btn_action_row.addWidget(self.btn_start, 4)
-        btn_action_row.addWidget(self.btn_cancel, 1)
-        ce_layout.addLayout(btn_action_row)
-
-        layout.addWidget(card_exec)
-        layout.addStretch()
-        return page
-
-    def _build_review_page(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
+    def _build_review_stage(self) -> QWidget:
+        stage = QWidget()
+        layout = QVBoxLayout(stage)
+        layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
 
-        # Workspace Header
+        # Top Bar of Review Stage
         top_bar = QHBoxLayout()
-        w_title = QLabel("Staging & Review Workspace")
-        w_title.setProperty("class", "Title")
+        w_title = QLabel("STUDIO REVIEW WORKSPACE")
+        w_title.setProperty("class", "SectionHeader")
         
-        self.btn_back = QPushButton("← Proses Video Baru")
-        self.btn_back.setProperty("class", "Secondary")
-        self.btn_back.clicked.connect(self._on_back_to_input)
+        self.btn_new_task = QPushButton("← New Project")
+        self.btn_new_task.setProperty("class", "Secondary")
+        self.btn_new_task.clicked.connect(self._on_back_to_standby)
 
         top_bar.addWidget(w_title)
         top_bar.addStretch()
-        top_bar.addWidget(self.btn_back)
+        top_bar.addWidget(self.btn_new_task)
         layout.addLayout(top_bar)
 
-        # Main Splitter: Left Gallery, Right Player & Export
+        # Review Body (Left: 9:16 Center Player, Right: Clip Strip Gallery)
         splitter = QSplitter(Qt.Horizontal)
 
-        # Left: Scrollable Card Gallery (Minimum 360px)
-        left_panel = QFrame()
-        left_panel.setProperty("class", "Card")
-        left_panel.setMinimumWidth(360)
-        lp_layout = QVBoxLayout(left_panel)
-        lp_layout.setContentsMargins(12, 12, 12, 12)
-        lp_layout.setSpacing(10)
+        # Center Studio Player Area
+        player_area = QFrame()
+        player_area.setStyleSheet("background-color: #121417; border: 1px solid #282C35; border-radius: 8px;")
+        p_layout = QVBoxLayout(player_area)
+        p_layout.setContentsMargins(16, 16, 16, 16)
+        p_layout.setSpacing(10)
 
-        self.lbl_gallery_count = QLabel("Daftar Klip Terdeteksi (0 Klip)")
-        self.lbl_gallery_count.setProperty("class", "SectionHeader")
-        lp_layout.addWidget(self.lbl_gallery_count)
-
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.gallery_container = QWidget()
-        self.gallery_layout = QVBoxLayout(self.gallery_container)
-        self.gallery_layout.setContentsMargins(2, 2, 2, 2)
-        self.gallery_layout.setSpacing(8)
-        self.gallery_layout.addStretch()
-        self.scroll_area.setWidget(self.gallery_container)
-        lp_layout.addWidget(self.scroll_area)
-
-        splitter.addWidget(left_panel)
-
-        # Right: Built-in Video Player & Action Controls
-        right_panel = QFrame()
-        right_panel.setProperty("class", "Card")
-        rp_layout = QVBoxLayout(right_panel)
-        rp_layout.setContentsMargins(16, 16, 16, 16)
-        rp_layout.setSpacing(12)
-
-        # Player Container
+        # Video Widget (Centered 9:16 aspect)
         self.video_widget = QVideoWidget()
-        self.video_widget.setStyleSheet("background-color: #181A1D; border: 1px solid #3B3F47; border-radius: 6px;")
-        self.video_widget.setMinimumSize(280, 480)
+        self.video_widget.setStyleSheet("background-color: #0B0D0F; border-radius: 6px;")
+        self.video_widget.setFixedSize(270, 480)
         self.player.setVideoOutput(self.video_widget)
-        rp_layout.addWidget(self.video_widget, 1)
+        p_layout.addWidget(self.video_widget, 0, Qt.AlignCenter)
 
-        # Playback Controls
+        # Player Controls
         ctrl_layout = QHBoxLayout()
         ctrl_layout.setSpacing(8)
         self.btn_play_pause = QPushButton("▶")
@@ -514,46 +560,70 @@ class MainWindow(QMainWindow):
         self.slider_progress.sliderMoved.connect(self._on_seek)
 
         self.lbl_time = QLabel("00:00 / 00:00")
-        self.lbl_time.setStyleSheet("font-size: 11px; color: #9CA3AF;")
+        self.lbl_time.setStyleSheet("font-size: 11px; color: #8B949E;")
 
         ctrl_layout.addWidget(self.btn_play_pause)
         ctrl_layout.addWidget(self.slider_progress, 1)
         ctrl_layout.addWidget(self.lbl_time)
-        rp_layout.addLayout(ctrl_layout)
+        p_layout.addLayout(ctrl_layout)
 
-        # Selected Clip Detail Frame
+        # Selected Clip Info Frame
         info_frame = QFrame()
-        info_frame.setStyleSheet("background-color: #1E2024; border: 1px solid #363A42; border-radius: 6px; padding: 10px;")
-        info_frame_layout = QVBoxLayout(info_frame)
-        info_frame_layout.setContentsMargins(8, 8, 8, 8)
-        self.lbl_clip_info = QLabel("Pilih klip di sebelah kiri untuk memutar pratinjau.")
-        self.lbl_clip_info.setStyleSheet("color: #E4E7EB; font-size: 12px; line-height: 1.4;")
+        info_frame.setStyleSheet("background-color: #1B1E24; border: 1px solid #282C35; border-radius: 6px; padding: 10px;")
+        info_l = QVBoxLayout(info_frame)
+        info_l.setContentsMargins(8, 8, 8, 8)
+        self.lbl_clip_info = QLabel("Select a clip to preview.")
+        self.lbl_clip_info.setStyleSheet("color: #E6E9EE; font-size: 12px; line-height: 1.4;")
         self.lbl_clip_info.setWordWrap(True)
-        info_frame_layout.addWidget(self.lbl_clip_info)
-        rp_layout.addWidget(info_frame)
+        info_l.addWidget(self.lbl_clip_info)
+        p_layout.addWidget(info_frame)
 
-        # Export Action Buttons
-        act_layout = QHBoxLayout()
-        act_layout.setSpacing(10)
-        self.btn_save_one = QPushButton("💾 Simpan Klip Ini")
+        splitter.addWidget(player_area)
+
+        # Right / Side Clip Strip
+        gallery_panel = QFrame()
+        gallery_panel.setStyleSheet("background-color: #1B1E24; border: 1px solid #282C35; border-radius: 8px;")
+        gp_layout = QVBoxLayout(gallery_panel)
+        gp_layout.setContentsMargins(12, 12, 12, 12)
+        gp_layout.setSpacing(10)
+
+        self.lbl_gallery_count = QLabel("CURATED CLIPS (0)")
+        self.lbl_gallery_count.setProperty("class", "SectionHeader")
+        gp_layout.addWidget(self.lbl_gallery_count)
+
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.gallery_container = QWidget()
+        self.gallery_layout = QVBoxLayout(self.gallery_container)
+        self.gallery_layout.setContentsMargins(2, 2, 2, 2)
+        self.gallery_layout.setSpacing(8)
+        self.gallery_layout.addStretch()
+        self.scroll_area.setWidget(self.gallery_container)
+        gp_layout.addWidget(self.scroll_area, 1)
+
+        # Export Actions at Bottom of Gallery
+        gp_layout.addWidget(self._build_divider())
+        act_layout = QVBoxLayout()
+        act_layout.setSpacing(8)
+        self.btn_save_one = QPushButton("💾 Export Selected Clip")
         self.btn_save_one.setFixedHeight(38)
         self.btn_save_one.clicked.connect(self._on_save_selected_clip)
 
-        self.btn_save_all = QPushButton("📦 Simpan Semua Klip")
+        self.btn_save_all = QPushButton("📦 Export All Clips")
         self.btn_save_all.setFixedHeight(38)
         self.btn_save_all.setProperty("class", "Success")
         self.btn_save_all.clicked.connect(self._on_save_all_clips)
 
-        act_layout.addWidget(self.btn_save_one, 1)
-        act_layout.addWidget(self.btn_save_all, 1)
-        rp_layout.addLayout(act_layout)
+        act_layout.addWidget(self.btn_save_one)
+        act_layout.addWidget(self.btn_save_all)
+        gp_layout.addLayout(act_layout)
 
-        splitter.addWidget(right_panel)
-        splitter.setStretchFactor(0, 2)
-        splitter.setStretchFactor(1, 3)
+        splitter.addWidget(gallery_panel)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
 
         layout.addWidget(splitter, 1)
-        return page
+        return stage
 
     def _setup_player_events(self):
         self.player.positionChanged.connect(self._on_position_changed)
@@ -561,14 +631,18 @@ class MainWindow(QMainWindow):
         self.player.playbackStateChanged.connect(self._on_state_changed)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.LeftButton and event.position().y() < 42:
             self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             event.accept()
 
     def mouseMoveEvent(self, event):
-        if event.buttons() == Qt.LeftButton:
+        if event.buttons() == Qt.LeftButton and not self._drag_pos.isNull():
             self.move(event.globalPosition().toPoint() - self._drag_pos)
             event.accept()
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = QPoint()
+        event.accept()
 
     def _on_discover_models(self):
         url = self.txt_endpoint.text().strip()
@@ -577,9 +651,9 @@ class MainWindow(QMainWindow):
             models = discover_models(url, key)
             self.cmb_models.clear()
             self.cmb_models.addItems(models)
-            QMessageBox.information(self, "Sukses", f"Ditemukan {len(models)} model.")
+            QMessageBox.information(self, "Models Discovered", f"Successfully loaded {len(models)} model(s).")
         except Exception as e:
-            QMessageBox.warning(self, "Error Discovery", f"Gagal mengambil model: {str(e)}")
+            QMessageBox.warning(self, "Discovery Error", f"Failed to retrieve models: {str(e)}")
 
     def _on_duration_preset_changed(self):
         preset = self.cmb_duration.currentText()
@@ -598,22 +672,21 @@ class MainWindow(QMainWindow):
 
     def _on_browse_video(self):
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Pilih Video", "", "Video Files (*.mp4 *.mkv *.mov *.avi)"
+            self, "Select Source Video", "", "Video Files (*.mp4 *.mkv *.mov *.avi)"
         )
         if file_path:
             self.txt_video.setText(file_path)
 
     def _on_start(self):
-        # Determine input source from active tab
         if self.input_tabs.currentIndex() == 0:
-            source = self.txt_video.text().strip()
-            if not source or not Path(source).exists():
-                QMessageBox.warning(self, "Validasi", "Pilih file video valid terlebih dahulu.")
-                return
-        else:
             source = self.txt_url.text().strip()
             if not is_valid_video_url(source):
-                QMessageBox.warning(self, "Validasi", "Masukkan tautan video valid (http:// atau https://).")
+                QMessageBox.warning(self, "Invalid Source", "Enter a valid video URL (http:// or https://).")
+                return
+        else:
+            source = self.txt_video.text().strip()
+            if not source or not Path(source).exists():
+                QMessageBox.warning(self, "Invalid Source", "Select a valid local video file first.")
                 return
 
         target_count = self.spn_clip_count.value()
@@ -622,7 +695,7 @@ class MainWindow(QMainWindow):
             min_dur = float(self.spn_min_dur.value())
             max_dur = float(self.spn_max_dur.value())
             if max_dur <= min_dur:
-                QMessageBox.warning(self, "Validasi", "Durasi Max harus lebih besar daripada Min.")
+                QMessageBox.warning(self, "Validation", "Max duration must be strictly greater than Min duration.")
                 return
         elif "15-30" in preset:
             min_dur, max_dur = 15.0, 30.0
@@ -645,9 +718,13 @@ class MainWindow(QMainWindow):
         self.config.campaign_rules = rules
         self.config.save()
 
+        # Switch to Stage 1: Processing
         self.btn_start.setEnabled(False)
-        self.btn_cancel.setEnabled(True)
+        self.btn_cancel.setVisible(True)
         self.progress_bar.setValue(0)
+        self.lbl_proc_pct.setText("0%")
+        self.stage_stack.setCurrentIndex(1)
+        self._reset_step_indicators()
 
         self.worker = PipelineWorker(
             self.orchestrator,
@@ -662,43 +739,76 @@ class MainWindow(QMainWindow):
         self.worker.failed.connect(self._on_worker_failed)
         self.worker.start()
 
+    def _reset_step_indicators(self):
+        for dot in self.step_widgets.values():
+            dot.setText("○")
+            dot.setStyleSheet("color: #8B949E; font-size: 14px; font-weight: bold;")
+
     def _on_cancel(self):
         if self.worker and self.worker.isRunning():
-            self.lbl_status.setText("Membatalkan proses dan membersihkan alokasi...")
+            self.lbl_stage_log.setText("Cancelling pipeline execution...")
             self.orchestrator.cancel()
             self.worker.wait(3000)
             self.btn_start.setEnabled(True)
-            self.btn_cancel.setEnabled(False)
-            self.progress_bar.setValue(0)
-            self.lbl_status.setText("Status: Dibatalkan oleh pengguna.")
+            self.btn_cancel.setVisible(False)
+            self.stage_stack.setCurrentIndex(0)
 
     def _on_worker_progress(self, status: str, pct: int, msg: str):
         self.progress_bar.setValue(pct)
-        self.lbl_status.setText(f"[{status}] {msg}")
+        self.lbl_proc_pct.setText(f"{pct}%")
+        self.lbl_stage_log.setText(f"[{status}] {msg}")
+
+        # Update visual step tracker
+        if pct < 20:
+            self._set_active_step("STEP_AUDIO")
+        elif pct < 50:
+            self._set_done_step("STEP_AUDIO")
+            self._set_active_step("STEP_WHISPER")
+        elif pct < 65:
+            self._set_done_step("STEP_WHISPER")
+            self._set_active_step("STEP_LLM")
+        elif pct < 80:
+            self._set_done_step("STEP_LLM")
+            self._set_active_step("STEP_REFRAME")
+        else:
+            self._set_done_step("STEP_REFRAME")
+            self._set_active_step("STEP_RENDER")
+
+    def _set_active_step(self, key: str):
+        if key in self.step_widgets:
+            self.step_widgets[key].setText("●")
+            self.step_widgets[key].setStyleSheet("color: #386FA4; font-size: 14px; font-weight: bold;")
+
+    def _set_done_step(self, key: str):
+        if key in self.step_widgets:
+            self.step_widgets[key].setText("✓")
+            self.step_widgets[key].setStyleSheet("color: #10B981; font-size: 14px; font-weight: bold;")
 
     def _on_worker_finished(self, clips: List[ClipResult]):
         self.btn_start.setEnabled(True)
-        self.btn_cancel.setEnabled(False)
+        self.btn_cancel.setVisible(False)
         self.progress_bar.setValue(100)
-        self.lbl_status.setText(f"Selesai! {len(clips)} klip dibuat di staging.")
+        self.lbl_proc_pct.setText("100%")
+
+        for key in self.step_widgets:
+            self._set_done_step(key)
 
         self.current_clips = clips
         self._populate_review_workspace()
-        self.stack.setCurrentIndex(1)
+        self.stage_stack.setCurrentIndex(2)
 
     def _on_worker_failed(self, error: str):
         self.btn_start.setEnabled(True)
-        self.btn_cancel.setEnabled(False)
-        self.lbl_status.setText("Gagal!")
-        QMessageBox.critical(self, "Error Pipeline", f"Pipeline terhenti: {error}")
+        self.btn_cancel.setVisible(False)
+        self.stage_stack.setCurrentIndex(0)
+        QMessageBox.critical(self, "Pipeline Error", f"Pipeline execution failed:\n{error}")
 
     def _populate_review_workspace(self):
-        # Clear existing card widgets
         for c in self.card_widgets:
             c.deleteLater()
         self.card_widgets.clear()
 
-        self.lbl_gallery_count.setText(f"Daftar Klip Terdeteksi ({len(self.current_clips)} Klip)")
+        self.lbl_gallery_count.setText(f"CURATED CLIPS ({len(self.current_clips)})")
 
         for clip in self.current_clips:
             card = ClipCardWidget(clip)
@@ -717,16 +827,16 @@ class MainWindow(QMainWindow):
         dur = max(0.0, clip.end_time - clip.start_time)
         mode_val = getattr(clip, "reframe_mode", "DYNAMIC_SCENE")
         if mode_val == "DYNAMIC_SCENE":
-            mode_str = "🔄 Transisi Dinamis (Talking Head 9:16 + Screen Record Fit)"
+            mode_str = "Dynamic Split (Talking Head 9:16 + Screen Fit)"
         elif mode_val == "CROP_TRACKING":
-            mode_str = "👤 Crop Wajah Penuh 9:16"
+            mode_str = "Full Face Crop 9:16"
         else:
-            mode_str = "🖼 Blurred Background (Screen / Slide Utuh)"
+            mode_str = "Blurred Background (Original Fit 16:9)"
 
         self.lbl_clip_info.setText(
-            f"<b>{clip.title}</b> &nbsp; <span style='color: #4A6FA5; font-size: 11px; font-weight: 600;'>[{mode_str}]</span><br/>"
-            f"<span style='color: #E4E7EB;'>Hook: \"{clip.hook}\"</span> &nbsp;•&nbsp; <span style='color: #9CA3AF;'>Skor: <b>{clip.virality_score}</b> &nbsp;•&nbsp; Durasi: <b>{dur:.1f}s</b></span><br/>"
-            f"<span style='color: #9CA3AF;'>{clip.reasoning}</span>"
+            f"<b>{clip.title}</b> &nbsp; <span style='color: #386FA4; font-size: 11px; font-weight: 600;'>[{mode_str}]</span><br/>"
+            f"<span style='color: #E6E9EE;'>Hook: \"{clip.hook}\"</span> &nbsp;•&nbsp; <span style='color: #8B949E;'>Score: <b>{clip.virality_score}</b> &nbsp;•&nbsp; Duration: <b>{dur:.1f}s</b></span><br/>"
+            f"<span style='color: #8B949E;'>{clip.reasoning}</span>"
         )
 
         if os.path.exists(clip.staging_path):
@@ -767,26 +877,26 @@ class MainWindow(QMainWindow):
 
     def _on_save_selected_clip(self):
         if not self.selected_clip or not os.path.exists(self.selected_clip.staging_path):
-            QMessageBox.warning(self, "Simpan", "Tidak ada klip aktif untuk disimpan.")
+            QMessageBox.warning(self, "Export", "No clip selected to export.")
             return
 
-        default_name = f"clip_{self.selected_clip.clip_id}_{int(self.selected_clip.start_time)}.mp4"
+        default_name = f"clipmax_{self.selected_clip.clip_id}_{int(self.selected_clip.start_time)}.mp4"
         dest_path, _ = QFileDialog.getSaveFileName(
-            self, "Simpan Klip 9:16", default_name, "Video Files (*.mp4)"
+            self, "Export 9:16 Clip", default_name, "Video Files (*.mp4)"
         )
         if dest_path:
             try:
                 shutil.copy2(self.selected_clip.staging_path, dest_path)
-                QMessageBox.information(self, "Berhasil", f"Klip berhasil disimpan ke:\n{dest_path}")
+                QMessageBox.information(self, "Export Successful", f"Clip saved to:\n{dest_path}")
             except Exception as e:
-                QMessageBox.critical(self, "Gagal", f"Gagal menyimpan file: {str(e)}")
+                QMessageBox.critical(self, "Export Failed", f"Failed to save file: {str(e)}")
 
     def _on_save_all_clips(self):
         if not self.current_clips:
-            QMessageBox.warning(self, "Simpan Semua", "Tidak ada klip untuk disimpan.")
+            QMessageBox.warning(self, "Export All", "No clips available to export.")
             return
 
-        dest_dir = QFileDialog.getExistingDirectory(self, "Pilih Folder Penyimpanan Semua Klip")
+        dest_dir = QFileDialog.getExistingDirectory(self, "Select Destination Folder for All Clips")
         if dest_dir:
             dest_dir_path = Path(dest_dir)
             copied_count = 0
@@ -796,9 +906,9 @@ class MainWindow(QMainWindow):
                     shutil.copy2(clip.staging_path, target)
                     copied_count += 1
             QMessageBox.information(
-                self, "Selesai", f"Berhasil menyimpan {copied_count} klip ke:\n{dest_dir}"
+                self, "Export Complete", f"Successfully exported {copied_count} clip(s) to:\n{dest_dir}"
             )
 
-    def _on_back_to_input(self):
+    def _on_back_to_standby(self):
         self.player.stop()
-        self.stack.setCurrentIndex(0)
+        self.stage_stack.setCurrentIndex(0)
