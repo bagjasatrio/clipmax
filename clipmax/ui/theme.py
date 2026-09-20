@@ -300,6 +300,47 @@ QSlider::handle:horizontal:hover {
     background: #FFFFFF;
 }
 
+/* Volume Slider & Mute Controls */
+QSlider#VolumeSlider {
+    max-width: 80px;
+}
+
+QSlider#VolumeSlider::groove:horizontal {
+    height: 4px;
+    background: #2F333B;
+    border-radius: 2px;
+}
+
+QSlider#VolumeSlider::sub-page:horizontal {
+    background: #4A6FA5;
+    border-radius: 2px;
+}
+
+QSlider#VolumeSlider::handle:horizontal {
+    width: 10px;
+    height: 10px;
+    margin: -3px 0;
+    border-radius: 5px;
+    background: #E4E7EB;
+}
+
+QSlider#VolumeSlider::handle:horizontal:hover {
+    background: #FFFFFF;
+}
+
+QPushButton#BtnMute {
+    background: transparent;
+    border: none;
+    font-size: 13px;
+    color: #E4E7EB;
+    padding: 0px;
+    border-radius: 4px;
+}
+
+QPushButton#BtnMute:hover {
+    background: #282C35;
+}
+
 /* ScrollBars */
 QScrollArea {
     border: none;

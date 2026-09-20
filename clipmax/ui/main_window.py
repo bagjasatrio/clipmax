@@ -3,7 +3,7 @@ import sys
 import shutil
 from pathlib import Path
 from typing import Optional, List, Dict
-from PySide6.QtCore import Qt, QThread, Signal, QPoint, QUrl
+from PySide6.QtCore import Qt, QThread, Signal, QPoint, QUrl, QSettings
 from PySide6.QtGui import QPixmap
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
@@ -192,6 +192,16 @@ class MainWindow(QMainWindow):
         self.player = QMediaPlayer()
         self.audio_output = QAudioOutput()
         self.player.setAudioOutput(self.audio_output)
+
+        # Settings & Default Volume (40% / 0.4f)
+        self.settings = QSettings("ClipMax", "ClipMaxStudio")
+        try:
+            self.current_volume = int(self.settings.value("player_volume", 40))
+            if not (0 <= self.current_volume <= 100):
+                self.current_volume = 40
+        except (ValueError, TypeError):
+            self.current_volume = 40
+        self.audio_output.setVolume(self.current_volume / 100.0)
 
         self._build_ui()
         self._setup_player_events()
@@ -642,9 +652,27 @@ class MainWindow(QMainWindow):
         self.lbl_time = QLabel("00:00 / 00:00")
         self.lbl_time.setStyleSheet("font-size: 11px; color: #8B949E;")
 
+        # Volume Controls
+        self.btn_mute = QPushButton("🔊" if self.current_volume > 0 else "🔇")
+        self.btn_mute.setObjectName("BtnMute")
+        self.btn_mute.setFixedSize(28, 28)
+        self.btn_mute.setToolTip("Mute / Unmute")
+        self.btn_mute.clicked.connect(self._toggle_mute)
+
+        self.slider_volume = QSlider(Qt.Horizontal)
+        self.slider_volume.setObjectName("VolumeSlider")
+        self.slider_volume.setRange(0, 100)
+        self.slider_volume.setValue(self.current_volume)
+        self.slider_volume.setFixedWidth(80)
+        self.slider_volume.setToolTip(f"Volume: {self.current_volume}%")
+        self.slider_volume.valueChanged.connect(self._on_volume_changed)
+
         ctrl_layout.addWidget(self.btn_play_pause)
         ctrl_layout.addWidget(self.slider_progress, 1)
         ctrl_layout.addWidget(self.lbl_time)
+        ctrl_layout.addSpacing(6)
+        ctrl_layout.addWidget(self.btn_mute)
+        ctrl_layout.addWidget(self.slider_volume)
         p_layout.addLayout(ctrl_layout)
 
         # Selected Clip Info Frame
@@ -1010,6 +1038,32 @@ class MainWindow(QMainWindow):
         cur_sec = int(pos_ms / 1000)
         tot_sec = int(dur_ms / 1000)
         self.lbl_time.setText(f"{cur_sec//60:02d}:{cur_sec%60:02d} / {tot_sec//60:02d}:{tot_sec%60:02d}")
+
+    def _toggle_mute(self):
+        is_muted = self.audio_output.isMuted()
+        if is_muted:
+            self.audio_output.setMuted(False)
+            val = self.slider_volume.value()
+            if val == 0:
+                self.slider_volume.setValue(40)
+            self.btn_mute.setText("🔊")
+        else:
+            self.audio_output.setMuted(True)
+            self.btn_mute.setText("🔇")
+
+    def _on_volume_changed(self, val: int):
+        vol_float = max(0.0, min(1.0, val / 100.0))
+        self.audio_output.setVolume(vol_float)
+        if val > 0 and self.audio_output.isMuted():
+            self.audio_output.setMuted(False)
+
+        if val == 0 or self.audio_output.isMuted():
+            self.btn_mute.setText("🔇")
+        else:
+            self.btn_mute.setText("🔊")
+
+        self.slider_volume.setToolTip(f"Volume: {val}%")
+        self.settings.setValue("player_volume", val)
 
     def _on_save_selected_clip(self):
         if not self.selected_clip or not os.path.exists(self.selected_clip.staging_path):
