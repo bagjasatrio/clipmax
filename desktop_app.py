@@ -4,6 +4,7 @@ import socket
 import time
 import threading
 from pathlib import Path
+from typing import Optional
 
 # Setup CUDA DLL paths before any AI / audio / video libraries are loaded
 from clipmax.dll_setup import setup_cuda_dll_paths
