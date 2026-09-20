@@ -25,12 +25,18 @@ def cleanup_vram() -> None:
         except Exception:
             pass
 
+DEFAULT_INITIAL_PROMPT = (
+    "Mobile Legends, gameplay, bang, bro, cuy, gank, war, turtle, lord, "
+    "wiped out, ulti, flicker, push tower, solo kill, GGWP, rata, nice try, by one."
+)
+
 def transcribe_audio(
     audio_path: str,
     model_size: str = "small",
     device: str = "cuda",
     compute_type: str = "float16",
-    language: Optional[str] = None
+    language: Optional[str] = None,
+    initial_prompt: Optional[str] = None
 ) -> Tuple[List[WordSegment], str]:
     from faster_whisper import WhisperModel
 
@@ -44,10 +50,12 @@ def transcribe_audio(
     try:
         print(f"[ClipMax Whisper] Menginisialisasi WhisperModel('{model_size}', device='{device}', compute_type='{compute_type}')...")
         whisper_model = WhisperModel(model_size, device=device, compute_type=compute_type)
+        prompt = initial_prompt if initial_prompt is not None else DEFAULT_INITIAL_PROMPT
         segments, info = whisper_model.transcribe(
             audio_path,
             word_timestamps=True,
-            language=language
+            language=language,
+            initial_prompt=prompt
         )
 
         for segment in segments:

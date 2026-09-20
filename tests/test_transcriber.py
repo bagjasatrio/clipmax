@@ -32,6 +32,8 @@ def test_transcribe_audio_mocked(tmp_path):
         assert mock_gc.called
         assert mock_model_cls.call_args.kwargs.get("device") == "cuda"
         assert mock_model_cls.call_args.kwargs.get("compute_type") == "float16"
+        assert instance.transcribe.call_args.kwargs.get("word_timestamps") is True
+        assert "Mobile Legends" in instance.transcribe.call_args.kwargs.get("initial_prompt")
 
 def test_transcribe_audio_cuda_raises_error_without_silent_fallback(tmp_path):
     wav_file = tmp_path / "fake_cuda.wav"

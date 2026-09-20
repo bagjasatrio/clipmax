@@ -20,6 +20,7 @@ from clipmax.reframe import (
     SceneSegment
 )
 from clipmax.subtitle import generate_kinetic_ass
+from clipmax.subtitle_cleaner import polish_subtitles_with_llm
 from clipmax.renderer import render_clip
 from clipmax.downloader import download_video, is_valid_video_url
 
@@ -317,10 +318,18 @@ class PipelineOrchestrator:
                         ]
                         subprocess.run(concat_cmd_fb, capture_output=True)
 
-                    # Subtitle generation for montage
+                    # Subtitle generation for montage with auto-polisher
                     temp_ass = str((temp_dir / f"clip_{clip_num}.ass").resolve())
                     self.temp_files.append(temp_ass)
-                    generate_kinetic_ass(shifted_words, 0.0, accumulated_dur, temp_ass)
+                    polished_shifted_words = polish_subtitles_with_llm(
+                        words=shifted_words,
+                        clip_start=0.0,
+                        clip_end=accumulated_dur,
+                        endpoint_url=self.config.endpoint_url,
+                        api_key=self.config.api_key,
+                        model=self.config.selected_model
+                    )
+                    generate_kinetic_ass(polished_shifted_words, 0.0, accumulated_dur, temp_ass)
 
                     self.status = PipelineStatus.RENDERING
                     if progress_callback:
@@ -406,10 +415,18 @@ class PipelineOrchestrator:
                         self.status = PipelineStatus.CANCELLED
                         return []
 
-                    # Stage 5: Subtitle Generation
+                    # Stage 5: Subtitle Generation with auto-polisher
                     temp_ass = str((temp_dir / f"clip_{clip_num}.ass").resolve())
                     self.temp_files.append(temp_ass)
-                    generate_kinetic_ass(words, clip.start_time, clip.end_time, temp_ass)
+                    polished_words = polish_subtitles_with_llm(
+                        words=words,
+                        clip_start=clip.start_time,
+                        clip_end=clip.end_time,
+                        endpoint_url=self.config.endpoint_url,
+                        api_key=self.config.api_key,
+                        model=self.config.selected_model
+                    )
+                    generate_kinetic_ass(polished_words, clip.start_time, clip.end_time, temp_ass)
 
                     # Stage 6: Video Rendering into Staging Cache (NVENC Forced)
                     self.status = PipelineStatus.RENDERING
