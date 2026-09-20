@@ -79,6 +79,9 @@ class AppConfig(BaseModel):
     campaign_rules: str = ""
     cookie_file: Optional[str] = None
     clip_mode: str = "single"
+    subtitle_base_color: str = "#FFFFFF"
+    subtitle_highlight_color: str = "#FF2A2A"
+    subtitle_color_preset: str = "red_white"
 
     @classmethod
     def load(cls, path: str = "config.json") -> "AppConfig":

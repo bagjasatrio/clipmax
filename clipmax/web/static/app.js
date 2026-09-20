@@ -28,6 +28,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectClipMode = document.getElementById("selectClipMode");
   const inputRules = document.getElementById("inputRules");
 
+  const selectColorPreset = document.getElementById("selectColorPreset");
+  const inputBaseColor = document.getElementById("inputBaseColor");
+  const lblBaseColor = document.getElementById("lblBaseColor");
+  const inputHighlightColor = document.getElementById("inputHighlightColor");
+  const lblHighlightColor = document.getElementById("lblHighlightColor");
+
   const btnGenerate = document.getElementById("btnGenerate");
   const btnCancel = document.getElementById("btnCancel");
 
@@ -149,6 +155,18 @@ document.addEventListener("DOMContentLoaded", () => {
         selectClipMode.value = cfg.clip_mode;
       }
 
+      if (cfg.subtitle_base_color && inputBaseColor) {
+        inputBaseColor.value = cfg.subtitle_base_color;
+        lblBaseColor.textContent = cfg.subtitle_base_color.toUpperCase();
+      }
+      if (cfg.subtitle_highlight_color && inputHighlightColor) {
+        inputHighlightColor.value = cfg.subtitle_highlight_color;
+        lblHighlightColor.textContent = cfg.subtitle_highlight_color.toUpperCase();
+      }
+      if (cfg.subtitle_color_preset && selectColorPreset) {
+        selectColorPreset.value = cfg.subtitle_color_preset;
+      }
+
       await refreshModels(cfg.selected_model);
     } catch (e) {
       console.warn("Error loading config:", e);
@@ -258,6 +276,40 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Color Preset Definitions & Handlers
+  const colorPresets = {
+    red_white: { highlight: "#FF2A2A", base: "#FFFFFF" },
+    tiktok_yellow: { highlight: "#FFE81F", base: "#FFFFFF" },
+    neon_green: { highlight: "#39FF14", base: "#FFFFFF" },
+    cyan_gamer: { highlight: "#00F0FF", base: "#FFFFFF" }
+  };
+
+  if (selectColorPreset) {
+    selectColorPreset.addEventListener("change", () => {
+      const p = colorPresets[selectColorPreset.value];
+      if (p) {
+        inputHighlightColor.value = p.highlight;
+        lblHighlightColor.textContent = p.highlight;
+        inputBaseColor.value = p.base;
+        lblBaseColor.textContent = p.base;
+      }
+    });
+  }
+
+  if (inputBaseColor) {
+    inputBaseColor.addEventListener("input", () => {
+      lblBaseColor.textContent = inputBaseColor.value.toUpperCase();
+      selectColorPreset.value = "custom";
+    });
+  }
+
+  if (inputHighlightColor) {
+    inputHighlightColor.addEventListener("input", () => {
+      lblHighlightColor.textContent = inputHighlightColor.value.toUpperCase();
+      selectColorPreset.value = "custom";
+    });
+  }
+
   // 7. Start Pipeline
   btnGenerate.addEventListener("click", async () => {
     const inputSource = activeTab === "url" ? inputUrl.value.trim() : localVideoPath.trim();
@@ -272,6 +324,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (durVal === "short") { minD = 15; maxD = 30; }
     else if (durVal === "long") { minD = 60; maxD = 90; }
     const clipModeVal = selectClipMode ? selectClipMode.value : "single";
+    const subBaseVal = inputBaseColor ? inputBaseColor.value : "#FFFFFF";
+    const subHighlightVal = inputHighlightColor ? inputHighlightColor.value : "#FF2A2A";
+    const subPresetVal = selectColorPreset ? selectColorPreset.value : "red_white";
 
     await fetch("/api/config", {
       method: "POST",
@@ -285,7 +340,10 @@ document.addEventListener("DOMContentLoaded", () => {
         min_duration: minD,
         max_duration: maxD,
         campaign_rules: inputRules.value.trim(),
-        clip_mode: clipModeVal
+        clip_mode: clipModeVal,
+        subtitle_base_color: subBaseVal,
+        subtitle_highlight_color: subHighlightVal,
+        subtitle_color_preset: subPresetVal
       })
     });
 
@@ -303,7 +361,9 @@ document.addEventListener("DOMContentLoaded", () => {
           min_duration: minD,
           max_duration: maxD,
           campaign_rules: inputRules.value.trim(),
-          clip_mode: clipModeVal
+          clip_mode: clipModeVal,
+          subtitle_base_color: subBaseVal,
+          subtitle_highlight_color: subHighlightVal
         })
       });
       if (!res.ok) {

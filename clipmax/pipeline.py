@@ -129,6 +129,8 @@ class PipelineOrchestrator:
         max_duration: Optional[float] = None,
         campaign_rules: Optional[str] = None,
         clip_mode: Optional[str] = None,
+        subtitle_base_color: Optional[str] = None,
+        subtitle_highlight_color: Optional[str] = None,
         **kwargs
     ) -> List[ClipResult]:
         self.cancel_requested.clear()
@@ -141,6 +143,8 @@ class PipelineOrchestrator:
         max_dur = max_duration if max_duration is not None else self.config.max_duration
         rules = campaign_rules if campaign_rules is not None else self.config.campaign_rules
         mode_type = clip_mode or getattr(self.config, "clip_mode", "single")
+        sub_base = subtitle_base_color or getattr(self.config, "subtitle_base_color", "#FFFFFF")
+        sub_highlight = subtitle_highlight_color or getattr(self.config, "subtitle_highlight_color", "#FF2A2A")
 
         temp_dir = Path(self.config.temp_dir)
         temp_dir.mkdir(parents=True, exist_ok=True)
@@ -329,7 +333,14 @@ class PipelineOrchestrator:
                         api_key=self.config.api_key,
                         model=self.config.selected_model
                     )
-                    generate_kinetic_ass(polished_shifted_words, 0.0, accumulated_dur, temp_ass)
+                    generate_kinetic_ass(
+                        polished_shifted_words,
+                        0.0,
+                        accumulated_dur,
+                        temp_ass,
+                        highlight_color=sub_highlight,
+                        base_color=sub_base
+                    )
 
                     self.status = PipelineStatus.RENDERING
                     if progress_callback:
@@ -426,7 +437,14 @@ class PipelineOrchestrator:
                         api_key=self.config.api_key,
                         model=self.config.selected_model
                     )
-                    generate_kinetic_ass(polished_words, clip.start_time, clip.end_time, temp_ass)
+                    generate_kinetic_ass(
+                        polished_words,
+                        clip.start_time,
+                        clip.end_time,
+                        temp_ass,
+                        highlight_color=sub_highlight,
+                        base_color=sub_base
+                    )
 
                     # Stage 6: Video Rendering into Staging Cache (NVENC Forced)
                     self.status = PipelineStatus.RENDERING

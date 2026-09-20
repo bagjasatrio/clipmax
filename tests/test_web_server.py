@@ -23,10 +23,18 @@ def test_api_config():
     assert data.get("engine") == "invidious_api"
 
 def test_api_config_update():
-    res = client.post("/api/config", json={"target_clip_count": 4, "clip_mode": "montage"})
+    res = client.post("/api/config", json={
+        "target_clip_count": 4,
+        "clip_mode": "montage",
+        "subtitle_base_color": "#EEEEEE",
+        "subtitle_highlight_color": "#FFE81F",
+        "subtitle_color_preset": "tiktok_yellow"
+    })
     assert res.status_code == 200
     assert state.config.target_clip_count == 4
     assert state.config.clip_mode == "montage"
+    assert state.config.subtitle_highlight_color == "#FFE81F"
+    assert state.config.subtitle_color_preset == "tiktok_yellow"
 
 def test_api_pipeline_status():
     res = client.get("/api/pipeline/status")
@@ -57,3 +65,5 @@ def test_static_index_html():
     assert "cookies.txt" not in res.text
     assert "Multi-Cut Montage" in res.text
     assert "Reset &amp; Clear Cache" in res.text or "Reset & Clear Cache" in res.text
+    assert "Subtitle Style" in res.text
+    assert "inputHighlightColor" in res.text

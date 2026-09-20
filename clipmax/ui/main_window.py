@@ -32,7 +32,9 @@ class PipelineWorker(QThread):
         min_duration: float = 30.0,
         max_duration: float = 60.0,
         campaign_rules: str = "",
-        clip_mode: str = "single"
+        clip_mode: str = "single",
+        subtitle_base_color: str = "#FFFFFF",
+        subtitle_highlight_color: str = "#FF2A2A"
     ):
         super().__init__()
         self.orchestrator = orchestrator
@@ -42,6 +44,8 @@ class PipelineWorker(QThread):
         self.max_duration = max_duration
         self.campaign_rules = campaign_rules
         self.clip_mode = clip_mode
+        self.subtitle_base_color = subtitle_base_color
+        self.subtitle_highlight_color = subtitle_highlight_color
 
     def run(self):
         try:
@@ -55,7 +59,9 @@ class PipelineWorker(QThread):
                 min_duration=self.min_duration,
                 max_duration=self.max_duration,
                 campaign_rules=self.campaign_rules,
-                clip_mode=self.clip_mode
+                clip_mode=self.clip_mode,
+                subtitle_base_color=self.subtitle_base_color,
+                subtitle_highlight_color=self.subtitle_highlight_color
             )
             self.finished.emit(clips)
         except Exception as e:
@@ -486,6 +492,51 @@ class MainWindow(QMainWindow):
         self.txt_rules.setFixedHeight(75)
         layout.addWidget(self.txt_rules)
 
+        # Section 4: Subtitle Style & Colors
+        lbl_s4 = QLabel("SUBTITLE STYLE (KARAOKE)")
+        lbl_s4.setProperty("class", "SectionHeader")
+        layout.addWidget(lbl_s4)
+
+        # Preset selector
+        sub_box = QVBoxLayout()
+        sub_box.setSpacing(3)
+        lbl_preset = QLabel("Color Preset:")
+        lbl_preset.setProperty("class", "FormLabel")
+        self.cmb_sub_preset = QComboBox()
+        self.cmb_sub_preset.addItem("Merah - Putih (Default)", "red_white")
+        self.cmb_sub_preset.addItem("Kuning TikTok (#FFE81F)", "tiktok_yellow")
+        self.cmb_sub_preset.addItem("Hijau Neon (#39FF14)", "neon_green")
+        self.cmb_sub_preset.addItem("Cyan Gamer (#00F0FF)", "cyan_gamer")
+        self.cmb_sub_preset.addItem("Custom", "custom")
+        self.cmb_sub_preset.currentIndexChanged.connect(self._on_sub_preset_changed)
+        sub_box.addWidget(lbl_preset)
+        sub_box.addWidget(self.cmb_sub_preset)
+        layout.addLayout(sub_box)
+
+        # Color inputs row
+        row_colors = QHBoxLayout()
+        row_colors.setSpacing(8)
+
+        base_box = QVBoxLayout()
+        base_box.setSpacing(2)
+        lbl_b_col = QLabel("Base Color:")
+        lbl_b_col.setProperty("class", "FormLabel")
+        self.txt_base_color = QLineEdit(getattr(self.config, "subtitle_base_color", "#FFFFFF"))
+        base_box.addWidget(lbl_b_col)
+        base_box.addWidget(self.txt_base_color)
+        row_colors.addLayout(base_box)
+
+        hl_box = QVBoxLayout()
+        hl_box.setSpacing(2)
+        lbl_h_col = QLabel("Active Highlight:")
+        lbl_h_col.setProperty("class", "FormLabel")
+        self.txt_hl_color = QLineEdit(getattr(self.config, "subtitle_highlight_color", "#FF2A2A"))
+        hl_box.addWidget(lbl_h_col)
+        hl_box.addWidget(self.txt_hl_color)
+        row_colors.addLayout(hl_box)
+
+        layout.addLayout(row_colors)
+
         layout.addStretch()
         layout.addWidget(self._build_divider())
 
@@ -797,6 +848,19 @@ class MainWindow(QMainWindow):
                 self.spn_min_dur.setValue(60)
                 self.spn_max_dur.setValue(90)
 
+    def _on_sub_preset_changed(self):
+        code = self.cmb_sub_preset.currentData()
+        presets = {
+            "red_white": ("#FFFFFF", "#FF2A2A"),
+            "tiktok_yellow": ("#FFFFFF", "#FFE81F"),
+            "neon_green": ("#FFFFFF", "#39FF14"),
+            "cyan_gamer": ("#FFFFFF", "#00F0FF"),
+        }
+        if code in presets:
+            base, hl = presets[code]
+            self.txt_base_color.setText(base)
+            self.txt_hl_color.setText(hl)
+
     def _on_reset_and_clear_cache(self):
         self.txt_url.clear()
         self.txt_video.clear()
@@ -846,6 +910,9 @@ class MainWindow(QMainWindow):
 
         rules = self.txt_rules.toPlainText().strip()
         clip_mode = self.cmb_clip_mode.currentData() or "single"
+        sub_base = self.txt_base_color.text().strip() or "#FFFFFF"
+        sub_hl = self.txt_hl_color.text().strip() or "#FF2A2A"
+        sub_preset = self.cmb_sub_preset.currentData() or "red_white"
 
         self.config.endpoint_url = endpoint
         self.config.api_key = key
@@ -856,6 +923,9 @@ class MainWindow(QMainWindow):
         self.config.max_duration = max_dur
         self.config.campaign_rules = rules
         self.config.clip_mode = clip_mode
+        self.config.subtitle_base_color = sub_base
+        self.config.subtitle_highlight_color = sub_hl
+        self.config.subtitle_color_preset = sub_preset
         self.config.save()
 
         # Switch to Stage 1: Processing
@@ -873,7 +943,9 @@ class MainWindow(QMainWindow):
             min_duration=min_dur,
             max_duration=max_dur,
             campaign_rules=rules,
-            clip_mode=clip_mode
+            clip_mode=clip_mode,
+            subtitle_base_color=sub_base,
+            subtitle_highlight_color=sub_hl
         )
         self.worker.progress_changed.connect(self._on_worker_progress)
         self.worker.finished.connect(self._on_worker_finished)

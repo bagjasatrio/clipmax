@@ -24,6 +24,8 @@ class PipelineStartRequest(BaseModel):
     max_duration: float = 60.0
     campaign_rules: str = ""
     clip_mode: str = "single"
+    subtitle_base_color: str = "#FFFFFF"
+    subtitle_highlight_color: str = "#FF2A2A"
     cookie_file: Optional[str] = None
 
 class ConfigUpdateRequest(BaseModel):
@@ -36,6 +38,9 @@ class ConfigUpdateRequest(BaseModel):
     max_duration: Optional[float] = None
     campaign_rules: Optional[str] = None
     clip_mode: Optional[str] = None
+    subtitle_base_color: Optional[str] = None
+    subtitle_highlight_color: Optional[str] = None
+    subtitle_color_preset: Optional[str] = None
     cookie_file: Optional[str] = None
 
 class ExportSingleRequest(BaseModel):
@@ -131,6 +136,9 @@ def get_config():
         "max_duration": state.config.max_duration,
         "campaign_rules": state.config.campaign_rules,
         "clip_mode": getattr(state.config, "clip_mode", "single"),
+        "subtitle_base_color": getattr(state.config, "subtitle_base_color", "#FFFFFF"),
+        "subtitle_highlight_color": getattr(state.config, "subtitle_highlight_color", "#FF2A2A"),
+        "subtitle_color_preset": getattr(state.config, "subtitle_color_preset", "red_white"),
         "engine": "invidious_api"
     }
 
@@ -154,6 +162,12 @@ def update_config(req: ConfigUpdateRequest):
         state.config.campaign_rules = req.campaign_rules
     if req.clip_mode is not None:
         state.config.clip_mode = req.clip_mode
+    if req.subtitle_base_color is not None:
+        state.config.subtitle_base_color = req.subtitle_base_color
+    if req.subtitle_highlight_color is not None:
+        state.config.subtitle_highlight_color = req.subtitle_highlight_color
+    if req.subtitle_color_preset is not None:
+        state.config.subtitle_color_preset = req.subtitle_color_preset
 
     state.config.save()
     state.orchestrator = PipelineOrchestrator(state.config)
@@ -194,7 +208,9 @@ def start_pipeline(req: PipelineStartRequest):
                 min_duration=req.min_duration,
                 max_duration=req.max_duration,
                 campaign_rules=req.campaign_rules,
-                clip_mode=req.clip_mode
+                clip_mode=req.clip_mode,
+                subtitle_base_color=req.subtitle_base_color,
+                subtitle_highlight_color=req.subtitle_highlight_color
             )
 
             if state.orchestrator.cancel_requested.is_set():
