@@ -22,6 +22,59 @@ def test_fixed_scene_crop_median_calculation():
     # Must be a fixed integer string, not a dynamic expression
     assert str(crop_x).isdigit()
 
+def test_face_count_rule_single_face_crop_916():
+    # Condition 1: EXACTLY 1 Face (Single Talking Head) -> CROP_TRACKING (Fixed median X)
+    samples = [(i * 0.2, 1, 480.0 + (i % 3) * 5) for i in range(50)]
+    segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=10.0)
+    assert len(segments) == 1
+    assert segments[0]["mode"] == "CROP_TRACKING"
+    assert segments[0]["start"] == 0.0
+    assert segments[0]["end"] == 10.0
+
+def test_face_count_rule_multi_person_blurred_bg():
+    # Condition 2: >= 2 Faces (Multi-person podcast / two-shot) -> BLURRED_BACKGROUND (16:9 full fit in center)
+    samples = [(i * 0.2, 2, 500.0) for i in range(50)]
+    segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=10.0)
+    assert len(segments) == 1
+    assert segments[0]["mode"] == "BLURRED_BACKGROUND"
+    assert segments[0]["start"] == 0.0
+    assert segments[0]["end"] == 10.0
+
+def test_face_count_rule_zero_face_blurred_bg():
+    # Condition 3: 0 Faces (Screen record / slide / B-roll) -> BLURRED_BACKGROUND (16:9 full fit in center)
+    samples = [(i * 0.2, 0, None) for i in range(50)]
+    segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=10.0)
+    assert len(segments) == 1
+    assert segments[0]["mode"] == "BLURRED_BACKGROUND"
+    assert segments[0]["start"] == 0.0
+    assert segments[0]["end"] == 10.0
+
+def test_face_count_rule_mixed_timeline():
+    # 0s-6s: Single talking head (fc=1) -> CROP_TRACKING
+    # 6s-12s: Two-shot podcast (fc=2) -> BLURRED_BACKGROUND
+    # 12s-16s: Screen share (fc=0) -> BLURRED_BACKGROUND (merged seamlessly)
+    # 16s-20s: Single talking head (fc=1) -> CROP_TRACKING
+    samples = (
+        [(i * 0.2, 1, 450.0) for i in range(30)] +
+        [(6.0 + i * 0.2, 2, 800.0) for i in range(30)] +
+        [(12.0 + i * 0.2, 0, None) for i in range(20)] +
+        [(16.0 + i * 0.2, 1, 450.0) for i in range(20)]
+    )
+    segments = merge_scene_intervals(samples, min_scene_sec=2.0, clip_duration=20.0, padding_sec=0.0)
+    assert len(segments) == 3
+    assert segments[0]["mode"] == "CROP_TRACKING"
+    assert segments[0]["start"] == 0.0
+    assert segments[0]["end"] == 6.0
+
+    # Multi-person (6-12s) + Screen share (12-16s) seamlessly merged as one BLURRED_BACKGROUND block
+    assert segments[1]["mode"] == "BLURRED_BACKGROUND"
+    assert segments[1]["start"] == 6.0
+    assert segments[1]["end"] == 16.0
+
+    assert segments[2]["mode"] == "CROP_TRACKING"
+    assert segments[2]["start"] == 16.0
+    assert segments[2]["end"] == 20.0
+
 def test_calculate_crop_box_center():
     x_crop, crop_w, crop_h = calculate_crop_box(
         frame_width=1920,

@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any, Union
 from enum import Enum
 from pydantic import BaseModel
 
@@ -57,16 +57,16 @@ def build_dynamic_crop_expression(
     visual_cuts: Optional[List[float]] = None
 ) -> str:
     """
-    Builds fixed or discrete step expression without continuous panning.
+    Builds fixed crop expression. In fixed-scene mode, returns a single fixed X coordinate string.
     """
     if not values:
         return str(max_x // 2)
 
-    # If single value or negligible variation across segment
+    # In fixed scene mode, values in a segment are identical or median-centered
     if max(values) - min(values) < 2.0 or len(values) == 1:
         return str(int(round(values[0])))
 
-    # Discrete step function (Hard Cuts)
+    # Discrete step function (Hard Cuts between scenes)
     blocks = []
     cur_val = values[0]
     cur_start = timestamps[0]
@@ -100,12 +100,18 @@ def get_face_detector_model() -> Optional[str]:
     return None
 
 def merge_scene_intervals(
-    raw_samples: List[Tuple[float, bool, float]],
+    raw_samples: List[Tuple[float, Any, float]],
     min_scene_sec: float = 2.0,
     clip_duration: float = 0.0,
     visual_cuts: Optional[List[float]] = None,
     padding_sec: float = 0.2
 ) -> List[Dict[str, Any]]:
+    """
+    Groups frame samples based on 3-Condition Face Count Rule:
+    - 1 Face (Single Talking Head) -> CROP_TRACKING (Fixed median X crop)
+    - >= 2 Faces (Multi-person podcast) -> BLURRED_BACKGROUND (Full 16:9 fit)
+    - 0 Faces (Screen record / slide / B-roll) -> BLURRED_BACKGROUND (Full 16:9 fit)
+    """
     if not raw_samples:
         return []
 
@@ -115,32 +121,43 @@ def merge_scene_intervals(
     if visual_cuts is None:
         visual_cuts = []
 
+    def classify_mode(indicator: Any) -> str:
+        # Handles face_count (int) or legacy is_face (bool)
+        if isinstance(indicator, bool):
+            return "CROP_TRACKING" if indicator else "BLURRED_BACKGROUND"
+        if isinstance(indicator, (int, float)):
+            # Exactly 1 face -> CROP_TRACKING, otherwise (0 or >= 2) -> BLURRED_BACKGROUND
+            return "CROP_TRACKING" if int(indicator) == 1 else "BLURRED_BACKGROUND"
+        return "BLURRED_BACKGROUND"
+
     # 1. Group contiguous identical states into raw chunks
     chunks: List[Dict[str, Any]] = []
-    cur_is_face = raw_samples[0][1]
+    first_mode = classify_mode(raw_samples[0][1])
+    cur_mode = first_mode
     cur_start = raw_samples[0][0]
-    cur_faces = [raw_samples[0][2]] if cur_is_face else []
+    cur_faces = [raw_samples[0][2]] if first_mode == "CROP_TRACKING" else []
 
-    for t, is_face, fx in raw_samples[1:]:
-        if is_face == cur_is_face:
-            if cur_is_face:
+    for t, face_ind, fx in raw_samples[1:]:
+        m = classify_mode(face_ind)
+        if m == cur_mode:
+            if m == "CROP_TRACKING" and fx is not None:
                 cur_faces.append(fx)
         else:
             chunks.append({
                 "start": cur_start,
                 "end": t,
-                "mode": "CROP_TRACKING" if cur_is_face else "BLURRED_BACKGROUND",
+                "mode": cur_mode,
                 "faces": cur_faces
             })
-            cur_is_face = is_face
+            cur_mode = m
             cur_start = t
-            cur_faces = [fx] if cur_is_face else []
+            cur_faces = [fx] if m == "CROP_TRACKING" and fx is not None else []
 
     final_end = clip_duration if clip_duration > 0 else raw_samples[-1][0]
     chunks.append({
         "start": cur_start,
         "end": final_end,
-        "mode": "CROP_TRACKING" if cur_is_face else "BLURRED_BACKGROUND",
+        "mode": cur_mode,
         "faces": cur_faces
     })
 
@@ -213,9 +230,13 @@ def segment_clip_scenes(
     padding_sec: float = 0.2
 ) -> List[SceneSegment]:
     """
-    Segments video clip into distinct fixed scenes:
-    - Talking Head: Locked static crop 9:16 using the MEDIAN dominant face X position (camera is completely stationary).
-    - Screen Record / Non-Face: Full 16:9 view fit inside 1080x1920 canvas with blurred background.
+    Fixed Scene Logic (3 Condition Face Count Rule):
+    - EXACTLY 1 Face (Single Talking Head):
+      Mode: CROP FULL 9:16 locked on the median dominant face X position (completely static).
+    - >= 2 Faces (Multi-person podcast / two-shot):
+      Mode: BLURRED_BACKGROUND (16:9 fit in center, full width, both speakers visible).
+    - 0 Faces (Screen Record / Slide / B-Roll):
+      Mode: BLURRED_BACKGROUND (16:9 fit in center, full width, no text cropped).
     """
     if padding_sec is None:
         padding_sec = 0.2
@@ -261,7 +282,7 @@ def segment_clip_scenes(
 
     default_center = width / 2.0
     last_center = default_center
-    raw_samples: List[Tuple[float, bool, float]] = []
+    raw_samples: List[Tuple[float, int, float]] = []
     visual_cuts: List[float] = []
     prev_gray = None
     cut_diff_threshold = 28.0
@@ -278,7 +299,7 @@ def segment_clip_scenes(
         if frame_idx % sample_step == 0:
             t_rel = (current_frame - start_frame) / fps
             ret, frame = cap.retrieve()
-            face_found = False
+            face_count = 0
 
             if ret and frame is not None:
                 small_frame = cv2.resize(frame, (detect_w, detect_h))
@@ -291,7 +312,7 @@ def segment_clip_scenes(
                         visual_cuts.append(t_rel)
                 prev_gray = gray
 
-                # Detect dominant face (largest bounding box area with score >= 0.6)
+                # Evaluate face count
                 if detector is not None:
                     try:
                         _, faces = detector.detect(small_frame)
@@ -304,16 +325,15 @@ def segment_clip_scenes(
                                 if score >= 0.6 and area >= min_face_area:
                                     valid_faces.append((area, f))
 
-                            if valid_faces:
-                                face_found = True
-                                # Pick dominant face with largest area
-                                best_face = max(valid_faces, key=lambda x: x[0])[1]
+                            face_count = len(valid_faces)
+                            if face_count == 1:
+                                best_face = valid_faces[0][1]
                                 cx_small = float(best_face[0] + best_face[2] / 2.0)
                                 last_center = cx_small * scale_x
                     except Exception:
-                        pass
+                        face_count = 0
 
-            raw_samples.append((t_rel, face_found, last_center))
+            raw_samples.append((t_rel, face_count, last_center))
 
         frame_idx += 1
         current_frame += 1
@@ -330,7 +350,7 @@ def segment_clip_scenes(
             )
         ]
 
-    # Merge into stable scene intervals with visual cut snapping and padding
+    # Merge into stable scene intervals based on Face Count Rule
     chunks = merge_scene_intervals(
         raw_samples,
         min_scene_sec=min_scene_sec,
@@ -347,7 +367,8 @@ def segment_clip_scenes(
             continue
 
         if c["mode"] == "CROP_TRACKING":
-            # Segmen Talking Head: Gunakan MEDIAN dari nilai X-center wajah sebagai satu-satunya titik crop (FIXED VALUE)
+            # Condition 1: EXACTLY 1 Face (Single Talking Head)
+            # Use MEDIAN of dominant face X-center as the SINGLE FIXED crop X value for whole segment (zero camera motion)
             faces = c.get("faces", [])
             if faces:
                 median_cx = float(np.median(faces))
@@ -364,7 +385,8 @@ def segment_clip_scenes(
                 )
             )
         else:
-            # Segmen Non-Face / Screen Record: Fit 16:9 di tengah dengan latar buram
+            # Condition 2 & 3: >= 2 Faces (Multi-person podcast) OR 0 Faces (Screen Record / Slide)
+            # Use BLURRED_BACKGROUND (16:9 full fit in center)
             scenes.append(
                 SceneSegment(
                     start_time=s_start,
@@ -400,6 +422,5 @@ def detect_face_centers(
     has_crop = any(sc.mode == "CROP_TRACKING" for sc in scenes)
     strategy = ReframeStrategy.CROP_TRACKING if has_crop else ReframeStrategy.BLURRED_BACKGROUND
 
-    # Return default centers list for compatibility with callers
     centers = [960.0]
     return centers, strategy
