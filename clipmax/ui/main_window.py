@@ -31,7 +31,8 @@ class PipelineWorker(QThread):
         target_clip_count: int = 3,
         min_duration: float = 30.0,
         max_duration: float = 60.0,
-        campaign_rules: str = ""
+        campaign_rules: str = "",
+        clip_mode: str = "single"
     ):
         super().__init__()
         self.orchestrator = orchestrator
@@ -40,6 +41,7 @@ class PipelineWorker(QThread):
         self.min_duration = min_duration
         self.max_duration = max_duration
         self.campaign_rules = campaign_rules
+        self.clip_mode = clip_mode
 
     def run(self):
         try:
@@ -52,7 +54,8 @@ class PipelineWorker(QThread):
                 target_clip_count=self.target_clip_count,
                 min_duration=self.min_duration,
                 max_duration=self.max_duration,
-                campaign_rules=self.campaign_rules
+                campaign_rules=self.campaign_rules,
+                clip_mode=self.clip_mode
             )
             self.finished.emit(clips)
         except Exception as e:
@@ -112,7 +115,9 @@ class ClipCardWidget(QFrame):
         # Time range & Mode tag
         dur = max(0.0, clip.end_time - clip.start_time)
         mode_val = getattr(clip, "reframe_mode", "DYNAMIC_SCENE")
-        if mode_val == "DYNAMIC_SCENE":
+        if mode_val == "MONTAGE":
+            mode_tag = "✂ Montage"
+        elif mode_val == "DYNAMIC_SCENE":
             mode_tag = "Dynamic Split"
         elif mode_val == "CROP_TRACKING":
             mode_tag = "Face Crop 9:16"
@@ -379,6 +384,20 @@ class MainWindow(QMainWindow):
         lbl_s3 = QLabel("CURATION & RULES")
         lbl_s3.setProperty("class", "SectionHeader")
         layout.addWidget(lbl_s3)
+
+        # Clip Type / Mode
+        mode_box = QVBoxLayout()
+        mode_box.setSpacing(3)
+        lbl_mode = QLabel("Clip Type (Mode):")
+        lbl_mode.setProperty("class", "FormLabel")
+        self.cmb_clip_mode = QComboBox()
+        self.cmb_clip_mode.addItem("Single Clip (Default)", "single")
+        self.cmb_clip_mode.addItem("Multi-Cut Montage", "montage")
+        if getattr(self.config, "clip_mode", "single") == "montage":
+            self.cmb_clip_mode.setCurrentIndex(1)
+        mode_box.addWidget(lbl_mode)
+        mode_box.addWidget(self.cmb_clip_mode)
+        layout.addLayout(mode_box)
 
         row_params = QHBoxLayout()
         row_params.setSpacing(8)
@@ -807,15 +826,17 @@ class MainWindow(QMainWindow):
             min_dur, max_dur = 30.0, 60.0
 
         rules = self.txt_rules.toPlainText().strip()
+        clip_mode = self.cmb_clip_mode.currentData() or "single"
 
-        self.config.endpoint_url = self.txt_endpoint.text().strip()
-        self.config.api_key = self.txt_key.text().strip()
-        self.config.selected_model = self.cmb_models.currentText()
+        self.config.endpoint_url = endpoint
+        self.config.api_key = key
+        self.config.selected_model = model
         self.config.target_clip_count = target_count
         self.config.duration_preset = preset
         self.config.min_duration = min_dur
         self.config.max_duration = max_dur
         self.config.campaign_rules = rules
+        self.config.clip_mode = clip_mode
         self.config.save()
 
         # Switch to Stage 1: Processing
@@ -832,7 +853,8 @@ class MainWindow(QMainWindow):
             target_clip_count=target_count,
             min_duration=min_dur,
             max_duration=max_dur,
-            campaign_rules=rules
+            campaign_rules=rules,
+            clip_mode=clip_mode
         )
         self.worker.progress_changed.connect(self._on_worker_progress)
         self.worker.finished.connect(self._on_worker_finished)

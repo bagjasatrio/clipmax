@@ -128,3 +128,50 @@ def test_evaluate_viral_clips_campaign_rules_and_count():
         assert len(clips) == 2
         assert clips[0].virality_score == 99
         assert clips[1].virality_score == 85
+
+def test_evaluate_viral_clips_montage_mode():
+    mock_json_response = '''
+    [
+      {
+        "title": "Epic War & Comeback",
+        "viral_score": 95,
+        "mode": "montage",
+        "cuts": [
+          {"start": 124.0, "end": 139.5, "event": "First Blood / War Turtle"},
+          {"start": 350.2, "end": 368.0, "event": "Lord Steal"},
+          {"start": 520.0, "end": 542.5, "event": "Wipeout & Base Push"}
+        ]
+      }
+    ]
+    '''
+    with patch("clipmax.ai_gateway.OpenAI") as mock_openai:
+        mock_client = MagicMock()
+        mock_choice = MagicMock()
+        mock_choice.message.content = mock_json_response
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice])
+        mock_openai.return_value = mock_client
+
+        clips = evaluate_viral_clips(
+            transcript="Gaming match full transcript",
+            endpoint_url="http://localhost:20128/v1",
+            api_key="test-key",
+            model="test-model",
+            target_clip_count=1,
+            min_duration=30.0,
+            max_duration=70.0,
+            clip_mode="montage"
+        )
+
+        assert len(clips) == 1
+        c = clips[0]
+        assert c.title == "Epic War & Comeback"
+        assert c.virality_score == 95
+        assert c.mode == "montage"
+        assert len(c.cuts) == 3
+        assert c.cuts[0].start == 124.0
+        assert c.cuts[0].end == 139.5
+        assert c.cuts[0].event == "First Blood / War Turtle"
+        assert c.cuts[1].event == "Lord Steal"
+        assert c.cuts[2].event == "Wipeout & Base Push"
+        # Total duration = (139.5-124.0) + (368.0-350.2) + (542.5-520.0) = 15.5 + 17.8 + 22.5 = 55.8s
+        assert 55.0 <= (c.cuts[0].end - c.cuts[0].start + c.cuts[1].end - c.cuts[1].start + c.cuts[2].end - c.cuts[2].start) <= 56.5

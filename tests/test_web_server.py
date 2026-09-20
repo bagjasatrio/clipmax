@@ -23,9 +23,10 @@ def test_api_config():
     assert data.get("engine") == "invidious_api"
 
 def test_api_config_update():
-    res = client.post("/api/config", json={"target_clip_count": 4})
+    res = client.post("/api/config", json={"target_clip_count": 4, "clip_mode": "montage"})
     assert res.status_code == 200
     assert state.config.target_clip_count == 4
+    assert state.config.clip_mode == "montage"
 
 def test_api_pipeline_status():
     res = client.get("/api/pipeline/status")
@@ -48,3 +49,4 @@ def test_static_index_html():
     assert "ClipMax Studio" in res.text
     assert "Invidious API Stream" in res.text
     assert "cookies.txt" not in res.text
+    assert "Multi-Cut Montage" in res.text

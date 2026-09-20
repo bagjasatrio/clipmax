@@ -6,13 +6,20 @@ from pydantic import BaseModel
 from openai import OpenAI
 from clipmax.config import parse_to_seconds
 
+class MontageCut(BaseModel):
+    start: float
+    end: float
+    event: str = ""
+
 class ViralClipCandidate(BaseModel):
     title: str
-    hook: str
+    hook: str = ""
     start_time: float
     end_time: float
     virality_score: int
-    reasoning: str
+    reasoning: str = ""
+    mode: str = "single"  # "single" or "montage"
+    cuts: Optional[List[MontageCut]] = None
 
 def safe_extract_json(text: str) -> Any:
     # 1. Direct parse
@@ -101,6 +108,29 @@ Format output WAJIB berupa JSON array murni tanpa markdown wrapper:
   }
 ]"""
 
+MONTAGE_SYSTEM_PROMPT = """Anda adalah editor dan kurator video montage profesional untuk TikTok, Instagram Reels, dan YouTube Shorts.
+Tugas Anda adalah merangkai video Multi-Cut Montage dengan menggabungkan beberapa momen penting atau klimaks berbeda dari transkrip video.
+
+Kriteria seleksi montage:
+1. Pilih 2 sampai 5 potongan momen penting/menarik (cuts) dari bagian video yang berbeda.
+2. Setiap cut memiliki deskripsi event/momen singkat (misal: "First Blood / War Turtle", "Lord Steal", "Wipeout & Base Push").
+3. TOTAL akumulasi durasi dari seluruh cuts dalam satu montage HARUS berada di dalam rentang durasi yang diminta.
+4. Beri skor viralitas (1-100).
+
+Format output WAJIB berupa JSON array murni tanpa markdown wrapper:
+[
+  {
+    "title": "Epic War & Comeback",
+    "viral_score": 95,
+    "mode": "montage",
+    "cuts": [
+      {"start": 124.0, "end": 139.5, "event": "First Blood / War Turtle"},
+      {"start": 350.2, "end": 368.0, "event": "Lord Steal"},
+      {"start": 520.0, "end": 542.5, "event": "Wipeout & Base Push"}
+    ]
+  }
+]"""
+
 def evaluate_viral_clips(
     transcript: str,
     endpoint_url: str,
@@ -109,7 +139,8 @@ def evaluate_viral_clips(
     target_clip_count: int = 3,
     min_duration: float = 30.0,
     max_duration: float = 60.0,
-    campaign_rules: str = ""
+    campaign_rules: str = "",
+    clip_mode: str = "single"
 ) -> List[ViralClipCandidate]:
     client = OpenAI(
         base_url=endpoint_url,
@@ -124,7 +155,21 @@ CRITICAL CAMPAIGN RULES (User Guidelines):
 Kamu WAJIB memilih dan memotong klip yang memenuhi aturan di atas.
 """
 
-    prompt = f"""Transkrip Video:
+    is_montage = (clip_mode == "montage")
+
+    if is_montage:
+        system_content = MONTAGE_SYSTEM_PROMPT
+        prompt = f"""Transkrip Video:
+
+{transcript}
+
+Instruksi Pemilihan Multi-Cut Montage:
+- Hasilkan tepat {target_clip_count} montage terbaik.
+- Setiap montage menggabungkan beberapa momen (cuts) berbeda.
+- Pastikan TOTAL akumulasi durasi dari seluruh cuts di setiap montage berada di dalam rentang {int(min_duration)} sampai {int(max_duration)} detik.{rules_section}"""
+    else:
+        system_content = SYSTEM_PROMPT
+        prompt = f"""Transkrip Video:
 
 {transcript}
 
@@ -135,7 +180,7 @@ Instruksi Pemilihan Klip:
     response = client.chat.completions.create(
         model=model,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_content},
             {"role": "user", "content": prompt}
         ],
         temperature=0.7
@@ -157,6 +202,37 @@ Instruksi Pemilihan Klip:
     for item in items:
         if not isinstance(item, dict):
             continue
+
+        if is_montage or item.get("mode") == "montage" or "cuts" in item:
+            cuts_raw = item.get("cuts", [])
+            valid_cuts: List[MontageCut] = []
+            for c in cuts_raw:
+                if not isinstance(c, dict):
+                    continue
+                c_start = parse_to_seconds(c.get("start", c.get("start_time", 0)))
+                c_end = parse_to_seconds(c.get("end", c.get("end_time", 0)))
+                c_ev = str(c.get("event", c.get("title", "")))
+                if c_end > c_start and (c_end - c_start) >= 2.0:
+                    valid_cuts.append(MontageCut(start=c_start, end=c_end, event=c_ev))
+
+            if len(valid_cuts) >= 2:
+                total_dur = sum(c.end - c.start for c in valid_cuts)
+                candidate = ViralClipCandidate(
+                    title=str(item.get("title", "Montage Clip")),
+                    hook=valid_cuts[0].event or str(item.get("hook", "")),
+                    start_time=valid_cuts[0].start,
+                    end_time=valid_cuts[-1].end,
+                    virality_score=int(item.get("viral_score", item.get("virality_score", 50))),
+                    reasoning=" | ".join(c.event for c in valid_cuts if c.event),
+                    mode="montage",
+                    cuts=valid_cuts
+                )
+                relaxed_results.append(candidate)
+                if lower_bound <= total_dur <= upper_bound:
+                    results.append(candidate)
+                continue
+
+        # Single clip processing (Default)
         start_sec = parse_to_seconds(item.get("start_time", 0))
         end_sec = parse_to_seconds(item.get("end_time", 0))
         dur = end_sec - start_sec
@@ -170,7 +246,8 @@ Instruksi Pemilihan Klip:
             start_time=start_sec,
             end_time=end_sec,
             virality_score=int(item.get("virality_score", 50)),
-            reasoning=str(item.get("reasoning", ""))
+            reasoning=str(item.get("reasoning", "")),
+            mode="single"
         )
         relaxed_results.append(candidate)
 

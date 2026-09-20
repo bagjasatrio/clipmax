@@ -23,6 +23,7 @@ class PipelineStartRequest(BaseModel):
     min_duration: float = 30.0
     max_duration: float = 60.0
     campaign_rules: str = ""
+    clip_mode: str = "single"
     cookie_file: Optional[str] = None
 
 class ConfigUpdateRequest(BaseModel):
@@ -34,6 +35,7 @@ class ConfigUpdateRequest(BaseModel):
     min_duration: Optional[float] = None
     max_duration: Optional[float] = None
     campaign_rules: Optional[str] = None
+    clip_mode: Optional[str] = None
     cookie_file: Optional[str] = None
 
 class ExportSingleRequest(BaseModel):
@@ -113,6 +115,7 @@ def get_config():
         "min_duration": state.config.min_duration,
         "max_duration": state.config.max_duration,
         "campaign_rules": state.config.campaign_rules,
+        "clip_mode": getattr(state.config, "clip_mode", "single"),
         "engine": "invidious_api"
     }
 
@@ -134,6 +137,8 @@ def update_config(req: ConfigUpdateRequest):
         state.config.max_duration = req.max_duration
     if req.campaign_rules is not None:
         state.config.campaign_rules = req.campaign_rules
+    if req.clip_mode is not None:
+        state.config.clip_mode = req.clip_mode
 
     state.config.save()
     state.orchestrator = PipelineOrchestrator(state.config)
@@ -173,7 +178,8 @@ def start_pipeline(req: PipelineStartRequest):
                 target_clip_count=req.target_clip_count,
                 min_duration=req.min_duration,
                 max_duration=req.max_duration,
-                campaign_rules=req.campaign_rules
+                campaign_rules=req.campaign_rules,
+                clip_mode=req.clip_mode
             )
 
             if state.orchestrator.cancel_requested.is_set():

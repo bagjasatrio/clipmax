@@ -1,13 +1,14 @@
 import os
+import shutil
 import subprocess
 import threading
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Optional, List
 from pydantic import BaseModel
-from clipmax.config import AppConfig, get_ffmpeg_bin
+from clipmax.config import AppConfig, get_ffmpeg_bin, sanitize_ffmpeg_path
 from clipmax.audio import extract_audio
-from clipmax.transcriber import transcribe_audio, cleanup_vram
+from clipmax.transcriber import transcribe_audio, cleanup_vram, WordSegment
 from clipmax.ai_gateway import evaluate_viral_clips, ViralClipCandidate
 from clipmax.reframe import (
     detect_face_centers,
@@ -126,7 +127,8 @@ class PipelineOrchestrator:
         min_duration: Optional[float] = None,
         max_duration: Optional[float] = None,
         campaign_rules: Optional[str] = None,
-        cookie_file: Optional[str] = None
+        clip_mode: Optional[str] = None,
+        **kwargs
     ) -> List[ClipResult]:
         self.cancel_requested.clear()
         self.temp_files.clear()
@@ -137,6 +139,7 @@ class PipelineOrchestrator:
         min_dur = min_duration if min_duration is not None else self.config.min_duration
         max_dur = max_duration if max_duration is not None else self.config.max_duration
         rules = campaign_rules if campaign_rules is not None else self.config.campaign_rules
+        mode_type = clip_mode or getattr(self.config, "clip_mode", "single")
 
         temp_dir = Path(self.config.temp_dir)
         temp_dir.mkdir(parents=True, exist_ok=True)
@@ -212,7 +215,8 @@ class PipelineOrchestrator:
                 target_clip_count=target_count,
                 min_duration=min_dur,
                 max_duration=max_dur,
-                campaign_rules=rules
+                campaign_rules=rules,
+                clip_mode=mode_type
             )
 
             if not candidates:
@@ -228,80 +232,229 @@ class PipelineOrchestrator:
                 clip_num = idx + 1
                 base_pct = 50 + int((idx / total_clips) * 45)
 
-                # Stage 4: Scene & Content-Aware Dynamic Split (70%)
-                self.status = PipelineStatus.TRACKING_FACES
-                if progress_callback:
-                    progress_callback(self.status, base_pct, f"Segmentasi visual scene dinamis klip {clip_num}/{total_clips}...")
+                is_montage = (clip.mode == "montage" and clip.cuts and len(clip.cuts) >= 2)
 
-                scenes = segment_clip_scenes(video_path, clip.start_time, clip.end_time)
+                if is_montage:
+                    mode_label = f"Montage ({len(clip.cuts)} cuts)"
+                    self.status = PipelineStatus.TRACKING_FACES
+                    if progress_callback:
+                        progress_callback(self.status, base_pct, f"Memproses multi-cut montage klip {clip_num}/{total_clips}...")
 
-                has_crop = any(sc.mode == "CROP_TRACKING" for sc in scenes)
-                has_blur = any(sc.mode == "BLURRED_BACKGROUND" for sc in scenes)
-                if has_crop and has_blur:
-                    mode = "DYNAMIC_SCENE"
-                    mode_label = f"Dynamic ({len(scenes)} scenes)"
-                elif has_crop:
-                    mode = "CROP_TRACKING"
-                    mode_label = "Crop Wajah 9:16"
+                    part_files: List[str] = []
+                    shifted_words: List[WordSegment] = []
+                    accumulated_dur = 0.0
+
+                    for k, cut in enumerate(clip.cuts):
+                        if self.cancel_requested.is_set():
+                            self.status = PipelineStatus.CANCELLED
+                            return []
+
+                        part_file = str((temp_dir / f"temp_part_{clip_num}_{k}.mp4").resolve())
+                        part_files.append(part_file)
+                        self.temp_files.append(part_file)
+
+                        cut_scenes = segment_clip_scenes(video_path, cut.start, cut.end)
+                        default_cx = cut_scenes[0].crop_x if cut_scenes else "0"
+                        cut_mode = cut_scenes[0].mode if cut_scenes else "CROP_TRACKING"
+
+                        render_clip(
+                            input_video=video_path,
+                            output_clip=part_file,
+                            start_time=cut.start,
+                            end_time=cut.end,
+                            crop_x=default_cx,
+                            ass_path=None,
+                            use_gpu=True,
+                            video_bitrate=self.config.video_bitrate,
+                            audio_bitrate=self.config.audio_bitrate,
+                            cancel_event=self.cancel_requested,
+                            pid_callback=self.set_pid,
+                            reframe_mode=cut_mode,
+                            scenes=cut_scenes
+                        )
+
+                        cut_dur = cut.end - cut.start
+                        for w in words:
+                            if w.start >= (cut.start - 0.1) and w.end <= (cut.end + 0.1):
+                                w_s = accumulated_dur + max(0.0, w.start - cut.start)
+                                w_e = accumulated_dur + min(cut_dur, w.end - cut.start)
+                                if w_e > w_s:
+                                    shifted_words.append(WordSegment(word=w.word, start=w_s, end=w_e, probability=w.probability))
+                        accumulated_dur += cut_dur
+
+                    # Merge via concat demuxer
+                    concat_list_path = str((temp_dir / f"concat_list_{clip_num}.txt").resolve())
+                    self.temp_files.append(concat_list_path)
+                    with open(concat_list_path, "w", encoding="utf-8") as cf:
+                        for pf in part_files:
+                            clean_pf = str(Path(pf).resolve()).replace("\\", "/")
+                            cf.write(f"file '{clean_pf}'\n")
+
+                    uncaptioned_montage = str((temp_dir / f"montage_raw_{clip_num}.mp4").resolve())
+                    self.temp_files.append(uncaptioned_montage)
+
+                    concat_cmd = [
+                        get_ffmpeg_bin(),
+                        "-y",
+                        "-f", "concat",
+                        "-safe", "0",
+                        "-i", concat_list_path,
+                        "-c", "copy",
+                        uncaptioned_montage
+                    ]
+                    c_res = subprocess.run(concat_cmd, capture_output=True)
+                    if c_res.returncode != 0:
+                        concat_cmd_fb = [
+                            get_ffmpeg_bin(),
+                            "-y",
+                            "-f", "concat",
+                            "-safe", "0",
+                            "-i", concat_list_path,
+                            "-c:v", "h264_nvenc",
+                            "-preset", "p4",
+                            "-c:a", "aac",
+                            uncaptioned_montage
+                        ]
+                        subprocess.run(concat_cmd_fb, capture_output=True)
+
+                    # Subtitle generation for montage
+                    temp_ass = str((temp_dir / f"clip_{clip_num}.ass").resolve())
+                    self.temp_files.append(temp_ass)
+                    generate_kinetic_ass(shifted_words, 0.0, accumulated_dur, temp_ass)
+
+                    self.status = PipelineStatus.RENDERING
+                    if progress_callback:
+                        progress_callback(self.status, min(95, base_pct + 10), f"Rendering NVENC ({mode_label}) klip {clip_num}/{total_clips}...")
+
+                    staging_clip_path = str((staging_dir / f"clipmax_{clip_num}_{int(clip.start_time)}.mp4").resolve())
+                    self.staging_files.append(staging_clip_path)
+
+                    if os.path.exists(temp_ass) and os.path.getsize(temp_ass) > 300:
+                        escaped_ass = sanitize_ffmpeg_path(temp_ass)
+                        burn_cmd = [
+                            get_ffmpeg_bin(),
+                            "-y",
+                            "-i", uncaptioned_montage,
+                            "-vf", f"subtitles='{escaped_ass}'",
+                            "-c:v", "h264_nvenc",
+                            "-preset", "p4",
+                            "-c:a", "copy",
+                            staging_clip_path
+                        ]
+                        b_proc = subprocess.run(burn_cmd, capture_output=True)
+                        if b_proc.returncode != 0:
+                            burn_cmd[burn_cmd.index("h264_nvenc")] = "libx264"
+                            subprocess.run(burn_cmd, capture_output=True)
+                    else:
+                        shutil.copy2(uncaptioned_montage, staging_clip_path)
+
+                    # Clean up temporary part files after final render
+                    for pf in part_files:
+                        try:
+                            Path(pf).unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                    try:
+                        Path(concat_list_path).unlink(missing_ok=True)
+                        Path(uncaptioned_montage).unlink(missing_ok=True)
+                    except Exception:
+                        pass
+
+                    staging_thumb_path = str((staging_dir / f"thumb_{clip_num}_{int(clip.start_time)}.jpg").resolve())
+                    self.staging_files.append(staging_thumb_path)
+                    generate_thumbnail(staging_clip_path, staging_thumb_path)
+
+                    results.append(
+                        ClipResult(
+                            clip_id=clip_num,
+                            title=clip.title,
+                            hook=clip.hook,
+                            virality_score=clip.virality_score,
+                            reasoning=clip.reasoning,
+                            start_time=clip.start_time,
+                            end_time=clip.end_time,
+                            staging_path=staging_clip_path,
+                            thumbnail_path=staging_thumb_path,
+                            reframe_mode="MONTAGE"
+                        )
+                    )
+
                 else:
-                    mode = "BLURRED_BACKGROUND"
-                    mode_label = "Blurred BG (Utuh)"
+                    # Single Clip Mode - existing flow completely untouched!
+                    # Stage 4: Scene & Content-Aware Dynamic Split (70%)
+                    self.status = PipelineStatus.TRACKING_FACES
+                    if progress_callback:
+                        progress_callback(self.status, base_pct, f"Segmentasi visual scene dinamis klip {clip_num}/{total_clips}...")
 
-                default_crop_x = scenes[0].crop_x if scenes else "0"
+                    scenes = segment_clip_scenes(video_path, clip.start_time, clip.end_time)
 
-                if self.cancel_requested.is_set():
-                    self.status = PipelineStatus.CANCELLED
-                    return []
+                    has_crop = any(sc.mode == "CROP_TRACKING" for sc in scenes)
+                    has_blur = any(sc.mode == "BLURRED_BACKGROUND" for sc in scenes)
+                    if has_crop and has_blur:
+                        mode = "DYNAMIC_SCENE"
+                        mode_label = f"Dynamic ({len(scenes)} scenes)"
+                    elif has_crop:
+                        mode = "CROP_TRACKING"
+                        mode_label = "Crop Wajah 9:16"
+                    else:
+                        mode = "BLURRED_BACKGROUND"
+                        mode_label = "Blurred BG (Utuh)"
 
-                # Stage 5: Subtitle Generation
-                temp_ass = str((temp_dir / f"clip_{clip_num}.ass").resolve())
-                self.temp_files.append(temp_ass)
-                generate_kinetic_ass(words, clip.start_time, clip.end_time, temp_ass)
+                    default_crop_x = scenes[0].crop_x if scenes else "0"
 
-                # Stage 6: Video Rendering into Staging Cache (NVENC Forced)
-                self.status = PipelineStatus.RENDERING
-                if progress_callback:
-                    progress_callback(self.status, min(95, base_pct + 10), f"Rendering NVENC ({mode_label}) klip {clip_num}/{total_clips}...")
+                    if self.cancel_requested.is_set():
+                        self.status = PipelineStatus.CANCELLED
+                        return []
 
-                staging_clip_path = str((staging_dir / f"clipmax_{clip_num}_{int(clip.start_time)}.mp4").resolve())
-                self.staging_files.append(staging_clip_path)
+                    # Stage 5: Subtitle Generation
+                    temp_ass = str((temp_dir / f"clip_{clip_num}.ass").resolve())
+                    self.temp_files.append(temp_ass)
+                    generate_kinetic_ass(words, clip.start_time, clip.end_time, temp_ass)
 
-                render_clip(
-                    input_video=video_path,
-                    output_clip=staging_clip_path,
-                    start_time=clip.start_time,
-                    end_time=clip.end_time,
-                    crop_x=default_crop_x,
-                    ass_path=temp_ass,
-                    use_gpu=True,
-                    video_bitrate=self.config.video_bitrate,
-                    audio_bitrate=self.config.audio_bitrate,
-                    cancel_event=self.cancel_requested,
-                    pid_callback=self.set_pid,
-                    reframe_mode=scenes[0].mode if scenes else mode,
-                    scenes=scenes
-                )
-                self.active_pid = None
+                    # Stage 6: Video Rendering into Staging Cache (NVENC Forced)
+                    self.status = PipelineStatus.RENDERING
+                    if progress_callback:
+                        progress_callback(self.status, min(95, base_pct + 10), f"Rendering NVENC ({mode_label}) klip {clip_num}/{total_clips}...")
 
-                # Generate thumbnail for preview gallery
-                staging_thumb_path = str((staging_dir / f"thumb_{clip_num}_{int(clip.start_time)}.jpg").resolve())
-                self.staging_files.append(staging_thumb_path)
-                generate_thumbnail(staging_clip_path, staging_thumb_path)
+                    staging_clip_path = str((staging_dir / f"clipmax_{clip_num}_{int(clip.start_time)}.mp4").resolve())
+                    self.staging_files.append(staging_clip_path)
 
-                results.append(
-                    ClipResult(
-                        clip_id=clip_num,
-                        title=clip.title,
-                        hook=clip.hook,
-                        virality_score=clip.virality_score,
-                        reasoning=clip.reasoning,
+                    render_clip(
+                        input_video=video_path,
+                        output_clip=staging_clip_path,
                         start_time=clip.start_time,
                         end_time=clip.end_time,
-                        staging_path=staging_clip_path,
-                        thumbnail_path=staging_thumb_path,
-                        reframe_mode=mode
+                        crop_x=default_crop_x,
+                        ass_path=temp_ass,
+                        use_gpu=True,
+                        video_bitrate=self.config.video_bitrate,
+                        audio_bitrate=self.config.audio_bitrate,
+                        cancel_event=self.cancel_requested,
+                        pid_callback=self.set_pid,
+                        reframe_mode=scenes[0].mode if scenes else mode,
+                        scenes=scenes
                     )
-                )
+                    self.active_pid = None
+
+                    # Generate thumbnail for preview gallery
+                    staging_thumb_path = str((staging_dir / f"thumb_{clip_num}_{int(clip.start_time)}.jpg").resolve())
+                    self.staging_files.append(staging_thumb_path)
+                    generate_thumbnail(staging_clip_path, staging_thumb_path)
+
+                    results.append(
+                        ClipResult(
+                            clip_id=clip_num,
+                            title=clip.title,
+                            hook=clip.hook,
+                            virality_score=clip.virality_score,
+                            reasoning=clip.reasoning,
+                            start_time=clip.start_time,
+                            end_time=clip.end_time,
+                            staging_path=staging_clip_path,
+                            thumbnail_path=staging_thumb_path,
+                            reframe_mode=mode
+                        )
+                    )
 
             self.status = PipelineStatus.COMPLETED
             if progress_callback:

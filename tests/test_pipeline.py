@@ -35,3 +35,68 @@ def test_generate_thumbnail_command(tmp_path):
         assert "-ss" in args
         assert "-vframes" in args
         assert "1" in args
+
+def test_pipeline_montage_mode_execution(tmp_path):
+    from clipmax.ai_gateway import ViralClipCandidate, MontageCut
+    from clipmax.transcriber import WordSegment
+    from clipmax.reframe import SceneSegment
+
+    cfg = AppConfig(temp_dir=str(tmp_path / "temp"), staging_dir=str(tmp_path / "staging"))
+    orchestrator = PipelineOrchestrator(cfg)
+
+    dummy_video = tmp_path / "input.mp4"
+    dummy_video.touch()
+
+    montage_candidate = ViralClipCandidate(
+        title="Gaming Montage",
+        hook="Epic play",
+        start_time=10.0,
+        end_time=50.0,
+        virality_score=92,
+        reasoning="Multi cut highlights",
+        mode="montage",
+        cuts=[
+            MontageCut(start=10.0, end=25.0, event="First Blood"),
+            MontageCut(start=35.0, end=50.0, event="Victory Push")
+        ]
+    )
+
+    dummy_words = [
+        WordSegment(word="First", start=11.0, end=11.5, probability=0.9),
+        WordSegment(word="Blood", start=11.6, end=12.2, probability=0.9),
+        WordSegment(word="Victory", start=36.0, end=36.8, probability=0.9),
+    ]
+
+    with patch("clipmax.pipeline.extract_audio") as mock_audio, \
+         patch("clipmax.pipeline.transcribe_audio") as mock_transcribe, \
+         patch("clipmax.pipeline.evaluate_viral_clips") as mock_eval, \
+         patch("clipmax.pipeline.segment_clip_scenes") as mock_scenes, \
+         patch("clipmax.pipeline.render_clip") as mock_render, \
+         patch("clipmax.pipeline.generate_kinetic_ass") as mock_ass, \
+         patch("clipmax.pipeline.generate_thumbnail") as mock_thumb, \
+         patch("subprocess.run") as mock_subproc, \
+         patch("shutil.copy2") as mock_copy:
+
+        mock_audio.return_value = str(tmp_path / "temp" / "audio.wav")
+        mock_transcribe.return_value = (dummy_words, "Full transcript")
+        mock_eval.return_value = [montage_candidate]
+        mock_scenes.return_value = [
+            SceneSegment(start_time=10.0, end_time=25.0, mode="CROP_TRACKING", crop_x="500")
+        ]
+        mock_thumb.return_value = "thumb.jpg"
+        mock_subproc.return_value = MagicMock(returncode=0)
+
+        results = orchestrator.run(
+            input_source=str(dummy_video),
+            clip_mode="montage"
+        )
+
+        assert len(results) == 1
+        res = results[0]
+        assert res.title == "Gaming Montage"
+        assert res.reframe_mode == "MONTAGE"
+        assert res.virality_score == 92
+        # Verify render_clip called once per cut (2 cuts = 2 calls)
+        assert mock_render.call_count == 2
+        # Verify generate_kinetic_ass called
+        assert mock_ass.call_count == 1

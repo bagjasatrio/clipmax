@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const inputTargetClips = document.getElementById("inputTargetClips");
   const selectDuration = document.getElementById("selectDuration");
+  const selectClipMode = document.getElementById("selectClipMode");
   const inputRules = document.getElementById("inputRules");
 
   const btnGenerate = document.getElementById("btnGenerate");
@@ -135,6 +136,9 @@ document.addEventListener("DOMContentLoaded", () => {
       inputApiKey.value = cfg.api_key || "";
       inputTargetClips.value = cfg.target_clip_count || 3;
       inputRules.value = cfg.campaign_rules || "";
+      if (selectClipMode && cfg.clip_mode) {
+        selectClipMode.value = cfg.clip_mode;
+      }
 
       await refreshModels(cfg.selected_model);
     } catch (e) {
@@ -258,6 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const durVal = selectDuration.value;
     if (durVal === "short") { minD = 15; maxD = 30; }
     else if (durVal === "long") { minD = 60; maxD = 90; }
+    const clipModeVal = selectClipMode ? selectClipMode.value : "single";
 
     await fetch("/api/config", {
       method: "POST",
@@ -270,7 +275,8 @@ document.addEventListener("DOMContentLoaded", () => {
         duration_preset: durVal,
         min_duration: minD,
         max_duration: maxD,
-        campaign_rules: inputRules.value.trim()
+        campaign_rules: inputRules.value.trim(),
+        clip_mode: clipModeVal
       })
     });
 
@@ -287,7 +293,8 @@ document.addEventListener("DOMContentLoaded", () => {
           target_clip_count: parseInt(inputTargetClips.value) || 3,
           min_duration: minD,
           max_duration: maxD,
-          campaign_rules: inputRules.value.trim()
+          campaign_rules: inputRules.value.trim(),
+          clip_mode: clipModeVal
         })
       });
       if (!res.ok) {
@@ -383,7 +390,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="flex items-center space-x-2 text-[10px] text-gray-400">
             <span>⏱ ${durSec}s</span>
             <span>•</span>
-            <span class="truncate">${clip.reframe_mode || "Crop 9:16"}</span>
+            ${clip.reframe_mode === "MONTAGE" 
+              ? '<span class="px-1.5 py-0.2 rounded bg-purple-900/60 text-purple-300 font-medium text-[9px]">✂ Multi-Cut Montage</span>' 
+              : `<span class="truncate">${clip.reframe_mode || "Crop 9:16"}</span>`}
           </div>
         </div>
       `;
