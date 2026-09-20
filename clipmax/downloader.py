@@ -40,29 +40,28 @@ def find_manual_cookie_file() -> Optional[str]:
 
 def get_ydl_options(output_path: str, active_cookie_path: Optional[str] = None) -> Dict[str, Any]:
     """
-    Returns yt-dlp options prioritizing active cookies.txt without any cookiesfrombrowser dependency.
+    Returns yt-dlp options using login-free tv_embedded / creator clients with optional cookies.txt.
     """
     ydl_opts: Dict[str, Any] = {
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "outtmpl": output_path,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["tv_embedded", "creator"],
+                "player_skip": ["webpage", "configs"]
+            }
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (PlayStation 4 9.00) AppleWebKit/537.78 (KHTML, like Gecko)"
+        },
         "nocheckcertificate": True,
-        "quiet": True,
         "no_warnings": True,
+        "quiet": False
     }
 
     cookie = active_cookie_path or find_manual_cookie_file()
     if cookie and os.path.isfile(cookie):
         ydl_opts["cookiefile"] = cookie
-    else:
-        ydl_opts["extractor_args"] = {
-            "youtube": {
-                "player_client": ["android", "ios"],
-                "player_skip": ["webpage", "configs"]
-            }
-        }
-        ydl_opts["http_headers"] = {
-            "User-Agent": "com.google.android.youtube/19.05.36 (Linux; U; Android 14; US) gzip"
-        }
 
     return ydl_opts
 
@@ -105,94 +104,81 @@ def download_video(
     # Build strategies without cookiesfrombrowser:
     strategies: List[Tuple[str, Dict[str, Any]]] = []
 
-    # 1. If cookies.txt is provided, try with cookiefile first
-    if active_cookie and os.path.isfile(active_cookie):
-        strategies.append((
-            "Manual cookies.txt",
-            {
-                "outtmpl": out_template,
-                "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-                "merge_output_format": "mp4",
-                "ffmpeg_location": ffmpeg_bin,
-                "cookiefile": active_cookie,
-                "nocheckcertificate": True,
-                "quiet": True,
-                "no_warnings": True,
-                "progress_hooks": [progress_hook],
-                "ignoreerrors": False,
-                "extract_flat": False,
+    # 1. Primary Strategy: TV Embedded / Creator (100% login-free, no GVS PO Token required)
+    opts_tv: Dict[str, Any] = {
+        "outtmpl": out_template,
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "merge_output_format": "mp4",
+        "ffmpeg_location": ffmpeg_bin,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["tv_embedded", "creator"],
+                "player_skip": ["webpage", "configs"]
             }
-        ))
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (PlayStation 4 9.00) AppleWebKit/537.78 (KHTML, like Gecko)"
+        },
+        "nocheckcertificate": True,
+        "no_warnings": True,
+        "quiet": False,
+        "progress_hooks": [progress_hook],
+        "ignoreerrors": False,
+        "extract_flat": False,
+    }
+    if active_cookie and os.path.isfile(active_cookie):
+        opts_tv["cookiefile"] = active_cookie
+        strategies.append(("TV Embedded / Creator (dengan cookies.txt)", opts_tv))
+    else:
+        strategies.append(("TV Embedded / Creator (Bebas Login)", opts_tv))
 
-    # 2. Android + iOS Mobile Client (safe anti-bot bypass)
-    strategies.append((
-        "Android/iOS Mobile Client",
-        {
-            "outtmpl": out_template,
-            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-            "merge_output_format": "mp4",
-            "ffmpeg_location": ffmpeg_bin,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android", "ios"],
-                    "player_skip": ["webpage", "configs"]
-                }
-            },
-            "http_headers": {
-                "User-Agent": "com.google.android.youtube/19.05.36 (Linux; U; Android 14; US) gzip"
-            },
-            "nocheckcertificate": True,
-            "quiet": True,
-            "no_warnings": True,
-            "progress_hooks": [progress_hook],
-            "ignoreerrors": False,
-            "extract_flat": False,
-        }
-    ))
+    # 2. Android + iOS Mobile Client Fallback
+    opts_mobile: Dict[str, Any] = {
+        "outtmpl": out_template,
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "merge_output_format": "mp4",
+        "ffmpeg_location": ffmpeg_bin,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios"],
+                "player_skip": ["webpage", "configs"]
+            }
+        },
+        "http_headers": {
+            "User-Agent": "com.google.android.youtube/19.05.36 (Linux; U; Android 14; US) gzip"
+        },
+        "nocheckcertificate": True,
+        "no_warnings": True,
+        "quiet": False,
+        "progress_hooks": [progress_hook],
+        "ignoreerrors": False,
+        "extract_flat": False,
+    }
+    if active_cookie and os.path.isfile(active_cookie):
+        opts_mobile["cookiefile"] = active_cookie
+    strategies.append(("Android/iOS Mobile Client", opts_mobile))
 
     # 3. Android + Web Client fallback
-    strategies.append((
-        "Android/Web Client",
-        {
-            "outtmpl": out_template,
-            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-            "merge_output_format": "mp4",
-            "ffmpeg_location": ffmpeg_bin,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android", "web"]
-                }
-            },
-            "nocheckcertificate": True,
-            "quiet": True,
-            "no_warnings": True,
-            "progress_hooks": [progress_hook],
-            "ignoreerrors": False,
-            "extract_flat": False,
-        }
-    ))
-
-    # 4. TV / Safari Client fallback
-    strategies.append((
-        "TV/Safari Client",
-        {
-            "outtmpl": out_template,
-            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-            "merge_output_format": "mp4",
-            "ffmpeg_location": ffmpeg_bin,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["tv", "web_safari"]
-                }
-            },
-            "nocheckcertificate": True,
-            "quiet": True,
-            "no_warnings": True,
-            "progress_hooks": [progress_hook],
-            "ignoreerrors": False,
-            "extract_flat": False,
-        }
-    ))
+    opts_web: Dict[str, Any] = {
+        "outtmpl": out_template,
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "merge_output_format": "mp4",
+        "ffmpeg_location": ffmpeg_bin,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"]
+            }
+        },
+        "nocheckcertificate": True,
+        "no_warnings": True,
+        "quiet": False,
+        "progress_hooks": [progress_hook],
+        "ignoreerrors": False,
+        "extract_flat": False,
+    }
+    if active_cookie and os.path.isfile(active_cookie):
+        opts_web["cookiefile"] = active_cookie
+    strategies.append(("Android/Web Client", opts_web))
 
     last_error: Optional[Exception] = None
 

@@ -24,8 +24,9 @@ def test_get_ydl_options_structure():
         assert "format" in opts
         assert "outtmpl" in opts
         assert "cookiesfrombrowser" not in opts
-        assert opts["extractor_args"]["youtube"]["player_client"] == ["android", "ios"]
-        assert "com.google.android.youtube" in opts["http_headers"]["User-Agent"]
+        assert opts["extractor_args"]["youtube"]["player_client"] == ["tv_embedded", "creator"]
+        assert "Mozilla/5.0 (PlayStation 4 9.00)" in opts["http_headers"]["User-Agent"]
+        assert opts["quiet"] is False
 
 def test_find_manual_cookie_file(tmp_path):
     cookie_txt = tmp_path / "cookies.txt"
