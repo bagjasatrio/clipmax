@@ -43,6 +43,33 @@ def extract_video_id(url: str) -> Optional[str]:
     match = re.search(r'(?:[?&]v=|\/embed\/|\/shorts\/|\/v\/|youtu\.be\/)([0-9A-Za-z_-]{11})', url)
     return match.group(1) if match else None
 
+def _download_file_stream(
+    url: str,
+    target_path: str,
+    cancel_event: Optional[threading.Event] = None,
+    progress_callback: Optional[Callable[[int, str], None]] = None,
+    label: str = "Invidious"
+) -> bool:
+    try:
+        with requests.get(url, stream=True, timeout=60) as r:
+            r.raise_for_status()
+            total_size = int(r.headers.get("content-length", 0))
+            downloaded = 0
+            with open(target_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1024 * 1024):
+                    if cancel_event and cancel_event.is_set():
+                        return False
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if progress_callback and total_size > 0:
+                            pct = int((downloaded / total_size) * 100)
+                            progress_callback(pct, f"Mengunduh {label}: {pct}%")
+            return os.path.exists(target_path) and os.path.getsize(target_path) > 0
+    except Exception as e:
+        print(f"[Invidious Stream Error] {label}: {e}")
+        return False
+
 def download_via_invidious(
     youtube_url: str,
     output_path: str,
@@ -51,6 +78,7 @@ def download_via_invidious(
 ) -> bool:
     """
     Downloads YouTube video stream using public Invidious instances without requiring login or cookies.
+    Strictly prioritizes Full HD 1080p streams before falling back to lower resolutions.
     """
     video_id = extract_video_id(youtube_url)
     if not video_id:
@@ -79,32 +107,70 @@ def download_via_invidious(
 
             data = resp.json()
             format_streams = data.get("formatStreams", [])
-            if not format_streams:
-                continue
+            adaptive_formats = data.get("adaptiveFormats", [])
 
-            # Sort by highest qualityLabel number
-            best_stream = max(
-                format_streams,
-                key=lambda s: int(re.sub(r'\D', '', str(s.get("qualityLabel", "0"))) or 0)
-            )
-            direct_download_url = best_stream.get("url")
-
-            if direct_download_url:
-                with requests.get(direct_download_url, stream=True, timeout=60) as r:
-                    r.raise_for_status()
-                    total_size = int(r.headers.get("content-length", 0))
-                    downloaded = 0
-                    with open(output_path, "wb") as f:
-                        for chunk in r.iter_content(chunk_size=1024 * 1024):
-                            if cancel_event and cancel_event.is_set():
-                                return False
-                            if chunk:
-                                f.write(chunk)
-                                downloaded += len(chunk)
-                                if progress_callback and total_size > 0:
-                                    pct = int((downloaded / total_size) * 100)
-                                    progress_callback(pct, f"Mengunduh via Invidious: {pct}%")
+            # 1. Prioritize formatStreams with >= 1080p
+            high_muxed = [
+                s for s in format_streams
+                if int(re.sub(r'\D', '', str(s.get("qualityLabel", "0"))) or 0) >= 1080 and s.get("url")
+            ]
+            if high_muxed:
+                best_stream = max(
+                    high_muxed,
+                    key=lambda s: int(re.sub(r'\D', '', str(s.get("qualityLabel", "0"))) or 0)
+                )
+                if _download_file_stream(best_stream.get("url"), output_path, cancel_event, progress_callback, "1080p Invidious"):
                     return True
+
+            # 2. Check adaptiveFormats for 1080p video + audio
+            v1080_candidates = [
+                f for f in adaptive_formats
+                if "video" in f.get("type", "") and (
+                    int(re.sub(r'\D', '', str(f.get("qualityLabel", "0"))) or 0) >= 1080
+                    or (f.get("height") and f.get("height") >= 1080)
+                ) and f.get("url")
+            ]
+            audio_candidates = [
+                f for f in adaptive_formats
+                if "audio" in f.get("type", "") and f.get("url")
+            ]
+
+            if v1080_candidates and audio_candidates:
+                best_video = max(
+                    v1080_candidates,
+                    key=lambda s: int(re.sub(r'\D', '', str(s.get("qualityLabel", "0"))) or 0)
+                )
+                best_audio = audio_candidates[0]
+                temp_v = str(Path(output_path).with_suffix(".temp_v.mp4"))
+                temp_a = str(Path(output_path).with_suffix(".temp_a.m4a"))
+                try:
+                    ok_v = _download_file_stream(best_video.get("url"), temp_v, cancel_event, progress_callback, "1080p Video")
+                    ok_a = _download_file_stream(best_audio.get("url"), temp_a, cancel_event, None, "Audio")
+                    if ok_v and ok_a:
+                        ffmpeg_bin = get_ffmpeg_bin()
+                        mux_cmd = [
+                            ffmpeg_bin, "-y",
+                            "-i", temp_v,
+                            "-i", temp_a,
+                            "-c", "copy",
+                            str(Path(output_path).resolve())
+                        ]
+                        subprocess.run(mux_cmd, capture_output=True)
+                        if os.path.exists(output_path) and os.path.getsize(output_path) > 1024:
+                            return True
+                finally:
+                    Path(temp_v).unlink(missing_ok=True)
+                    Path(temp_a).unlink(missing_ok=True)
+
+            # 3. If no 1080p found, fallback to highest available in format_streams
+            if format_streams:
+                best_stream = max(
+                    format_streams,
+                    key=lambda s: int(re.sub(r'\D', '', str(s.get("qualityLabel", "0"))) or 0)
+                )
+                if best_stream.get("url"):
+                    if _download_file_stream(best_stream.get("url"), output_path, cancel_event, progress_callback, "Invidious"):
+                        return True
         except Exception as e:
             print(f"[Invidious] Error fetching from {base_url}: {e}")
             continue
@@ -114,18 +180,19 @@ def download_via_invidious(
 def get_ydl_options(output_path: str, **kwargs) -> Dict[str, Any]:
     """
     Returns yt-dlp options configured for safe fallback without requiring login or cookies.
+    Forces highest resolution (1080p / bestvideo+bestaudio).
     """
     return {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best[height>=1080]/best[ext=mp4]/best",
         "outtmpl": output_path,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "ios"],
+                "player_client": ["tv_embedded", "creator", "android", "ios"],
                 "player_skip": ["webpage", "configs"]
             }
         },
         "http_headers": {
-            "User-Agent": "com.google.android.youtube/19.05.36 (Linux; U; Android 14; US) gzip"
+            "User-Agent": "Mozilla/5.0 (PlayStation 4 9.00) AppleWebKit/537.78 (KHTML, like Gecko)"
         },
         "nocheckcertificate": True,
         "no_warnings": True,

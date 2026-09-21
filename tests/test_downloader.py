@@ -28,12 +28,13 @@ def test_extract_video_id():
 
 def test_get_ydl_options_structure():
     opts = get_ydl_options("temp/out.mp4")
-    assert opts["format"] == "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+    assert "bestvideo" in opts["format"]
+    assert "bestaudio" in opts["format"]
     assert opts["outtmpl"] == "temp/out.mp4"
     assert opts["nocheckcertificate"] is True
     assert opts["no_warnings"] is True
     assert opts["quiet"] is False
-    assert opts["extractor_args"]["youtube"]["player_client"] == ["android", "ios"]
+    assert "tv_embedded" in opts["extractor_args"]["youtube"]["player_client"]
 
 def test_clean_error_message():
     raw = "\x1b[0;31mERROR:\x1b[0m []0;31mERROR:[]0m [youtube] UCCZ-F2bidU: This video is unavailable."

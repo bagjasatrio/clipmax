@@ -317,8 +317,15 @@ class PipelineOrchestrator:
                             "-safe", "0",
                             "-i", concat_list_path,
                             "-c:v", "h264_nvenc",
-                            "-preset", "p4",
+                            "-preset", "p6",
+                            "-tune", "hq",
+                            "-rc", "vbr",
+                            "-cq", "19",
+                            "-b:v", "6M",
+                            "-maxrate", "10M",
+                            "-bufsize", "12M",
                             "-c:a", "aac",
+                            "-b:a", "192k",
                             uncaptioned_montage
                         ]
                         subprocess.run(concat_cmd_fb, capture_output=True)
@@ -358,7 +365,13 @@ class PipelineOrchestrator:
                             "-i", uncaptioned_montage,
                             "-vf", f"subtitles='{escaped_ass}'",
                             "-c:v", "h264_nvenc",
-                            "-preset", "p4",
+                            "-preset", "p6",
+                            "-tune", "hq",
+                            "-rc", "vbr",
+                            "-cq", "19",
+                            "-b:v", "6M",
+                            "-maxrate", "10M",
+                            "-bufsize", "12M",
                             "-c:a", "copy",
                             staging_clip_path
                         ]

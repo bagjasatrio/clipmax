@@ -69,8 +69,8 @@ class AppConfig(BaseModel):
     output_dir: str = str(Path("./output").resolve())
     temp_dir: str = str(Path("./temp").resolve())
     reframe_split_mode: bool = True
-    nvenc_preset: str = "p4"
-    video_bitrate: str = "6000k"
+    nvenc_preset: str = "p6"
+    video_bitrate: str = "6M"
     audio_bitrate: str = "192k"
     target_clip_count: int = 3
     duration_preset: str = "Auto / Optimal (30-60s)"

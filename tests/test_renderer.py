@@ -55,7 +55,8 @@ def test_render_clip_command_blurred_background():
         assert "-filter_complex" in args
         fc_idx = args.index("-filter_complex") + 1
         fc_str = args[fc_idx]
-        assert "boxblur=25:5" in fc_str
+        assert "boxblur=20:20" in fc_str
+        assert "flags=lanczos" in fc_str
         assert "overlay=(W-w)/2:(H-h)/2" in fc_str
         assert "subtitles='C\\:/temp/sub.ass'" in fc_str
         assert "-c:v" in args
@@ -144,7 +145,8 @@ def test_render_clip_single_scene_respects_scene_mode():
         args_blur = mock_popen.call_args[0][0]
         assert "-filter_complex" in args_blur
         fc_blur = args_blur[args_blur.index("-filter_complex") + 1]
-        assert "boxblur=25:5" in fc_blur
+        assert "boxblur=20:20" in fc_blur
+        assert "flags=lanczos" in fc_blur
         assert "overlay=(W-w)/2:(H-h)/2" in fc_blur
 
         # 2. Single scene with CROP_9_16 (Centered talking head)
