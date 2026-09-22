@@ -96,3 +96,49 @@ def generate_kinetic_ass(
         f.write("\n")
 
     return str(out_p.resolve())
+
+def generate_overlay_ass(
+    text: str,
+    duration: float,
+    output_ass_path: str,
+    font_name: str = "Impact",
+    font_size: int = 56,
+    text_color: str = "#FFFFFF",
+    bg_color: str = "#000000",
+    has_bg: bool = True,
+    position: str = "top"
+) -> str:
+    """Generates an ASS subtitle file for burning a custom text/title overlay."""
+    out_p = Path(output_ass_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+
+    t_ass = to_ass_color(text_color)
+    bg_ass = to_ass_color(bg_color)
+    border_style = 3 if has_bg else 1
+    outline_pad = 10 if has_bg else 4
+    shadow_depth = 0 if has_bg else 2
+    align = 8 if position == "top" else (5 if position == "center" else 2)
+    margin_v = 160 if position == "top" else (0 if position == "center" else 480)
+
+    header = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: OverlayText,{font_name},{font_size},{t_ass},{t_ass},{bg_ass},{bg_ass},-1,0,0,0,100,100,1,0,{border_style},{outline_pad},{shadow_depth},{align},50,50,{margin_v},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    clean_text = text.strip().replace("\r", "").replace("\n", r"\N")
+    end_str = format_ass_time(max(0.1, duration))
+    event_line = f"Dialogue: 2,0:00:00.00,{end_str},OverlayText,,0,0,0,,{clean_text}\n"
+
+    with open(out_p, "w", encoding="utf-8") as f:
+        f.write(header)
+        f.write(event_line)
+
+    return str(out_p.resolve())

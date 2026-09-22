@@ -72,6 +72,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnMin = document.getElementById("btnMin");
   const btnClose = document.getElementById("btnClose");
 
+  // Video Text Overlay Elements
+  const liveTextOverlay = document.getElementById("liveTextOverlay");
+  const inputOverlayText = document.getElementById("inputOverlayText");
+  const selectOverlayFont = document.getElementById("selectOverlayFont");
+  const selectOverlayPosition = document.getElementById("selectOverlayPosition");
+  const pickerOverlayTextColor = document.getElementById("pickerOverlayTextColor");
+  const lblOverlayTextColor = document.getElementById("lblOverlayTextColor");
+  const selectOverlayBgStyle = document.getElementById("selectOverlayBgStyle");
+  const btnApplyOverlay = document.getElementById("btnApplyOverlay");
+  const lblApplyOverlay = document.getElementById("lblApplyOverlay");
+  const btnRemoveOverlay = document.getElementById("btnRemoveOverlay");
+  const badgeOverlayStatus = document.getElementById("badgeOverlayStatus");
+
   // Step Indicators
   const stepElements = {
     ingest: document.getElementById("step-ingest"),
@@ -483,6 +496,23 @@ document.addEventListener("DOMContentLoaded", () => {
     activeClipHook.textContent = `"${clip.hook}"`;
     activeClipReason.textContent = clip.reasoning || "";
 
+    // Reset or populate overlay settings for this clip
+    if (inputOverlayText) {
+      inputOverlayText.value = clip.overlay_text || "";
+      if (selectOverlayFont) selectOverlayFont.value = clip.overlay_font || "Montserrat";
+      if (selectOverlayPosition) selectOverlayPosition.value = clip.overlay_position || "top";
+      if (pickerOverlayTextColor) {
+        pickerOverlayTextColor.value = clip.overlay_text_color || "#FFFFFF";
+        if (lblOverlayTextColor) lblOverlayTextColor.textContent = pickerOverlayTextColor.value.toUpperCase();
+      }
+      if (selectOverlayBgStyle) selectOverlayBgStyle.value = clip.overlay_bg_style || "solid_black";
+      if (badgeOverlayStatus) {
+        badgeOverlayStatus.textContent = clip.has_overlay ? "Terbakar di Video" : "Live Preview";
+        badgeOverlayStatus.className = clip.has_overlay ? "text-[10px] text-emerald-400 font-mono" : "text-[10px] text-gray-400 font-mono";
+      }
+      updateLiveOverlayPreview();
+    }
+
     renderClipsGallery(currentClips);
   }
 
@@ -555,6 +585,192 @@ document.addEventListener("DOMContentLoaded", () => {
       muteIcon.textContent = "🔇";
     }
   });
+
+  // Video Text Overlay Live Preview & Handlers
+  function updateLiveOverlayPreview() {
+    if (!liveTextOverlay || !inputOverlayText) return;
+    const txt = inputOverlayText.value.trim();
+    if (!txt) {
+      liveTextOverlay.classList.add("hidden");
+      return;
+    }
+
+    liveTextOverlay.classList.remove("hidden");
+    liveTextOverlay.textContent = txt;
+
+    // Font Family
+    const font = selectOverlayFont ? selectOverlayFont.value : "Montserrat";
+    liveTextOverlay.style.fontFamily = font;
+
+    // Text Color
+    const textColor = pickerOverlayTextColor ? pickerOverlayTextColor.value : "#FFFFFF";
+    liveTextOverlay.style.color = textColor;
+
+    // Background Style
+    const bgStyle = selectOverlayBgStyle ? selectOverlayBgStyle.value : "solid_black";
+    liveTextOverlay.style.textShadow = "none";
+    liveTextOverlay.style.border = "none";
+
+    if (bgStyle === "solid_black") {
+      liveTextOverlay.style.backgroundColor = "#000000";
+    } else if (bgStyle === "semi_black") {
+      liveTextOverlay.style.backgroundColor = "rgba(0, 0, 0, 0.65)";
+    } else if (bgStyle === "yellow_viral") {
+      liveTextOverlay.style.backgroundColor = "#FFE81F";
+      liveTextOverlay.style.color = "#000000";
+    } else if (bgStyle === "red_alert") {
+      liveTextOverlay.style.backgroundColor = "#FF2A2A";
+    } else if (bgStyle === "none") {
+      liveTextOverlay.style.backgroundColor = "transparent";
+      liveTextOverlay.style.textShadow = "2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000";
+    }
+
+    // Position
+    const pos = selectOverlayPosition ? selectOverlayPosition.value : "top";
+    if (pos === "top") {
+      liveTextOverlay.style.top = "10%";
+      liveTextOverlay.style.bottom = "auto";
+      liveTextOverlay.style.transform = "none";
+    } else if (pos === "center") {
+      liveTextOverlay.style.top = "50%";
+      liveTextOverlay.style.bottom = "auto";
+      liveTextOverlay.style.transform = "translateY(-50%)";
+    } else if (pos === "bottom") {
+      liveTextOverlay.style.top = "auto";
+      liveTextOverlay.style.bottom = "26%";
+      liveTextOverlay.style.transform = "none";
+    }
+  }
+
+  if (inputOverlayText) {
+    inputOverlayText.addEventListener("input", updateLiveOverlayPreview);
+  }
+  if (selectOverlayFont) {
+    selectOverlayFont.addEventListener("change", updateLiveOverlayPreview);
+  }
+  if (selectOverlayPosition) {
+    selectOverlayPosition.addEventListener("change", updateLiveOverlayPreview);
+  }
+  if (pickerOverlayTextColor) {
+    pickerOverlayTextColor.addEventListener("input", () => {
+      if (lblOverlayTextColor) lblOverlayTextColor.textContent = pickerOverlayTextColor.value.toUpperCase();
+      updateLiveOverlayPreview();
+    });
+  }
+  if (selectOverlayBgStyle) {
+    selectOverlayBgStyle.addEventListener("change", updateLiveOverlayPreview);
+  }
+
+  if (btnApplyOverlay) {
+    btnApplyOverlay.addEventListener("click", async () => {
+      if (!selectedClip) {
+        alert("Pilih klip terlebih dahulu dari galeri di sebelah kanan.");
+        return;
+      }
+      const text = inputOverlayText.value.trim();
+      if (!text) {
+        alert("Harap masukkan teks video terlebih dahulu.");
+        return;
+      }
+
+      btnApplyOverlay.disabled = true;
+      const originalHTML = btnApplyOverlay.innerHTML;
+      btnApplyOverlay.innerHTML = `<span class="animate-spin mr-1">⌛</span><span>Merender Teks...</span>`;
+
+      const bgStyle = selectOverlayBgStyle ? selectOverlayBgStyle.value : "solid_black";
+      let bgColor = "#000000";
+      let hasBg = true;
+      if (bgStyle === "yellow_viral") bgColor = "#FFE81F";
+      else if (bgStyle === "red_alert") bgColor = "#FF2A2A";
+      else if (bgStyle === "none") { bgColor = "#000000"; hasBg = false; }
+
+      let textColor = pickerOverlayTextColor ? pickerOverlayTextColor.value : "#FFFFFF";
+      if (bgStyle === "yellow_viral") textColor = "#000000";
+
+      try {
+        const resp = await fetch("/api/clips/overlay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clip_id: selectedClip.clip_id,
+            text: text,
+            font_name: selectOverlayFont ? selectOverlayFont.value : "Montserrat",
+            font_size: 56,
+            text_color: textColor,
+            bg_color: bgColor,
+            has_bg: hasBg,
+            position: selectOverlayPosition ? selectOverlayPosition.value : "top"
+          })
+        });
+
+        const data = await resp.json();
+        if (resp.ok) {
+          // Hide DOM live overlay since text is now burned into the video
+          if (liveTextOverlay) liveTextOverlay.classList.add("hidden");
+
+          // Save metadata into clip
+          selectedClip.overlay_text = text;
+          selectedClip.overlay_font = selectOverlayFont ? selectOverlayFont.value : "Montserrat";
+          selectedClip.overlay_position = selectOverlayPosition ? selectOverlayPosition.value : "top";
+          selectedClip.overlay_text_color = textColor;
+          selectedClip.overlay_bg_style = bgStyle;
+          selectedClip.has_overlay = true;
+
+          if (badgeOverlayStatus) {
+            badgeOverlayStatus.textContent = "Terbakar di Video";
+            badgeOverlayStatus.className = "text-[10px] text-emerald-400 font-mono";
+          }
+
+          // Reload video with cache buster
+          const vidName = selectedClip.staging_path ? selectedClip.staging_path.split(/[\\/]/).pop() : "";
+          mainVideo.src = `/staging/${vidName}?t=${Date.now()}`;
+          mainVideo.load();
+          mainVideo.play().catch(() => {});
+        } else {
+          alert(`Gagal merender teks: ${data.detail || "Terjadi kesalahan."}`);
+        }
+      } catch (err) {
+        console.error("Error applying overlay:", err);
+        alert(`Error merender teks: ${err.message}`);
+      } finally {
+        btnApplyOverlay.disabled = false;
+        btnApplyOverlay.innerHTML = originalHTML;
+      }
+    });
+  }
+
+  if (btnRemoveOverlay) {
+    btnRemoveOverlay.addEventListener("click", async () => {
+      if (!selectedClip) return;
+      btnRemoveOverlay.disabled = true;
+      try {
+        const resp = await fetch("/api/clips/remove-overlay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clip_id: selectedClip.clip_id })
+        });
+        if (resp.ok) {
+          if (inputOverlayText) inputOverlayText.value = "";
+          selectedClip.overlay_text = "";
+          selectedClip.has_overlay = false;
+          if (liveTextOverlay) liveTextOverlay.classList.add("hidden");
+          if (badgeOverlayStatus) {
+            badgeOverlayStatus.textContent = "Live Preview";
+            badgeOverlayStatus.className = "text-[10px] text-gray-400 font-mono";
+          }
+          // Reload original video
+          const vidName = selectedClip.staging_path ? selectedClip.staging_path.split(/[\\/]/).pop() : "";
+          mainVideo.src = `/staging/${vidName}?t=${Date.now()}`;
+          mainVideo.load();
+          mainVideo.play().catch(() => {});
+        }
+      } catch (err) {
+        console.error("Error removing overlay:", err);
+      } finally {
+        btnRemoveOverlay.disabled = false;
+      }
+    });
+  }
 
   // 11. Export Actions
   btnExportSingle.addEventListener("click", async () => {

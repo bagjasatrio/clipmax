@@ -190,3 +190,56 @@ def render_clip(
         raise RuntimeError(f"FFmpeg render failed: {err_msg}")
 
     return str(out_p.resolve())
+
+def apply_ass_overlay(
+    input_video: str,
+    output_video: str,
+    ass_path: str,
+    use_gpu: bool = True
+) -> str:
+    """Burns an ASS subtitle or text overlay onto an existing 9:16 video."""
+    in_p = Path(input_video)
+    if not in_p.exists():
+        raise FileNotFoundError(f"Input video not found: {input_video}")
+    out_p = Path(output_video)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+
+    escaped_ass = sanitize_ffmpeg_path(ass_path)
+    encoder = "h264_nvenc" if (use_gpu and is_nvenc_supported()) else "libx264"
+    preset = "p6" if encoder == "h264_nvenc" else "veryfast"
+
+    if encoder == "h264_nvenc":
+        encoder_args = [
+            "-c:v", "h264_nvenc",
+            "-preset", "p6",
+            "-tune", "hq",
+            "-rc", "vbr",
+            "-cq", "19",
+            "-b:v", "6M",
+            "-maxrate", "10M",
+            "-bufsize", "12M",
+            "-c:a", "copy"
+        ]
+    else:
+        encoder_args = [
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "18",
+            "-c:a", "copy"
+        ]
+
+    cmd = [
+        get_ffmpeg_bin(),
+        "-y",
+        "-i", str(in_p.resolve()),
+        "-vf", f"subtitles='{escaped_ass}'",
+        *encoder_args,
+        str(out_p.resolve())
+    ]
+
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        print(f"[Overlay Render ERROR] FFmpeg failed: {proc.stderr}", file=sys.stderr)
+        raise RuntimeError(f"FFmpeg overlay rendering failed: {proc.stderr}")
+
+    return str(out_p.resolve())

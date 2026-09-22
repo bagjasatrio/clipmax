@@ -54,3 +54,28 @@ def test_generate_kinetic_ass_custom_colors(tmp_path):
     assert "&H001FE8FF&" in content
     assert "&H00FFFFFF&" in content
 
+def test_generate_overlay_ass(tmp_path):
+    from clipmax.subtitle import generate_overlay_ass
+
+    out_file = tmp_path / "overlay_test.ass"
+    res = generate_overlay_ass(
+        text="FAKTA MENARIK!\nTONTON SAMPAI HABIS",
+        duration=20.5,
+        output_ass_path=str(out_file),
+        font_name="Impact",
+        font_size=56,
+        text_color="#FFE81F",
+        bg_color="#000000",
+        has_bg=True,
+        position="top"
+    )
+
+    assert Path(res).exists()
+    content = out_file.read_text(encoding="utf-8")
+    assert "Style: OverlayText,Impact,56" in content
+    # BorderStyle=3 for background box
+    assert ",3,10,0,8,50,50,160,1" in content
+    # Text in dialogue event with \N for newline
+    assert r"Dialogue: 2,0:00:00.00,0:00:20.50,OverlayText,,0,0,0,,FAKTA MENARIK!\NTONTON SAMPAI HABIS" in content
+
+

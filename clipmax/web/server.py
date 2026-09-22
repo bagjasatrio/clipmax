@@ -1,4 +1,5 @@
 import os
+import time
 import shutil
 import asyncio
 import threading
@@ -16,6 +17,8 @@ from clipmax.config import AppConfig, is_cuda_available, clear_temp_cache
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
 from clipmax.ai_gateway import discover_models
 from clipmax.downloader import is_valid_video_url, clean_error_message, extract_video_id, download_via_invidious
+from clipmax.subtitle import generate_overlay_ass
+from clipmax.renderer import apply_ass_overlay
 
 class PipelineStartRequest(BaseModel):
     input_source: str
@@ -49,6 +52,19 @@ class ExportSingleRequest(BaseModel):
 
 class ExportAllRequest(BaseModel):
     dest_dir: str
+
+class ClipOverlayRequest(BaseModel):
+    clip_id: int
+    text: str
+    font_name: str = "Impact"
+    font_size: int = 56
+    text_color: str = "#FFFFFF"
+    bg_color: str = "#000000"
+    has_bg: bool = True
+    position: str = "top"
+
+class RemoveOverlayRequest(BaseModel):
+    clip_id: int
 
 class AppState:
     def __init__(self):
@@ -336,6 +352,71 @@ def export_all_clips(req: ExportAllRequest):
             exported.append(str(target))
 
     return {"status": "ok", "exported_count": len(exported), "directory": str(dest_dir)}
+
+@app.post("/api/clips/overlay")
+def add_clip_overlay(req: ClipOverlayRequest):
+    clip = next((c for c in state.clips if c.clip_id == req.clip_id), None)
+    if not clip or not os.path.exists(clip.staging_path):
+        raise HTTPException(status_code=404, detail="Clip not found in staging")
+
+    staging_path = Path(clip.staging_path)
+    base_backup_path = staging_path.parent / f"{staging_path.stem}_base{staging_path.suffix}"
+
+    # Backup the original clip if not already backed up
+    if not base_backup_path.exists():
+        shutil.copy2(str(staging_path), str(base_backup_path))
+
+    temp_dir = Path(state.config.temp_dir)
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    ass_path = temp_dir / f"overlay_clip_{req.clip_id}.ass"
+
+    duration = max(0.1, clip.end_time - clip.start_time)
+    generate_overlay_ass(
+        text=req.text,
+        duration=duration,
+        output_ass_path=str(ass_path),
+        font_name=req.font_name,
+        font_size=req.font_size,
+        text_color=req.text_color,
+        bg_color=req.bg_color,
+        has_bg=req.has_bg,
+        position=req.position
+    )
+
+    temp_render_path = staging_path.parent / f"temp_{staging_path.name}"
+    try:
+        apply_ass_overlay(
+            input_video=str(base_backup_path),
+            output_video=str(temp_render_path),
+            ass_path=str(ass_path),
+            use_gpu=is_cuda_available()
+        )
+        if temp_render_path.exists():
+            shutil.move(str(temp_render_path), str(staging_path))
+    finally:
+        if temp_render_path.exists():
+            temp_render_path.unlink(missing_ok=True)
+
+    return {
+        "status": "ok",
+        "clip_id": req.clip_id,
+        "staging_path": str(staging_path),
+        "timestamp": time.time()
+    }
+
+@app.post("/api/clips/remove-overlay")
+def remove_clip_overlay(req: RemoveOverlayRequest):
+    clip = next((c for c in state.clips if c.clip_id == req.clip_id), None)
+    if not clip or not os.path.exists(clip.staging_path):
+        raise HTTPException(status_code=404, detail="Clip not found in staging")
+
+    staging_path = Path(clip.staging_path)
+    base_backup_path = staging_path.parent / f"{staging_path.stem}_base{staging_path.suffix}"
+
+    if base_backup_path.exists():
+        shutil.copy2(str(base_backup_path), str(staging_path))
+        return {"status": "ok", "message": "Overlay removed, reverted to base clip"}
+    return {"status": "ok", "message": "No base backup found"}
 
 # Native Desktop Dialog Bridge via pywebview (if running in desktop window)
 @app.post("/api/dialog/video")

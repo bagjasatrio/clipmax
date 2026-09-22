@@ -303,6 +303,9 @@
           <!-- 9:16 Video Canvas Box -->
           <div class="relative bg-black rounded-lg overflow-hidden border border-[#222938] shadow-2xl h-[480px] aspect-9-16 flex items-center justify-center">
             <video id="mainVideo" class="w-full h-full object-contain" preload="metadata" playsinline></video>
+            
+            <!-- Live Visual Text Overlay Layer -->
+            <div id="liveTextOverlay" class="absolute pointer-events-none hidden max-w-[85%] text-center font-bold px-3 py-1.5 rounded transition-all select-none z-10 leading-tight"></div>
           </div>
 
           <!-- Video Controls Bar -->
@@ -337,6 +340,80 @@
               </div>
               <p id="activeClipHook" class="text-indigo-300 italic text-[11px] line-clamp-1"></p>
               <p id="activeClipReason" class="text-gray-400 text-[11px] line-clamp-2"></p>
+            </div>
+
+            <!-- Video Text Overlay Panel -->
+            <div class="p-3 bg-[#131722] border border-[#222938] rounded-lg mt-2 text-xs space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="font-semibold text-gray-200 flex items-center space-x-1.5">
+                  <span>✍️</span>
+                  <span>Tambah / Edit Teks Video</span>
+                </span>
+                <span id="badgeOverlayStatus" class="text-[10px] text-gray-400 font-mono">Live Preview</span>
+              </div>
+
+              <!-- Text Input -->
+              <div>
+                <input type="text" id="inputOverlayText" placeholder="Tulis teks judul/hook video di sini..." class="w-full px-2.5 py-1.5 bg-[#0D1017] border border-[#222938] focus:border-indigo-500 rounded text-xs text-white placeholder-gray-600 outline-none transition">
+              </div>
+
+              <!-- Controls Grid: Font, Color, Background, Position -->
+              <div class="grid grid-cols-2 gap-2 text-[11px]">
+                <!-- Font Selection -->
+                <div>
+                  <label class="block text-gray-400 mb-0.5">Font:</label>
+                  <select id="selectOverlayFont" class="w-full px-2 py-1 bg-[#0D1017] border border-[#222938] rounded text-gray-200 outline-none">
+                    <option value="Impact">Impact (Viral Punchy)</option>
+                    <option value="Montserrat" selected>Montserrat (Modern)</option>
+                    <option value="Roboto">Roboto (Clean)</option>
+                    <option value="Arial">Arial (Sans-Serif)</option>
+                    <option value="Trebuchet MS">Trebuchet MS</option>
+                    <option value="Georgia">Georgia (Serif)</option>
+                  </select>
+                </div>
+
+                <!-- Position Selection -->
+                <div>
+                  <label class="block text-gray-400 mb-0.5">Posisi Teks:</label>
+                  <select id="selectOverlayPosition" class="w-full px-2 py-1 bg-[#0D1017] border border-[#222938] rounded text-gray-200 outline-none">
+                    <option value="top" selected>Atas (Header)</option>
+                    <option value="center">Tengah (Center)</option>
+                    <option value="bottom">Bawah (Di Atas Subtitle)</option>
+                  </select>
+                </div>
+
+                <!-- Text Color -->
+                <div>
+                  <label class="block text-gray-400 mb-0.5">Warna Teks:</label>
+                  <div class="flex items-center space-x-1.5">
+                    <input type="color" id="pickerOverlayTextColor" value="#FFFFFF" class="w-6 h-6 rounded cursor-pointer border border-[#222938] bg-transparent">
+                    <span id="lblOverlayTextColor" class="text-[10px] font-mono text-gray-300">#FFFFFF</span>
+                  </div>
+                </div>
+
+                <!-- Background Style -->
+                <div>
+                  <label class="block text-gray-400 mb-0.5">Background Teks:</label>
+                  <select id="selectOverlayBgStyle" class="w-full px-2 py-1 bg-[#0D1017] border border-[#222938] rounded text-gray-200 outline-none">
+                    <option value="solid_black" selected>Box Hitam Solid</option>
+                    <option value="semi_black">Box Hitam 60%</option>
+                    <option value="yellow_viral">Box Kuning Viral</option>
+                    <option value="red_alert">Box Merah Alert</option>
+                    <option value="none">Tanpa Background</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex items-center space-x-2 pt-1">
+                <button id="btnApplyOverlay" class="flex-1 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-semibold transition flex items-center justify-center space-x-1 shadow">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  <span id="lblApplyOverlay">Terapkan & Render Ulang</span>
+                </button>
+                <button id="btnRemoveOverlay" class="py-1.5 px-2.5 bg-gray-800 hover:bg-red-900/60 text-gray-300 hover:text-red-300 border border-[#222938] rounded text-xs transition" title="Hapus Teks & Kembalikan Klip Asli">
+                  Hapus Teks
+                </button>
+              </div>
             </div>
           </div>
 

@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from clipmax.web.server import app, state
@@ -138,4 +139,54 @@ def test_desktop_js_api_tuple_handling(tmp_path):
 
     assert saved == str(dest_file)
     assert dest_file.exists()
+
+def test_api_clip_overlay_and_remove(tmp_path):
+    clip_file = tmp_path / "clipmax_4_0.mp4"
+    clip_file.write_text("dummy mp4 video bytes")
+
+    dummy_clip = ClipResult(
+        clip_id=4,
+        title="Clip 4 Viral",
+        hook="Hook 4",
+        virality_score=95,
+        reasoning="Ok",
+        start_time=0.0,
+        end_time=20.0,
+        staging_path=str(clip_file)
+    )
+    state.clips = [dummy_clip]
+
+    with patch("clipmax.web.server.apply_ass_overlay") as mock_apply:
+        # Mock apply_ass_overlay creating the output video file
+        def fake_apply(input_video, output_video, ass_path, use_gpu):
+            Path(output_video).write_text("rendered mp4 with overlay")
+            return output_video
+        mock_apply.side_effect = fake_apply
+
+        res = client.post("/api/clips/overlay", json={
+            "clip_id": 4,
+            "text": "TOP HEADLINE!",
+            "font_name": "Impact",
+            "text_color": "#FFE81F",
+            "bg_color": "#000000",
+            "has_bg": True,
+            "position": "top"
+        })
+
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "ok"
+        assert data["clip_id"] == 4
+        assert clip_file.read_text() == "rendered mp4 with overlay"
+
+        # Check backup base file exists
+        backup_file = tmp_path / "clipmax_4_0_base.mp4"
+        assert backup_file.exists()
+        assert backup_file.read_text() == "dummy mp4 video bytes"
+
+        # Test remove overlay
+        res_remove = client.post("/api/clips/remove-overlay", json={"clip_id": 4})
+        assert res_remove.status_code == 200
+        assert clip_file.read_text() == "dummy mp4 video bytes"
+
 
