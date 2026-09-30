@@ -126,6 +126,243 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let currentImageOverlayServerPath = "";
 
+  // Multi-Page Containers
+  const pageHome = document.getElementById("pageHome");
+  const pageMedia = document.getElementById("pageMedia");
+  const pageCuration = document.getElementById("pageCuration");
+  const pageStyling = document.getElementById("pageStyling");
+  const pageStudio = document.getElementById("pageStudio");
+
+  // Stepper Header Tabs
+  const navTabHome = document.getElementById("navTabHome");
+  const navTabMedia = document.getElementById("navTabMedia");
+  const navTabCuration = document.getElementById("navTabCuration");
+  const navTabStyling = document.getElementById("navTabStyling");
+  const navTabStudio = document.getElementById("navTabStudio");
+  const studioBadgeDot = document.getElementById("studioBadgeDot");
+
+  // Page Navigation Buttons
+  const btnStartNewProject = document.getElementById("btnStartNewProject");
+  const btnCancelFromMedia = document.getElementById("btnCancelFromMedia");
+  const btnNextToCuration = document.getElementById("btnNextToCuration");
+  const btnBackToMedia = document.getElementById("btnBackToMedia");
+  const btnNextToStyling = document.getElementById("btnNextToStyling");
+  const btnBackToCuration = document.getElementById("btnBackToCuration");
+  const btnEmptyStartProject = document.getElementById("btnEmptyStartProject");
+  const btnStandbyGoToMedia = document.getElementById("btnStandbyGoToMedia");
+
+  // Last Project & History Elements
+  const lastProjectSection = document.getElementById("lastProjectSection");
+  const lastProjectCard = document.getElementById("lastProjectCard");
+  const lastProjectThumb = document.getElementById("lastProjectThumb");
+  const lastProjectThumbPlaceholder = document.getElementById("lastProjectThumbPlaceholder");
+  const lastProjectBadgeMode = document.getElementById("lastProjectBadgeMode");
+  const lastProjectDate = document.getElementById("lastProjectDate");
+  const lastProjectTitle = document.getElementById("lastProjectTitle");
+  const lastProjectSource = document.getElementById("lastProjectSource");
+  const lastProjectClipsCount = document.getElementById("lastProjectClipsCount");
+  const btnOpenLastProject = document.getElementById("btnOpenLastProject");
+  const totalProjectsCount = document.getElementById("totalProjectsCount");
+  const btnRefreshProjects = document.getElementById("btnRefreshProjects");
+  const projectHistoryEmpty = document.getElementById("projectHistoryEmpty");
+  const projectHistoryList = document.getElementById("projectHistoryList");
+
+  let currentPage = "home";
+
+  function showPage(targetPage) {
+    currentPage = targetPage;
+    const pages = {
+      home: pageHome,
+      media: pageMedia,
+      curation: pageCuration,
+      styling: pageStyling,
+      studio: pageStudio
+    };
+
+    const tabs = {
+      home: navTabHome,
+      media: navTabMedia,
+      curation: navTabCuration,
+      styling: navTabStyling,
+      studio: navTabStudio
+    };
+
+    Object.keys(pages).forEach(key => {
+      if (pages[key]) {
+        if (key === targetPage) {
+          pages[key].classList.remove("hidden");
+        } else {
+          pages[key].classList.add("hidden");
+        }
+      }
+    });
+
+    Object.keys(tabs).forEach(key => {
+      if (tabs[key]) {
+        if (key === targetPage) {
+          tabs[key].className = "flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-semibold transition text-white bg-[#1E2538] shadow-sm";
+        } else {
+          tabs[key].className = "flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-medium transition text-gray-400 hover:text-gray-200";
+        }
+      }
+    });
+
+    if (targetPage === "home") {
+      loadProjectHistory();
+    }
+  }
+
+  // Wire Stepper Tabs
+  if (navTabHome) navTabHome.addEventListener("click", () => showPage("home"));
+  if (navTabMedia) navTabMedia.addEventListener("click", () => showPage("media"));
+  if (navTabCuration) navTabCuration.addEventListener("click", () => showPage("curation"));
+  if (navTabStyling) navTabStyling.addEventListener("click", () => showPage("styling"));
+  if (navTabStudio) navTabStudio.addEventListener("click", () => showPage("studio"));
+
+  // Stepper Flow Buttons
+  if (btnStartNewProject) btnStartNewProject.addEventListener("click", () => showPage("media"));
+  if (btnEmptyStartProject) btnEmptyStartProject.addEventListener("click", () => showPage("media"));
+  if (btnStandbyGoToMedia) btnStandbyGoToMedia.addEventListener("click", () => showPage("media"));
+  if (btnCancelFromMedia) btnCancelFromMedia.addEventListener("click", () => showPage("home"));
+
+  if (btnNextToCuration) {
+    btnNextToCuration.addEventListener("click", () => {
+      const source = activeTab === "url" ? inputUrl.value.trim() : localVideoPath.trim();
+      if (!source) {
+        alert(activeTab === "url" ? "Harap masukkan URL YouTube terlebih dahulu." : "Harap pilih file video lokal terlebih dahulu.");
+        return;
+      }
+      showPage("curation");
+    });
+  }
+
+  if (btnBackToMedia) btnBackToMedia.addEventListener("click", () => showPage("media"));
+  if (btnNextToStyling) btnNextToStyling.addEventListener("click", () => showPage("styling"));
+  if (btnBackToCuration) btnBackToCuration.addEventListener("click", () => showPage("curation"));
+
+  // --- Project History Logic ---
+  async function loadProjectHistory() {
+    try {
+      const res = await fetch("/api/projects");
+      if (!res.ok) return;
+      const data = await res.json();
+      const projects = data.projects || [];
+
+      if (totalProjectsCount) totalProjectsCount.textContent = projects.length;
+
+      if (projects.length === 0) {
+        if (projectHistoryEmpty) projectHistoryEmpty.classList.remove("hidden");
+        if (lastProjectSection) lastProjectSection.classList.add("hidden");
+        if (projectHistoryList) projectHistoryList.innerHTML = "";
+        return;
+      }
+
+      if (projectHistoryEmpty) projectHistoryEmpty.classList.add("hidden");
+      if (lastProjectSection) lastProjectSection.classList.remove("hidden");
+
+      // Last Project (First in list)
+      const last = projects[0];
+      if (lastProjectTitle) lastProjectTitle.textContent = last.title;
+      if (lastProjectDate) lastProjectDate.textContent = last.created_at;
+      if (lastProjectClipsCount) lastProjectClipsCount.textContent = `${last.clip_count} Klip Siap Di-review`;
+      if (lastProjectSource) lastProjectSource.textContent = last.input_source;
+      if (lastProjectBadgeMode) {
+        lastProjectBadgeMode.textContent = last.clip_mode === "montage" ? "Multi-Cut Montage" : "Single Clip";
+      }
+
+      if (last.cover_thumbnail && lastProjectThumb && lastProjectThumbPlaceholder) {
+        lastProjectThumb.src = `${last.cover_thumbnail}?t=${Date.now()}`;
+        lastProjectThumb.classList.remove("hidden");
+        lastProjectThumbPlaceholder.classList.add("hidden");
+      } else if (lastProjectThumb && lastProjectThumbPlaceholder) {
+        lastProjectThumb.classList.add("hidden");
+        lastProjectThumbPlaceholder.classList.remove("hidden");
+      }
+
+      if (btnOpenLastProject) {
+        btnOpenLastProject.onclick = () => loadProject(last.project_id);
+      }
+
+      // Render full list
+      if (projectHistoryList) {
+        projectHistoryList.innerHTML = "";
+        projects.forEach(p => {
+          const item = document.createElement("div");
+          item.className = "p-3.5 rounded-xl bg-[#131722] border border-[#222938] hover:border-[#374151] transition flex items-center space-x-3.5 shadow";
+          
+          const thumbUrl = p.cover_thumbnail ? `${p.cover_thumbnail}?t=${Date.now()}` : "";
+          const isMontage = p.clip_mode === "montage";
+
+          item.innerHTML = `
+            <div class="w-14 h-20 bg-black rounded-lg overflow-hidden shrink-0 border border-[#252E42] flex items-center justify-center">
+              ${thumbUrl ? `<img src="${thumbUrl}" class="w-full h-full object-cover">` : '<span class="text-[10px] text-gray-500 font-mono">9:16</span>'}
+            </div>
+            <div class="flex-1 min-w-0 space-y-1">
+              <div class="flex items-center space-x-2">
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold ${isMontage ? 'bg-purple-900/60 text-purple-300' : 'bg-indigo-950 text-indigo-300'}">
+                  ${isMontage ? 'Montage' : 'Single'}
+                </span>
+                <span class="text-[11px] text-gray-400 font-mono">${p.created_at}</span>
+              </div>
+              <h4 class="text-xs font-bold text-gray-200 truncate">${p.title}</h4>
+              <p class="text-[11px] text-gray-500 truncate">${p.input_source}</p>
+              <div class="text-[10px] text-emerald-400 font-medium">🎬 ${p.clip_count} Klip</div>
+            </div>
+            <div class="flex items-center space-x-2 shrink-0">
+              <button class="btn-load-proj px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition shadow">
+                Buka Proyek
+              </button>
+              <button class="btn-del-proj p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-red-950/30 transition" title="Hapus Proyek">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          `;
+
+          item.querySelector(".btn-load-proj").addEventListener("click", () => loadProject(p.project_id));
+          item.querySelector(".btn-del-proj").addEventListener("click", async () => {
+            if (confirm(`Yakin ingin menghapus proyek "${p.title}"?`)) {
+              await fetch(`/api/projects/${p.project_id}`, { method: "DELETE" });
+              loadProjectHistory();
+            }
+          });
+
+          projectHistoryList.appendChild(item);
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to load project history:", e);
+    }
+  }
+
+  async function loadProject(projectId) {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/load`, { method: "POST" });
+      if (!res.ok) {
+        alert("Gagal memuat proyek. File mungkin sudah dipindahkan.");
+        return;
+      }
+      const data = await res.json();
+      currentClips = data.clips || [];
+
+      if (studioBadgeDot) studioBadgeDot.classList.remove("hidden");
+
+      showPage("studio");
+      showStage("review");
+
+      if (currentClips.length > 0) {
+        renderClipsGallery(currentClips);
+        selectClip(currentClips[0]);
+      }
+    } catch (e) {
+      console.error("Error loading project:", e);
+      alert(`Error loading project: ${e.message}`);
+    }
+  }
+
+  if (btnRefreshProjects) {
+    btnRefreshProjects.addEventListener("click", loadProjectHistory);
+  }
+
   // Step Indicators
   const stepElements = {
     ingest: document.getElementById("step-ingest"),
@@ -403,7 +640,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Start pipeline
     try {
+      showPage("studio");
       showStage("processing");
+      if (studioBadgeDot) studioBadgeDot.classList.remove("hidden");
       updateProgressUI("STARTING", 5, "Mempersiapkan pipeline...");
 
       const res = await fetch("/api/pipeline/start", {
@@ -468,11 +707,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function onPipelineComplete(clips) {
     currentClips = clips;
+    showPage("studio");
     showStage("review");
+    if (studioBadgeDot) studioBadgeDot.classList.remove("hidden");
     renderClipsGallery(clips);
     if (clips.length > 0) {
       selectClip(clips[0]);
     }
+    loadProjectHistory();
   }
 
   // 9. Review Workspace & Gallery
@@ -1311,7 +1553,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   btnNewTask.addEventListener("click", () => {
     mainVideo.pause();
-    showStage("standby");
+    showPage("media");
   });
 
   // 12. Window Control Buttons
@@ -1369,4 +1611,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialization
   loadInitialData();
   connectWebSocket();
+  showPage("home");
+  loadProjectHistory();
 });

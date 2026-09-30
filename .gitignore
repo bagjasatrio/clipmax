@@ -12,3 +12,4 @@ config.json
 .pytest_cache/
 cookies.txt
 *.cookies.txt
+projects/

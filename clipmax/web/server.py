@@ -255,6 +255,16 @@ def start_pipeline(req: PipelineStartRequest):
                 state.progress = 100
                 state.message = f"Selesai! {len(results)} klip siap di Review Workspace."
                 state.clips = results
+                try:
+                    import clipmax.project_manager as pm
+                    pm.save_project(
+                        clips=results,
+                        input_source=req.input_source,
+                        clip_mode=req.clip_mode
+                    )
+                except Exception as ex:
+                    print(f"[ProjectManager Error] Gagal simpan project otomatis: {ex}")
+
                 state.broadcast_sync({
                     "type": "complete",
                     "status": "COMPLETED",
@@ -627,6 +637,57 @@ project_root = Path(__file__).resolve().parent.parent.parent
 staging_path = project_root / "temp" / "staging"
 staging_path.mkdir(parents=True, exist_ok=True)
 app.mount("/staging", StaticFiles(directory=str(staging_path)), name="staging")
+
+# Mount Projects Directory for Saved Project Media
+projects_path = project_root / "projects"
+projects_path.mkdir(parents=True, exist_ok=True)
+app.mount("/projects_media", StaticFiles(directory=str(projects_path)), name="projects_media")
+
+# --- Project Management Endpoints ---
+@app.get("/api/projects")
+def get_projects_list():
+    import clipmax.project_manager as pm
+    return {"projects": pm.list_projects()}
+
+@app.get("/api/projects/last")
+def get_last_project_api():
+    import clipmax.project_manager as pm
+    last = pm.get_last_project()
+    return {"project": last}
+
+@app.post("/api/projects/{project_id}/load")
+def load_project_api(project_id: str):
+    import clipmax.project_manager as pm
+    staging_dir = Path(state.config.temp_dir) / "staging"
+    restored = pm.restore_project_to_staging(project_id, staging_dir)
+    if restored is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    state.clips = restored
+    state.status = "COMPLETED"
+    state.progress = 100
+    state.message = f"Proyek berhasil dimuat ulang ({len(restored)} klip)."
+
+    state.broadcast_sync({
+        "type": "complete",
+        "status": "COMPLETED",
+        "progress": 100,
+        "message": state.message,
+        "clips": [c.model_dump() for c in restored]
+    })
+
+    record = pm.get_project_by_id(project_id)
+    return {
+        "status": "ok",
+        "project": record,
+        "clips": [c.model_dump() for c in restored]
+    }
+
+@app.delete("/api/projects/{project_id}")
+def delete_project_api(project_id: str):
+    import clipmax.project_manager as pm
+    pm.delete_project(project_id)
+    return {"status": "ok"}
 
 # Mount Static UI Files
 static_dir = Path(__file__).resolve().parent / "static"

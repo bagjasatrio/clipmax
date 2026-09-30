@@ -206,4 +206,54 @@ def test_api_clip_overlay_and_remove(tmp_path):
         assert res_remove.status_code == 200
         assert clip_file.read_text() == "dummy mp4 video bytes"
 
+def test_api_projects_endpoints(tmp_path, monkeypatch):
+    import clipmax.project_manager as pm
+    monkeypatch.setattr(pm, "PROJECTS_DIR", tmp_path / "projects")
+    monkeypatch.setattr(pm, "PROJECTS_FILE", tmp_path / "projects" / "projects.json")
+
+    # Initial empty list
+    res_list = client.get("/api/projects")
+    assert res_list.status_code == 200
+    assert res_list.json()["projects"] == []
+
+    res_last = client.get("/api/projects/last")
+    assert res_last.status_code == 200
+    assert res_last.json()["project"] is None
+
+    # Create dummy project
+    dummy_vid = tmp_path / "clipmax_5_0.mp4"
+    dummy_vid.write_text("project video test")
+    clip = ClipResult(
+        clip_id=5,
+        title="Project 5",
+        hook="Hook 5",
+        virality_score=88,
+        reasoning="Desc",
+        start_time=0.0,
+        end_time=15.0,
+        staging_path=str(dummy_vid)
+    )
+    saved = pm.save_project([clip], input_source="test_video.mp4")
+
+    # Test GET list & last
+    res_list2 = client.get("/api/projects")
+    assert res_list2.status_code == 200
+    assert len(res_list2.json()["projects"]) == 1
+
+    res_last2 = client.get("/api/projects/last")
+    assert res_last2.status_code == 200
+    assert res_last2.json()["project"]["project_id"] == saved["project_id"]
+
+    # Test load project
+    res_load = client.post(f"/api/projects/{saved['project_id']}/load")
+    assert res_load.status_code == 200
+    assert len(state.clips) == 1
+    assert state.clips[0].title == "Project 5"
+
+    # Test delete project
+    res_del = client.delete(f"/api/projects/{saved['project_id']}")
+    assert res_del.status_code == 200
+    assert len(pm.list_projects()) == 0
+
+
 
