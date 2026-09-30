@@ -1,4 +1,11 @@
+import os
 import sys
+
+# Ensure stdout/stderr are valid under pythonw.exe (windowless python)
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
 
 # Setup CUDA DLL paths before any AI / audio / video libraries are loaded
 from clipmax.dll_setup import setup_cuda_dll_paths
