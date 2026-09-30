@@ -1,5 +1,6 @@
 import os
 import sys
+import shutil
 import subprocess
 import threading
 from pathlib import Path
@@ -191,20 +192,24 @@ def render_clip(
 
     return str(out_p.resolve())
 
-def apply_ass_overlay(
+def apply_clip_overlays(
     input_video: str,
     output_video: str,
-    ass_path: str,
+    ass_path: Optional[str] = None,
+    image_path: Optional[str] = None,
+    image_x_pct: float = 85.0,
+    image_y_pct: float = 8.0,
+    image_scale_pct: float = 16.0,
+    image_opacity: float = 1.0,
     use_gpu: bool = True
 ) -> str:
-    """Burns an ASS subtitle or text overlay onto an existing 9:16 video."""
+    """Burns an ASS subtitle/text overlay and/or an image watermark overlay onto an existing 9:16 video."""
     in_p = Path(input_video)
     if not in_p.exists():
         raise FileNotFoundError(f"Input video not found: {input_video}")
     out_p = Path(output_video)
     out_p.parent.mkdir(parents=True, exist_ok=True)
 
-    escaped_ass = sanitize_ffmpeg_path(ass_path)
     encoder = "h264_nvenc" if (use_gpu and is_nvenc_supported()) else "libx264"
     preset = "p6" if encoder == "h264_nvenc" else "veryfast"
 
@@ -228,14 +233,44 @@ def apply_ass_overlay(
             "-c:a", "copy"
         ]
 
-    cmd = [
-        get_ffmpeg_bin(),
-        "-y",
-        "-i", str(in_p.resolve()),
-        "-vf", f"subtitles='{escaped_ass}'",
-        *encoder_args,
-        str(out_p.resolve())
-    ]
+    has_ass = bool(ass_path and os.path.exists(ass_path))
+    has_img = bool(image_path and os.path.exists(image_path))
+
+    if not has_ass and not has_img:
+        shutil.copy2(str(in_p), str(out_p))
+        return str(out_p.resolve())
+
+    cmd = [get_ffmpeg_bin(), "-y", "-i", str(in_p.resolve())]
+
+    if has_ass and has_img:
+        cmd.extend(["-i", str(Path(image_path).resolve())])
+        escaped_ass = sanitize_ffmpeg_path(ass_path)
+        img_w = max(32, int(round((image_scale_pct / 100.0) * 1080)))
+        alpha_filter = f",colorchannelmixer=aa={image_opacity:.2f}" if image_opacity < 0.99 else ""
+        filter_complex = (
+            f"[1:v]scale={img_w}:-1,format=rgba{alpha_filter}[logo];"
+            f"[0:v]subtitles='{escaped_ass}'[v_sub];"
+            f"[v_sub][logo]overlay="
+            f"x='min(max(0,(main_w*{image_x_pct}/100)-(overlay_w/2)),main_w-overlay_w)':"
+            f"y='min(max(0,(main_h*{image_y_pct}/100)-(overlay_h/2)),main_h-overlay_h)'"
+        )
+        cmd.extend(["-filter_complex", filter_complex])
+    elif has_img:
+        cmd.extend(["-i", str(Path(image_path).resolve())])
+        img_w = max(32, int(round((image_scale_pct / 100.0) * 1080)))
+        alpha_filter = f",colorchannelmixer=aa={image_opacity:.2f}" if image_opacity < 0.99 else ""
+        filter_complex = (
+            f"[1:v]scale={img_w}:-1,format=rgba{alpha_filter}[logo];"
+            f"[0:v][logo]overlay="
+            f"x='min(max(0,(main_w*{image_x_pct}/100)-(overlay_w/2)),main_w-overlay_w)':"
+            f"y='min(max(0,(main_h*{image_y_pct}/100)-(overlay_h/2)),main_h-overlay_h)'"
+        )
+        cmd.extend(["-filter_complex", filter_complex])
+    else:
+        escaped_ass = sanitize_ffmpeg_path(ass_path)
+        cmd.extend(["-vf", f"subtitles='{escaped_ass}'"])
+
+    cmd.extend([*encoder_args, str(out_p.resolve())])
 
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
@@ -243,3 +278,17 @@ def apply_ass_overlay(
         raise RuntimeError(f"FFmpeg overlay rendering failed: {proc.stderr}")
 
     return str(out_p.resolve())
+
+def apply_ass_overlay(
+    input_video: str,
+    output_video: str,
+    ass_path: str,
+    use_gpu: bool = True
+) -> str:
+    """Burns an ASS subtitle or text overlay onto an existing 9:16 video."""
+    return apply_clip_overlays(
+        input_video=input_video,
+        output_video=output_video,
+        ass_path=ass_path,
+        use_gpu=use_gpu
+    )

@@ -156,9 +156,8 @@ def test_api_clip_overlay_and_remove(tmp_path):
     )
     state.clips = [dummy_clip]
 
-    with patch("clipmax.web.server.apply_ass_overlay") as mock_apply:
-        # Mock apply_ass_overlay creating the output video file
-        def fake_apply(input_video, output_video, ass_path, use_gpu):
+    with patch("clipmax.web.server.apply_clip_overlays") as mock_apply:
+        def fake_apply(input_video, output_video, ass_path=None, image_path=None, **kwargs):
             Path(output_video).write_text("rendered mp4 with overlay")
             return output_video
         mock_apply.side_effect = fake_apply
@@ -170,7 +169,9 @@ def test_api_clip_overlay_and_remove(tmp_path):
             "text_color": "#FFE81F",
             "bg_color": "#000000",
             "has_bg": True,
-            "position": "top"
+            "position": "free",
+            "x_pct": 50.0,
+            "y_pct": 25.0
         })
 
         assert res.status_code == 200
@@ -184,7 +185,23 @@ def test_api_clip_overlay_and_remove(tmp_path):
         assert backup_file.exists()
         assert backup_file.read_text() == "dummy mp4 video bytes"
 
-        # Test remove overlay
+        # Test image overlay
+        img_dummy = tmp_path / "logo.png"
+        img_dummy.write_text("dummy logo png")
+        res_img = client.post("/api/clips/image-overlay", json={
+            "clip_id": 4,
+            "image_path": str(img_dummy),
+            "x_pct": 80.0,
+            "y_pct": 10.0,
+            "scale_pct": 15.0,
+            "opacity": 0.9
+        })
+        assert res_img.status_code == 200
+
+        # Test remove overlays
+        res_remove_img = client.post("/api/clips/remove-image-overlay", json={"clip_id": 4})
+        assert res_remove_img.status_code == 200
+
         res_remove = client.post("/api/clips/remove-overlay", json={"clip_id": 4})
         assert res_remove.status_code == 200
         assert clip_file.read_text() == "dummy mp4 video bytes"

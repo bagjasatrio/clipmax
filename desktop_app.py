@@ -59,6 +59,23 @@ class DesktopJsApi:
                 print(f"[Desktop Dialog Error]: {e}")
         return None
 
+    def choose_image_file(self) -> Optional[str]:
+        w = self.window_holder.get("window")
+        if w:
+            try:
+                res = w.create_file_dialog(
+                    webview.FileDialog.OPEN,
+                    allow_multiple=False,
+                    file_types=('Image Files (*.png;*.jpg;*.jpeg;*.webp)', 'All files (*.*)')
+                )
+                if res:
+                    save_path = res[0] if isinstance(res, (tuple, list)) else res
+                    if save_path and isinstance(save_path, str) and save_path.strip():
+                        return save_path
+            except Exception as e:
+                print(f"[Desktop Dialog Image Error]: {e}")
+        return None
+
     def open_external_url(self, url: str):
         import webbrowser
         webbrowser.open(url)

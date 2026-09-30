@@ -18,7 +18,7 @@ from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
 from clipmax.ai_gateway import discover_models
 from clipmax.downloader import is_valid_video_url, clean_error_message, extract_video_id, download_via_invidious
 from clipmax.subtitle import generate_overlay_ass
-from clipmax.renderer import apply_ass_overlay
+from clipmax.renderer import apply_ass_overlay, apply_clip_overlays
 
 class PipelineStartRequest(BaseModel):
     input_source: str
@@ -62,6 +62,16 @@ class ClipOverlayRequest(BaseModel):
     bg_color: str = "#000000"
     has_bg: bool = True
     position: str = "top"
+    x_pct: Optional[float] = None
+    y_pct: Optional[float] = None
+
+class ClipImageOverlayRequest(BaseModel):
+    clip_id: int
+    image_path: str
+    x_pct: float = 85.0
+    y_pct: float = 8.0
+    scale_pct: float = 16.0
+    opacity: float = 1.0
 
 class RemoveOverlayRequest(BaseModel):
     clip_id: int
@@ -75,6 +85,7 @@ class AppState:
         self.progress: int = 0
         self.message: str = "Masukkan video untuk memulai kurasi klip 9:16."
         self.clips: List[ClipResult] = []
+        self.clip_overlays: Dict[int, Dict[str, Any]] = {}
         self.window_holder: Dict[str, Any] = {"window": None}
         self.active_websockets: List[WebSocket] = []
         self.loop: Optional[asyncio.AbstractEventLoop] = None
@@ -353,42 +364,68 @@ def export_all_clips(req: ExportAllRequest):
 
     return {"status": "ok", "exported_count": len(exported), "directory": str(dest_dir)}
 
-@app.post("/api/clips/overlay")
-def add_clip_overlay(req: ClipOverlayRequest):
-    clip = next((c for c in state.clips if c.clip_id == req.clip_id), None)
+def rebuild_clip_overlays(clip_id: int) -> Path:
+    clip = next((c for c in state.clips if c.clip_id == clip_id), None)
     if not clip or not os.path.exists(clip.staging_path):
         raise HTTPException(status_code=404, detail="Clip not found in staging")
 
     staging_path = Path(clip.staging_path)
     base_backup_path = staging_path.parent / f"{staging_path.stem}_base{staging_path.suffix}"
 
-    # Backup the original clip if not already backed up
     if not base_backup_path.exists():
         shutil.copy2(str(staging_path), str(base_backup_path))
 
-    temp_dir = Path(state.config.temp_dir)
-    temp_dir.mkdir(parents=True, exist_ok=True)
-    ass_path = temp_dir / f"overlay_clip_{req.clip_id}.ass"
+    cfg = state.clip_overlays.get(clip_id, {})
+    text_cfg = cfg.get("text_config")
+    img_cfg = cfg.get("image_config")
 
-    duration = max(0.1, clip.end_time - clip.start_time)
-    generate_overlay_ass(
-        text=req.text,
-        duration=duration,
-        output_ass_path=str(ass_path),
-        font_name=req.font_name,
-        font_size=req.font_size,
-        text_color=req.text_color,
-        bg_color=req.bg_color,
-        has_bg=req.has_bg,
-        position=req.position
-    )
+    ass_path = None
+    if text_cfg and text_cfg.get("text", "").strip():
+        temp_dir = Path(state.config.temp_dir)
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        ass_path = str((temp_dir / f"overlay_clip_{clip_id}.ass").resolve())
+        duration = max(0.1, clip.end_time - clip.start_time)
+        generate_overlay_ass(
+            text=text_cfg["text"],
+            duration=duration,
+            output_ass_path=ass_path,
+            font_name=text_cfg.get("font_name", "Impact"),
+            font_size=text_cfg.get("font_size", 56),
+            text_color=text_cfg.get("text_color", "#FFFFFF"),
+            bg_color=text_cfg.get("bg_color", "#000000"),
+            has_bg=text_cfg.get("has_bg", True),
+            position=text_cfg.get("position", "top"),
+            x_pct=text_cfg.get("x_pct"),
+            y_pct=text_cfg.get("y_pct")
+        )
+
+    img_path = None
+    img_x = 85.0
+    img_y = 8.0
+    img_scale = 16.0
+    img_opacity = 1.0
+    if img_cfg and img_cfg.get("image_path") and os.path.exists(img_cfg["image_path"]):
+        img_path = img_cfg["image_path"]
+        img_x = float(img_cfg.get("x_pct", 85.0))
+        img_y = float(img_cfg.get("y_pct", 8.0))
+        img_scale = float(img_cfg.get("scale_pct", 16.0))
+        img_opacity = float(img_cfg.get("opacity", 1.0))
+
+    if not ass_path and not img_path:
+        shutil.copy2(str(base_backup_path), str(staging_path))
+        return staging_path
 
     temp_render_path = staging_path.parent / f"temp_{staging_path.name}"
     try:
-        apply_ass_overlay(
+        apply_clip_overlays(
             input_video=str(base_backup_path),
             output_video=str(temp_render_path),
-            ass_path=str(ass_path),
+            ass_path=ass_path,
+            image_path=img_path,
+            image_x_pct=img_x,
+            image_y_pct=img_y,
+            image_scale_pct=img_scale,
+            image_opacity=img_opacity,
             use_gpu=is_cuda_available()
         )
         if temp_render_path.exists():
@@ -396,6 +433,17 @@ def add_clip_overlay(req: ClipOverlayRequest):
     finally:
         if temp_render_path.exists():
             temp_render_path.unlink(missing_ok=True)
+
+    return staging_path
+
+@app.post("/api/clips/overlay")
+def add_clip_overlay(req: ClipOverlayRequest):
+    clip = next((c for c in state.clips if c.clip_id == req.clip_id), None)
+    if not clip or not os.path.exists(clip.staging_path):
+        raise HTTPException(status_code=404, detail="Clip not found in staging")
+
+    state.clip_overlays.setdefault(req.clip_id, {})["text_config"] = req.model_dump()
+    staging_path = rebuild_clip_overlays(req.clip_id)
 
     return {
         "status": "ok",
@@ -410,13 +458,85 @@ def remove_clip_overlay(req: RemoveOverlayRequest):
     if not clip or not os.path.exists(clip.staging_path):
         raise HTTPException(status_code=404, detail="Clip not found in staging")
 
-    staging_path = Path(clip.staging_path)
-    base_backup_path = staging_path.parent / f"{staging_path.stem}_base{staging_path.suffix}"
+    state.clip_overlays.setdefault(req.clip_id, {})["text_config"] = None
+    rebuild_clip_overlays(req.clip_id)
+    return {"status": "ok", "message": "Overlay removed, reverted to base clip"}
 
-    if base_backup_path.exists():
-        shutil.copy2(str(base_backup_path), str(staging_path))
-        return {"status": "ok", "message": "Overlay removed, reverted to base clip"}
-    return {"status": "ok", "message": "No base backup found"}
+@app.post("/api/clips/image-overlay")
+def add_clip_image_overlay(req: ClipImageOverlayRequest):
+    clip = next((c for c in state.clips if c.clip_id == req.clip_id), None)
+    if not clip or not os.path.exists(clip.staging_path):
+        raise HTTPException(status_code=404, detail="Clip not found in staging")
+
+    if not os.path.exists(req.image_path):
+        raise HTTPException(status_code=400, detail="Image file not found on server")
+
+    state.clip_overlays.setdefault(req.clip_id, {})["image_config"] = req.model_dump()
+    staging_path = rebuild_clip_overlays(req.clip_id)
+
+    return {
+        "status": "ok",
+        "clip_id": req.clip_id,
+        "staging_path": str(staging_path),
+        "timestamp": time.time()
+    }
+
+@app.post("/api/clips/remove-image-overlay")
+def remove_clip_image_overlay(req: RemoveOverlayRequest):
+    clip = next((c for c in state.clips if c.clip_id == req.clip_id), None)
+    if not clip or not os.path.exists(clip.staging_path):
+        raise HTTPException(status_code=404, detail="Clip not found in staging")
+
+    state.clip_overlays.setdefault(req.clip_id, {})["image_config"] = None
+    rebuild_clip_overlays(req.clip_id)
+    return {"status": "ok", "message": "Image overlay removed"}
+
+@app.post("/api/clips/upload-overlay-image")
+async def upload_overlay_image(file: UploadFile = File(...)):
+    temp_dir = Path(state.config.temp_dir) / "overlays"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    suffix = Path(file.filename).suffix or ".png"
+    target_path = temp_dir / f"overlay_{int(time.time() * 1000)}{suffix}"
+    with open(target_path, "wb") as f:
+        content = await file.read()
+        f.write(content)
+    return {
+        "status": "ok",
+        "image_path": str(target_path.resolve()),
+        "filename": target_path.name
+    }
+
+@app.get("/api/media/image-preview")
+def preview_image(path: str):
+    p = Path(path)
+    if not p.exists() or not p.is_file():
+        raise HTTPException(status_code=404, detail="Image not found")
+    suffix = p.suffix.lower()
+    media_type = "image/png"
+    if suffix in [".jpg", ".jpeg"]:
+        media_type = "image/jpeg"
+    elif suffix == ".webp":
+        media_type = "image/webp"
+    return FileResponse(path=str(p), media_type=media_type)
+
+@app.post("/api/dialog/image")
+def dialog_choose_image():
+    window = state.window_holder.get("window")
+    if window:
+        try:
+            import webview
+            res = window.create_file_dialog(
+                webview.FileDialog.OPEN,
+                allow_multiple=False,
+                file_types=('Image Files (*.png;*.jpg;*.jpeg;*.webp)', 'All files (*.*)')
+            )
+            if res:
+                path_str = res[0] if isinstance(res, (tuple, list)) else res
+                if isinstance(path_str, str) and path_str.strip():
+                    return {"status": "ok", "path": path_str.strip()}
+        except Exception as e:
+            print(f"[Desktop Dialog Image Error]: {e}")
+    return {"status": "cancelled"}
 
 # Native Desktop Dialog Bridge via pywebview (if running in desktop window)
 @app.post("/api/dialog/video")

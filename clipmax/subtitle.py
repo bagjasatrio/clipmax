@@ -106,7 +106,9 @@ def generate_overlay_ass(
     text_color: str = "#FFFFFF",
     bg_color: str = "#000000",
     has_bg: bool = True,
-    position: str = "top"
+    position: str = "top",
+    x_pct: Optional[float] = None,
+    y_pct: Optional[float] = None
 ) -> str:
     """Generates an ASS subtitle file for burning a custom text/title overlay."""
     out_p = Path(output_ass_path)
@@ -117,8 +119,18 @@ def generate_overlay_ass(
     border_style = 3 if has_bg else 1
     outline_pad = 10 if has_bg else 4
     shadow_depth = 0 if has_bg else 2
-    align = 8 if position == "top" else (5 if position == "center" else 2)
-    margin_v = 160 if position == "top" else (0 if position == "center" else 480)
+
+    # Free roam positioning or preset alignment
+    if x_pct is not None and y_pct is not None:
+        align = 5  # center anchor
+        margin_v = 0
+        px = int(round((x_pct / 100.0) * 1080))
+        py = int(round((y_pct / 100.0) * 1920))
+        pos_tag = f"{{\\an5\\pos({px},{py})}}"
+    else:
+        align = 8 if position == "top" else (5 if position == "center" else 2)
+        margin_v = 160 if position == "top" else (0 if position == "center" else 480)
+        pos_tag = ""
 
     header = f"""[Script Info]
 ScriptType: v4.00+
@@ -135,7 +147,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     clean_text = text.strip().replace("\r", "").replace("\n", r"\N")
     end_str = format_ass_time(max(0.1, duration))
-    event_line = f"Dialogue: 2,0:00:00.00,{end_str},OverlayText,,0,0,0,,{clean_text}\n"
+    event_line = f"Dialogue: 2,0:00:00.00,{end_str},OverlayText,,0,0,0,,{pos_tag}{clean_text}\n"
 
     with open(out_p, "w", encoding="utf-8") as f:
         f.write(header)

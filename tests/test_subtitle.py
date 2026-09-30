@@ -78,4 +78,26 @@ def test_generate_overlay_ass(tmp_path):
     # Text in dialogue event with \N for newline
     assert r"Dialogue: 2,0:00:00.00,0:00:20.50,OverlayText,,0,0,0,,FAKTA MENARIK!\NTONTON SAMPAI HABIS" in content
 
+def test_generate_overlay_ass_free_roam(tmp_path):
+    from clipmax.subtitle import generate_overlay_ass
+
+    out_file = tmp_path / "overlay_freeroam.ass"
+    res = generate_overlay_ass(
+        text="FREE ROAM TITLE",
+        duration=10.0,
+        output_ass_path=str(out_file),
+        font_name="Montserrat",
+        font_size=50,
+        text_color="#FFFFFF",
+        has_bg=False,
+        x_pct=40.0,
+        y_pct=65.0
+    )
+
+    assert Path(res).exists()
+    content = out_file.read_text(encoding="utf-8")
+    assert "Style: OverlayText,Montserrat,50" in content
+    # Pos tag at 40% of 1080 = 432, 65% of 1920 = 1248
+    assert r"{\an5\pos(432,1248)}FREE ROAM TITLE" in content
+
 

@@ -59,6 +59,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const activeClipScore = document.getElementById("activeClipScore");
   const activeClipHook = document.getElementById("activeClipHook");
   const activeClipReason = document.getElementById("activeClipReason");
+  const btnCopyHook = document.getElementById("btnCopyHook");
+  const btnCopyReason = document.getElementById("btnCopyReason");
+  const btnCopyAll = document.getElementById("btnCopyAll");
 
   const clipsCount = document.getElementById("clipsCount");
   const clipsGallery = document.getElementById("clipsGallery");
@@ -72,11 +75,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnMin = document.getElementById("btnMin");
   const btnClose = document.getElementById("btnClose");
 
+  // Video Canvas Box Container for Draggable Overlays
+  const videoCanvasBox = document.getElementById("videoCanvasBox");
+
   // Video Text Overlay Elements
   const liveTextOverlay = document.getElementById("liveTextOverlay");
   const inputOverlayText = document.getElementById("inputOverlayText");
   const selectOverlayFont = document.getElementById("selectOverlayFont");
-  const selectOverlayPosition = document.getElementById("selectOverlayPosition");
   const pickerOverlayTextColor = document.getElementById("pickerOverlayTextColor");
   const lblOverlayTextColor = document.getElementById("lblOverlayTextColor");
   const selectOverlayBgStyle = document.getElementById("selectOverlayBgStyle");
@@ -84,6 +89,42 @@ document.addEventListener("DOMContentLoaded", () => {
   const lblApplyOverlay = document.getElementById("lblApplyOverlay");
   const btnRemoveOverlay = document.getElementById("btnRemoveOverlay");
   const badgeOverlayStatus = document.getElementById("badgeOverlayStatus");
+
+  // Free Roam Text Coordinates & Presets
+  const inputRangeTextX = document.getElementById("inputRangeTextX");
+  const inputRangeTextY = document.getElementById("inputRangeTextY");
+  const lblTextPosX = document.getElementById("lblTextPosX");
+  const lblTextPosY = document.getElementById("lblTextPosY");
+  const btnPosPresetTop = document.getElementById("btnPosPresetTop");
+  const btnPosPresetCenter = document.getElementById("btnPosPresetCenter");
+  const btnPosPresetBottom = document.getElementById("btnPosPresetBottom");
+
+  // Image / Logo Overlay Elements
+  const liveImageOverlayContainer = document.getElementById("liveImageOverlayContainer");
+  const liveImageOverlay = document.getElementById("liveImageOverlay");
+  const fileImageInput = document.getElementById("fileImageInput");
+  const btnPickImage = document.getElementById("btnPickImage");
+  const lblImageFileName = document.getElementById("lblImageFileName");
+  const btnClearImage = document.getElementById("btnClearImage");
+  const imageControlsWrapper = document.getElementById("imageControlsWrapper");
+  const inputRangeImageScale = document.getElementById("inputRangeImageScale");
+  const lblImageScale = document.getElementById("lblImageScale");
+  const inputRangeImageOpacity = document.getElementById("inputRangeImageOpacity");
+  const lblImageOpacity = document.getElementById("lblImageOpacity");
+  const inputRangeImageX = document.getElementById("inputRangeImageX");
+  const lblImagePosX = document.getElementById("lblImagePosX");
+  const inputRangeImageY = document.getElementById("inputRangeImageY");
+  const lblImagePosY = document.getElementById("lblImagePosY");
+  const btnImgPresetTopRight = document.getElementById("btnImgPresetTopRight");
+  const btnImgPresetTopLeft = document.getElementById("btnImgPresetTopLeft");
+  const btnImgPresetBottomRight = document.getElementById("btnImgPresetBottomRight");
+  const btnImgPresetCenter = document.getElementById("btnImgPresetCenter");
+  const btnApplyImageOverlay = document.getElementById("btnApplyImageOverlay");
+  const lblApplyImageOverlay = document.getElementById("lblApplyImageOverlay");
+  const btnRemoveImageOverlay = document.getElementById("btnRemoveImageOverlay");
+  const badgeImageOverlayStatus = document.getElementById("badgeImageOverlayStatus");
+
+  let currentImageOverlayServerPath = "";
 
   // Step Indicators
   const stepElements = {
@@ -493,14 +534,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     activeClipTitle.textContent = `#${clip.clip_id} ${clip.title}`;
     activeClipScore.textContent = `${clip.virality_score} Score`;
-    activeClipHook.textContent = `"${clip.hook}"`;
-    activeClipReason.textContent = clip.reasoning || "";
+    activeClipHook.textContent = `"${clip.hook || ""}"`;
+    activeClipReason.textContent = clip.reasoning || "Tidak ada deskripsi tambahan.";
 
     // Reset or populate overlay settings for this clip
     if (inputOverlayText) {
       inputOverlayText.value = clip.overlay_text || "";
       if (selectOverlayFont) selectOverlayFont.value = clip.overlay_font || "Montserrat";
-      if (selectOverlayPosition) selectOverlayPosition.value = clip.overlay_position || "top";
+      if (inputRangeTextX) {
+        inputRangeTextX.value = clip.overlay_x_pct !== undefined ? clip.overlay_x_pct : 50;
+        if (lblTextPosX) lblTextPosX.textContent = `${inputRangeTextX.value}%`;
+      }
+      if (inputRangeTextY) {
+        inputRangeTextY.value = clip.overlay_y_pct !== undefined ? clip.overlay_y_pct : 12;
+        if (lblTextPosY) lblTextPosY.textContent = `${inputRangeTextY.value}%`;
+      }
       if (pickerOverlayTextColor) {
         pickerOverlayTextColor.value = clip.overlay_text_color || "#FFFFFF";
         if (lblOverlayTextColor) lblOverlayTextColor.textContent = pickerOverlayTextColor.value.toUpperCase();
@@ -511,6 +559,48 @@ document.addEventListener("DOMContentLoaded", () => {
         badgeOverlayStatus.className = clip.has_overlay ? "text-[10px] text-emerald-400 font-mono" : "text-[10px] text-gray-400 font-mono";
       }
       updateLiveOverlayPreview();
+    }
+
+    // Reset or populate image overlay settings
+    if (imageControlsWrapper) {
+      if (clip.image_overlay_path) {
+        currentImageOverlayServerPath = clip.image_overlay_path;
+        if (lblImageFileName) lblImageFileName.textContent = clip.image_overlay_name || "logo.png";
+        if (btnClearImage) btnClearImage.classList.remove("hidden");
+        imageControlsWrapper.classList.remove("opacity-50", "pointer-events-none");
+        if (inputRangeImageScale) {
+          inputRangeImageScale.value = clip.image_scale_pct || 16;
+          if (lblImageScale) lblImageScale.textContent = `${inputRangeImageScale.value}%`;
+        }
+        if (inputRangeImageOpacity) {
+          inputRangeImageOpacity.value = clip.image_opacity ? Math.round(clip.image_opacity * 100) : 90;
+          if (lblImageOpacity) lblImageOpacity.textContent = `${inputRangeImageOpacity.value}%`;
+        }
+        if (inputRangeImageX) {
+          inputRangeImageX.value = clip.image_x_pct !== undefined ? clip.image_x_pct : 85;
+          if (lblImagePosX) lblImagePosX.textContent = `${inputRangeImageX.value}%`;
+        }
+        if (inputRangeImageY) {
+          inputRangeImageY.value = clip.image_y_pct !== undefined ? clip.image_y_pct : 8;
+          if (lblImagePosY) lblImagePosY.textContent = `${inputRangeImageY.value}%`;
+        }
+        if (badgeImageOverlayStatus) {
+          badgeImageOverlayStatus.textContent = clip.has_image_overlay ? "Terbakar di Video" : "Live Preview";
+          badgeImageOverlayStatus.className = clip.has_image_overlay ? "text-[10px] text-cyan-400 font-mono" : "text-[10px] text-gray-400 font-mono";
+        }
+        liveImageOverlay.src = `/api/media/image-preview?path=${encodeURIComponent(clip.image_overlay_path)}`;
+        updateLiveImageOverlayPreview();
+      } else {
+        currentImageOverlayServerPath = "";
+        if (lblImageFileName) lblImageFileName.textContent = "Belum ada file dipilih";
+        if (btnClearImage) btnClearImage.classList.add("hidden");
+        imageControlsWrapper.classList.add("opacity-50", "pointer-events-none");
+        if (liveImageOverlayContainer) liveImageOverlayContainer.classList.add("hidden");
+        if (badgeImageOverlayStatus) {
+          badgeImageOverlayStatus.textContent = "Belum Ada";
+          badgeImageOverlayStatus.className = "text-[10px] text-gray-400 font-mono";
+        }
+      }
     }
 
     renderClipsGallery(currentClips);
@@ -586,7 +676,62 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Video Text Overlay Live Preview & Handlers
+  // --- Description & Hook Copy Handlers ---
+  function copyToClipboard(text, buttonElement) {
+    if (!text) return;
+    const originalHTML = buttonElement.innerHTML;
+    const showSuccess = () => {
+      buttonElement.innerHTML = `<span>Tersalin! ✅</span>`;
+      setTimeout(() => {
+        buttonElement.innerHTML = originalHTML;
+      }, 1800);
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(showSuccess).catch(() => {
+        fallbackCopy(text, showSuccess);
+      });
+    } else {
+      fallbackCopy(text, showSuccess);
+    }
+  }
+
+  function fallbackCopy(text, callback) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      if (callback) callback();
+    } catch (_) {}
+    document.body.removeChild(ta);
+  }
+
+  if (btnCopyHook) {
+    btnCopyHook.addEventListener("click", () => {
+      if (selectedClip) copyToClipboard(selectedClip.hook || "", btnCopyHook);
+    });
+  }
+
+  if (btnCopyReason) {
+    btnCopyReason.addEventListener("click", () => {
+      if (selectedClip) copyToClipboard(selectedClip.reasoning || "", btnCopyReason);
+    });
+  }
+
+  if (btnCopyAll) {
+    btnCopyAll.addEventListener("click", () => {
+      if (!selectedClip) return;
+      const durSec = Math.round((selectedClip.end_time || 0) - (selectedClip.start_time || 0));
+      const fullText = `Judul: #${selectedClip.clip_id} ${selectedClip.title}\nViral Score: ${selectedClip.virality_score}\nHook: "${selectedClip.hook || ''}"\n\nAlasan & Deskripsi:\n${selectedClip.reasoning || ''}\n\nDurasi: ${durSec} detik`;
+      copyToClipboard(fullText, btnCopyAll);
+    });
+  }
+
+  // --- Video Text Overlay Live Preview & Handlers (Free Roam) ---
   function updateLiveOverlayPreview() {
     if (!liveTextOverlay || !inputOverlayText) return;
     const txt = inputOverlayText.value.trim();
@@ -625,21 +770,42 @@ document.addEventListener("DOMContentLoaded", () => {
       liveTextOverlay.style.textShadow = "2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000";
     }
 
-    // Position
-    const pos = selectOverlayPosition ? selectOverlayPosition.value : "top";
-    if (pos === "top") {
-      liveTextOverlay.style.top = "10%";
-      liveTextOverlay.style.bottom = "auto";
-      liveTextOverlay.style.transform = "none";
-    } else if (pos === "center") {
-      liveTextOverlay.style.top = "50%";
-      liveTextOverlay.style.bottom = "auto";
-      liveTextOverlay.style.transform = "translateY(-50%)";
-    } else if (pos === "bottom") {
-      liveTextOverlay.style.top = "auto";
-      liveTextOverlay.style.bottom = "26%";
-      liveTextOverlay.style.transform = "none";
-    }
+    // Free Roam Coordinates
+    const xPct = inputRangeTextX ? inputRangeTextX.value : 50;
+    const yPct = inputRangeTextY ? inputRangeTextY.value : 12;
+    liveTextOverlay.style.left = `${xPct}%`;
+    liveTextOverlay.style.top = `${yPct}%`;
+    liveTextOverlay.style.transform = "translate(-50%, -50%)";
+  }
+
+  // Draggable Free Roam for Text Overlay
+  let isDraggingText = false;
+  if (liveTextOverlay && videoCanvasBox) {
+    liveTextOverlay.addEventListener("pointerdown", (e) => {
+      isDraggingText = true;
+      liveTextOverlay.setPointerCapture(e.pointerId);
+    });
+    liveTextOverlay.addEventListener("pointermove", (e) => {
+      if (!isDraggingText) return;
+      const rect = videoCanvasBox.getBoundingClientRect();
+      let xPct = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+      let yPct = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+      xPct = Math.max(5, Math.min(95, xPct));
+      yPct = Math.max(5, Math.min(95, yPct));
+      if (inputRangeTextX) inputRangeTextX.value = xPct;
+      if (inputRangeTextY) inputRangeTextY.value = yPct;
+      if (lblTextPosX) lblTextPosX.textContent = `${xPct}%`;
+      if (lblTextPosY) lblTextPosY.textContent = `${yPct}%`;
+      updateLiveOverlayPreview();
+    });
+    const stopTextDrag = (e) => {
+      if (isDraggingText) {
+        isDraggingText = false;
+        try { liveTextOverlay.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+    };
+    liveTextOverlay.addEventListener("pointerup", stopTextDrag);
+    liveTextOverlay.addEventListener("pointercancel", stopTextDrag);
   }
 
   if (inputOverlayText) {
@@ -647,9 +813,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   if (selectOverlayFont) {
     selectOverlayFont.addEventListener("change", updateLiveOverlayPreview);
-  }
-  if (selectOverlayPosition) {
-    selectOverlayPosition.addEventListener("change", updateLiveOverlayPreview);
   }
   if (pickerOverlayTextColor) {
     pickerOverlayTextColor.addEventListener("input", () => {
@@ -659,6 +822,45 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   if (selectOverlayBgStyle) {
     selectOverlayBgStyle.addEventListener("change", updateLiveOverlayPreview);
+  }
+  if (inputRangeTextX) {
+    inputRangeTextX.addEventListener("input", () => {
+      if (lblTextPosX) lblTextPosX.textContent = `${inputRangeTextX.value}%`;
+      updateLiveOverlayPreview();
+    });
+  }
+  if (inputRangeTextY) {
+    inputRangeTextY.addEventListener("input", () => {
+      if (lblTextPosY) lblTextPosY.textContent = `${inputRangeTextY.value}%`;
+      updateLiveOverlayPreview();
+    });
+  }
+  if (btnPosPresetTop) {
+    btnPosPresetTop.addEventListener("click", () => {
+      if (inputRangeTextX) inputRangeTextX.value = 50;
+      if (inputRangeTextY) inputRangeTextY.value = 12;
+      if (lblTextPosX) lblTextPosX.textContent = "50%";
+      if (lblTextPosY) lblTextPosY.textContent = "12%";
+      updateLiveOverlayPreview();
+    });
+  }
+  if (btnPosPresetCenter) {
+    btnPosPresetCenter.addEventListener("click", () => {
+      if (inputRangeTextX) inputRangeTextX.value = 50;
+      if (inputRangeTextY) inputRangeTextY.value = 50;
+      if (lblTextPosX) lblTextPosX.textContent = "50%";
+      if (lblTextPosY) lblTextPosY.textContent = "50%";
+      updateLiveOverlayPreview();
+    });
+  }
+  if (btnPosPresetBottom) {
+    btnPosPresetBottom.addEventListener("click", () => {
+      if (inputRangeTextX) inputRangeTextX.value = 50;
+      if (inputRangeTextY) inputRangeTextY.value = 75;
+      if (lblTextPosX) lblTextPosX.textContent = "50%";
+      if (lblTextPosY) lblTextPosY.textContent = "75%";
+      updateLiveOverlayPreview();
+    });
   }
 
   if (btnApplyOverlay) {
@@ -687,6 +889,9 @@ document.addEventListener("DOMContentLoaded", () => {
       let textColor = pickerOverlayTextColor ? pickerOverlayTextColor.value : "#FFFFFF";
       if (bgStyle === "yellow_viral") textColor = "#000000";
 
+      const xVal = inputRangeTextX ? parseFloat(inputRangeTextX.value) : 50.0;
+      const yVal = inputRangeTextY ? parseFloat(inputRangeTextY.value) : 12.0;
+
       try {
         const resp = await fetch("/api/clips/overlay", {
           method: "POST",
@@ -699,19 +904,20 @@ document.addEventListener("DOMContentLoaded", () => {
             text_color: textColor,
             bg_color: bgColor,
             has_bg: hasBg,
-            position: selectOverlayPosition ? selectOverlayPosition.value : "top"
+            position: "free",
+            x_pct: xVal,
+            y_pct: yVal
           })
         });
 
         const data = await resp.json();
         if (resp.ok) {
-          // Hide DOM live overlay since text is now burned into the video
           if (liveTextOverlay) liveTextOverlay.classList.add("hidden");
 
-          // Save metadata into clip
           selectedClip.overlay_text = text;
           selectedClip.overlay_font = selectOverlayFont ? selectOverlayFont.value : "Montserrat";
-          selectedClip.overlay_position = selectOverlayPosition ? selectOverlayPosition.value : "top";
+          selectedClip.overlay_x_pct = xVal;
+          selectedClip.overlay_y_pct = yVal;
           selectedClip.overlay_text_color = textColor;
           selectedClip.overlay_bg_style = bgStyle;
           selectedClip.has_overlay = true;
@@ -721,7 +927,6 @@ document.addEventListener("DOMContentLoaded", () => {
             badgeOverlayStatus.className = "text-[10px] text-emerald-400 font-mono";
           }
 
-          // Reload video with cache buster
           const vidName = selectedClip.staging_path ? selectedClip.staging_path.split(/[\\/]/).pop() : "";
           mainVideo.src = `/staging/${vidName}?t=${Date.now()}`;
           mainVideo.load();
@@ -758,7 +963,6 @@ document.addEventListener("DOMContentLoaded", () => {
             badgeOverlayStatus.textContent = "Live Preview";
             badgeOverlayStatus.className = "text-[10px] text-gray-400 font-mono";
           }
-          // Reload original video
           const vidName = selectedClip.staging_path ? selectedClip.staging_path.split(/[\\/]/).pop() : "";
           mainVideo.src = `/staging/${vidName}?t=${Date.now()}`;
           mainVideo.load();
@@ -768,6 +972,286 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("Error removing overlay:", err);
       } finally {
         btnRemoveOverlay.disabled = false;
+      }
+    });
+  }
+
+  // --- Image / Logo Overlay Handlers (Free Roam) ---
+  function updateLiveImageOverlayPreview() {
+    if (!liveImageOverlayContainer || !currentImageOverlayServerPath) {
+      if (liveImageOverlayContainer) liveImageOverlayContainer.classList.add("hidden");
+      return;
+    }
+    liveImageOverlayContainer.classList.remove("hidden");
+    const scale = inputRangeImageScale ? inputRangeImageScale.value : 16;
+    const opacity = inputRangeImageOpacity ? (inputRangeImageOpacity.value / 100.0) : 0.9;
+    const xPct = inputRangeImageX ? inputRangeImageX.value : 85;
+    const yPct = inputRangeImageY ? inputRangeImageY.value : 8;
+
+    liveImageOverlayContainer.style.width = `${scale}%`;
+    liveImageOverlayContainer.style.left = `${xPct}%`;
+    liveImageOverlayContainer.style.top = `${yPct}%`;
+    liveImageOverlayContainer.style.transform = "translate(-50%, -50%)";
+    liveImageOverlayContainer.style.opacity = opacity;
+  }
+
+  // Draggable Free Roam for Logo / Image Overlay
+  let isDraggingImage = false;
+  if (liveImageOverlayContainer && videoCanvasBox) {
+    liveImageOverlayContainer.addEventListener("pointerdown", (e) => {
+      isDraggingImage = true;
+      liveImageOverlayContainer.setPointerCapture(e.pointerId);
+    });
+    liveImageOverlayContainer.addEventListener("pointermove", (e) => {
+      if (!isDraggingImage) return;
+      const rect = videoCanvasBox.getBoundingClientRect();
+      let xPct = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+      let yPct = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+      xPct = Math.max(5, Math.min(95, xPct));
+      yPct = Math.max(5, Math.min(95, yPct));
+      if (inputRangeImageX) inputRangeImageX.value = xPct;
+      if (inputRangeImageY) inputRangeImageY.value = yPct;
+      if (lblImagePosX) lblImagePosX.textContent = `${xPct}%`;
+      if (lblImagePosY) lblImagePosY.textContent = `${yPct}%`;
+      updateLiveImageOverlayPreview();
+    });
+    const stopImgDrag = (e) => {
+      if (isDraggingImage) {
+        isDraggingImage = false;
+        try { liveImageOverlayContainer.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+    };
+    liveImageOverlayContainer.addEventListener("pointerup", stopImgDrag);
+    liveImageOverlayContainer.addEventListener("pointercancel", stopImgDrag);
+  }
+
+  function handleImageSelected(filePath, displayName, isNative) {
+    currentImageOverlayServerPath = filePath;
+    if (lblImageFileName) lblImageFileName.textContent = displayName;
+    if (btnClearImage) btnClearImage.classList.remove("hidden");
+    if (imageControlsWrapper) imageControlsWrapper.classList.remove("opacity-50", "pointer-events-none");
+
+    if (liveImageOverlay) {
+      if (isNative) {
+        liveImageOverlay.src = `/api/media/image-preview?path=${encodeURIComponent(filePath)}`;
+      }
+    }
+    updateLiveImageOverlayPreview();
+  }
+
+  if (btnPickImage) {
+    btnPickImage.addEventListener("click", async () => {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.choose_image_file) {
+        try {
+          let chosen = await window.pywebview.api.choose_image_file();
+          if (Array.isArray(chosen)) chosen = chosen[0];
+          if (chosen && typeof chosen === "string" && chosen.trim() !== "") {
+            handleImageSelected(chosen.trim(), chosen.split(/[\\/]/).pop(), true);
+            return;
+          }
+        } catch (e) {
+          console.warn("pywebview choose_image_file failed, fallback to input:", e);
+        }
+      }
+      if (fileImageInput) fileImageInput.click();
+    });
+  }
+
+  if (fileImageInput) {
+    fileImageInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (liveImageOverlay) {
+        liveImageOverlay.src = URL.createObjectURL(file);
+      }
+
+      const fd = new FormData();
+      fd.append("file", file);
+      try {
+        const res = await fetch("/api/clips/upload-overlay-image", {
+          method: "POST",
+          body: fd
+        });
+        const data = await res.json();
+        if (res.ok && data.image_path) {
+          handleImageSelected(data.image_path, file.name, false);
+        } else {
+          alert(`Gagal upload logo: ${data.detail || 'Terjadi kesalahan'}`);
+        }
+      } catch (err) {
+        console.error("Upload overlay image error:", err);
+      }
+    });
+  }
+
+  if (btnClearImage) {
+    btnClearImage.addEventListener("click", () => {
+      currentImageOverlayServerPath = "";
+      if (fileImageInput) fileImageInput.value = "";
+      if (lblImageFileName) lblImageFileName.textContent = "Belum ada file dipilih";
+      btnClearImage.classList.add("hidden");
+      if (imageControlsWrapper) imageControlsWrapper.classList.add("opacity-50", "pointer-events-none");
+      if (liveImageOverlayContainer) liveImageOverlayContainer.classList.add("hidden");
+    });
+  }
+
+  if (inputRangeImageScale) {
+    inputRangeImageScale.addEventListener("input", () => {
+      if (lblImageScale) lblImageScale.textContent = `${inputRangeImageScale.value}%`;
+      updateLiveImageOverlayPreview();
+    });
+  }
+  if (inputRangeImageOpacity) {
+    inputRangeImageOpacity.addEventListener("input", () => {
+      if (lblImageOpacity) lblImageOpacity.textContent = `${inputRangeImageOpacity.value}%`;
+      updateLiveImageOverlayPreview();
+    });
+  }
+  if (inputRangeImageX) {
+    inputRangeImageX.addEventListener("input", () => {
+      if (lblImagePosX) lblImagePosX.textContent = `${inputRangeImageX.value}%`;
+      updateLiveImageOverlayPreview();
+    });
+  }
+  if (inputRangeImageY) {
+    inputRangeImageY.addEventListener("input", () => {
+      if (lblImagePosY) lblImagePosY.textContent = `${inputRangeImageY.value}%`;
+      updateLiveImageOverlayPreview();
+    });
+  }
+
+  // Logo Preset Buttons
+  if (btnImgPresetTopRight) {
+    btnImgPresetTopRight.addEventListener("click", () => {
+      if (inputRangeImageX) inputRangeImageX.value = 85;
+      if (inputRangeImageY) inputRangeImageY.value = 8;
+      if (lblImagePosX) lblImagePosX.textContent = "85%";
+      if (lblImagePosY) lblImagePosY.textContent = "8%";
+      updateLiveImageOverlayPreview();
+    });
+  }
+  if (btnImgPresetTopLeft) {
+    btnImgPresetTopLeft.addEventListener("click", () => {
+      if (inputRangeImageX) inputRangeImageX.value = 15;
+      if (inputRangeImageY) inputRangeImageY.value = 8;
+      if (lblImagePosX) lblImagePosX.textContent = "15%";
+      if (lblImagePosY) lblImagePosY.textContent = "8%";
+      updateLiveImageOverlayPreview();
+    });
+  }
+  if (btnImgPresetBottomRight) {
+    btnImgPresetBottomRight.addEventListener("click", () => {
+      if (inputRangeImageX) inputRangeImageX.value = 85;
+      if (inputRangeImageY) inputRangeImageY.value = 88;
+      if (lblImagePosX) lblImagePosX.textContent = "85%";
+      if (lblImagePosY) lblImagePosY.textContent = "88%";
+      updateLiveImageOverlayPreview();
+    });
+  }
+  if (btnImgPresetCenter) {
+    btnImgPresetCenter.addEventListener("click", () => {
+      if (inputRangeImageX) inputRangeImageX.value = 50;
+      if (inputRangeImageY) inputRangeImageY.value = 50;
+      if (lblImagePosX) lblImagePosX.textContent = "50%";
+      if (lblImagePosY) lblImagePosY.textContent = "50%";
+      updateLiveImageOverlayPreview();
+    });
+  }
+
+  if (btnApplyImageOverlay) {
+    btnApplyImageOverlay.addEventListener("click", async () => {
+      if (!selectedClip) {
+        alert("Pilih klip terlebih dahulu dari galeri di sebelah kanan.");
+        return;
+      }
+      if (!currentImageOverlayServerPath) {
+        alert("Pilih file logo/gambar terlebih dahulu.");
+        return;
+      }
+
+      btnApplyImageOverlay.disabled = true;
+      const originalHTML = btnApplyImageOverlay.innerHTML;
+      btnApplyImageOverlay.innerHTML = `<span class="animate-spin mr-1">⌛</span><span>Membakar Logo...</span>`;
+
+      const xVal = inputRangeImageX ? parseFloat(inputRangeImageX.value) : 85.0;
+      const yVal = inputRangeImageY ? parseFloat(inputRangeImageY.value) : 8.0;
+      const scaleVal = inputRangeImageScale ? parseFloat(inputRangeImageScale.value) : 16.0;
+      const opacityVal = inputRangeImageOpacity ? (parseFloat(inputRangeImageOpacity.value) / 100.0) : 0.9;
+
+      try {
+        const resp = await fetch("/api/clips/image-overlay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clip_id: selectedClip.clip_id,
+            image_path: currentImageOverlayServerPath,
+            x_pct: xVal,
+            y_pct: yVal,
+            scale_pct: scaleVal,
+            opacity: opacityVal
+          })
+        });
+
+        const data = await resp.json();
+        if (resp.ok) {
+          if (liveImageOverlayContainer) liveImageOverlayContainer.classList.add("hidden");
+
+          selectedClip.image_overlay_path = currentImageOverlayServerPath;
+          selectedClip.image_overlay_name = lblImageFileName ? lblImageFileName.textContent : "logo.png";
+          selectedClip.image_x_pct = xVal;
+          selectedClip.image_y_pct = yVal;
+          selectedClip.image_scale_pct = scaleVal;
+          selectedClip.image_opacity = opacityVal;
+          selectedClip.has_image_overlay = true;
+
+          if (badgeImageOverlayStatus) {
+            badgeImageOverlayStatus.textContent = "Terbakar di Video";
+            badgeImageOverlayStatus.className = "text-[10px] text-cyan-400 font-mono";
+          }
+
+          const vidName = selectedClip.staging_path ? selectedClip.staging_path.split(/[\\/]/).pop() : "";
+          mainVideo.src = `/staging/${vidName}?t=${Date.now()}`;
+          mainVideo.load();
+          mainVideo.play().catch(() => {});
+        } else {
+          alert(`Gagal membakar logo: ${data.detail || "Terjadi kesalahan."}`);
+        }
+      } catch (err) {
+        console.error("Error applying image overlay:", err);
+        alert(`Error membakar logo: ${err.message}`);
+      } finally {
+        btnApplyImageOverlay.disabled = false;
+        btnApplyImageOverlay.innerHTML = originalHTML;
+      }
+    });
+  }
+
+  if (btnRemoveImageOverlay) {
+    btnRemoveImageOverlay.addEventListener("click", async () => {
+      if (!selectedClip) return;
+      btnRemoveImageOverlay.disabled = true;
+      try {
+        const resp = await fetch("/api/clips/remove-image-overlay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clip_id: selectedClip.clip_id })
+        });
+        if (resp.ok) {
+          selectedClip.image_overlay_path = "";
+          selectedClip.has_image_overlay = false;
+          if (badgeImageOverlayStatus) {
+            badgeImageOverlayStatus.textContent = "Belum Ada";
+            badgeImageOverlayStatus.className = "text-[10px] text-gray-400 font-mono";
+          }
+          const vidName = selectedClip.staging_path ? selectedClip.staging_path.split(/[\\/]/).pop() : "";
+          mainVideo.src = `/staging/${vidName}?t=${Date.now()}`;
+          mainVideo.load();
+          mainVideo.play().catch(() => {});
+        }
+      } catch (err) {
+        console.error("Error removing image overlay:", err);
+      } finally {
+        btnRemoveImageOverlay.disabled = false;
       }
     });
   }

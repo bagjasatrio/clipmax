@@ -163,3 +163,41 @@ def test_render_clip_single_scene_respects_scene_mode():
         vf_crop = args_crop[args_crop.index("-vf") + 1]
         assert "crop=ih*(9/16):ih:650:0" in vf_crop
         assert "scale=1080:1920" in vf_crop
+
+def test_apply_clip_overlays(tmp_path):
+    from clipmax.renderer import apply_clip_overlays
+
+    in_file = tmp_path / "in.mp4"
+    in_file.write_text("dummy")
+    out_file = tmp_path / "out.mp4"
+    logo_file = tmp_path / "logo.png"
+    logo_file.write_text("logo")
+    ass_file = tmp_path / "sub.ass"
+    ass_file.write_text("ass")
+
+    with patch("subprocess.run") as mock_run, \
+         patch("clipmax.renderer.is_nvenc_supported", return_value=False):
+        
+        proc = MagicMock()
+        proc.returncode = 0
+        mock_run.return_value = proc
+
+        # Test both ASS and Image overlay
+        apply_clip_overlays(
+            input_video=str(in_file),
+            output_video=str(out_file),
+            ass_path=str(ass_file),
+            image_path=str(logo_file),
+            image_x_pct=80.0,
+            image_y_pct=15.0,
+            image_scale_pct=20.0,
+            image_opacity=0.85
+        )
+
+        args = mock_run.call_args[0][0]
+        assert "-filter_complex" in args
+        fc = args[args.index("-filter_complex") + 1]
+        assert "subtitles=" in fc
+        assert "colorchannelmixer=aa=0.85" in fc
+        assert "overlay=" in fc
+
