@@ -147,11 +147,12 @@ def render_clip(
             str(out_p.resolve())
         ]
     else:
-        # Mode CROP_9_16 / CROP_TRACKING: 9:16 crop centered on tracked face
+        # Mode CROP_9_16 / CROP_TRACKING: 9:16 crop centered on tracked face with subtle edge sharpening
         crop_x_val = f"'{active_crop_x}'" if (isinstance(active_crop_x, str) and not str(active_crop_x).isdigit()) else str(active_crop_x)
         filter_parts = [
             f"crop=ih*(9/16):ih:{crop_x_val}:0",
             "scale=1080:1920:flags=lanczos",
+            "unsharp=5:5:0.6:3:3:0.3",
             "setsar=1"
         ]
         if escaped_ass:

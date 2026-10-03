@@ -162,14 +162,15 @@ def download_via_invidious(
                     Path(temp_v).unlink(missing_ok=True)
                     Path(temp_a).unlink(missing_ok=True)
 
-            # 3. If no 1080p found, fallback to highest available in format_streams
+            # 3. If no 1080p found, only accept format_streams if >= 720p (otherwise prefer yt-dlp HD)
             if format_streams:
                 best_stream = max(
                     format_streams,
                     key=lambda s: int(re.sub(r'\D', '', str(s.get("qualityLabel", "0"))) or 0)
                 )
-                if best_stream.get("url"):
-                    if _download_file_stream(best_stream.get("url"), output_path, cancel_event, progress_callback, "Invidious"):
+                q_num = int(re.sub(r'\D', '', str(best_stream.get("qualityLabel", "0"))) or 0)
+                if q_num >= 720 and best_stream.get("url"):
+                    if _download_file_stream(best_stream.get("url"), output_path, cancel_event, progress_callback, f"Invidious ({q_num}p)"):
                         return True
         except Exception as e:
             print(f"[Invidious] Error fetching from {base_url}: {e}")
@@ -180,10 +181,10 @@ def download_via_invidious(
 def get_ydl_options(output_path: str, **kwargs) -> Dict[str, Any]:
     """
     Returns yt-dlp options configured for safe fallback without requiring login or cookies.
-    Forces highest resolution (1080p / bestvideo+bestaudio).
+    Forces highest resolution (up to 4K 2160p / 1440p / 1080p).
     """
     return {
-        "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/bestvideo+bestaudio/best[height>=1080]/best[ext=mp4]/best",
+        "format": "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/bestvideo+bestaudio/best[height>=1080]/best[ext=mp4]/best",
         "outtmpl": output_path,
         "extractor_args": {
             "youtube": {
