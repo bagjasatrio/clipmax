@@ -497,11 +497,236 @@
       <!-- 3. REVIEW WORKSPACE (When Finished) -->
       <section id="stageReview" class="flex-1 flex overflow-hidden hidden">
         
-        <!-- Left: Centered Video Player & Controls -->
-        <div class="flex-1 flex flex-col items-center justify-center p-4 overflow-y-auto">
+        <!-- ================= LEFT PANEL: KETERANGAN & EDIT DETAIL (DIPERLEBAR) ================= -->
+        <div class="w-[580px] xl:w-[640px] shrink-0 border-r border-[#222938] bg-[#0E121A] flex flex-col h-full overflow-y-auto p-4 space-y-4">
+          
+          <!-- 1. Metadata, Hook & Deskripsi Lengkap (Diperlebar) -->
+          <div class="p-4 bg-[#131722] border border-[#222938] rounded-xl text-xs space-y-3 shadow-md select-text">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex-1 min-w-0">
+                <span id="activeClipTitle" class="font-bold text-gray-100 text-sm leading-snug break-words select-text">Judul Klip</span>
+              </div>
+              <span id="activeClipScore" class="shrink-0 px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">95 Score</span>
+            </div>
+            
+            <!-- Viral Hook Card -->
+            <div class="p-3 rounded-lg bg-indigo-950/40 border border-indigo-500/20">
+              <div class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-indigo-400 mb-1">
+                <span>Viral Hook</span>
+                <button type="button" id="btnCopyHook" class="text-indigo-400 hover:text-white transition flex items-center space-x-1" title="Salin Hook">
+                  <span>📋 Salin</span>
+                </button>
+              </div>
+              <p id="activeClipHook" class="text-indigo-200 italic text-xs leading-relaxed break-words select-text"></p>
+            </div>
+
+            <!-- Full Reasoning / Description -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                <span>Alasan / Deskripsi Lengkap</span>
+                <div class="flex items-center space-x-2">
+                  <button type="button" id="btnCopyReason" class="text-gray-400 hover:text-indigo-300 transition flex items-center space-x-1" title="Salin Deskripsi Saja">
+                    <span>📋 Salin</span>
+                  </button>
+                  <button type="button" id="btnCopyAll" class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-bold text-[10px] transition shadow flex items-center space-x-1" title="Salin Judul, Hook & Deskripsi Lengkap">
+                    <span>📋 Salin Semua</span>
+                  </button>
+                </div>
+              </div>
+              <div id="activeClipReason" class="text-gray-300 text-xs leading-relaxed break-words whitespace-pre-wrap max-h-40 overflow-y-auto bg-[#0A0D14] p-3 rounded-lg border border-[#1E2533] select-text"></div>
+            </div>
+          </div>
+
+          <!-- 2. Grid 2 Kolom Berdampingan: Teks Video & Watermark Gambar -->
+          <div class="grid grid-cols-2 gap-3.5">
+
+            <!-- Kolom Kiri: Video Text Overlay Panel -->
+            <div class="p-3.5 bg-[#131722] border border-[#222938] rounded-xl text-xs space-y-3 flex flex-col justify-between shadow-md">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold text-gray-200 flex items-center space-x-1.5">
+                    <span>✍️</span>
+                    <span>Edit Teks Video</span>
+                  </span>
+                  <span id="badgeOverlayStatus" class="text-[10px] text-gray-400 font-mono">Live</span>
+                </div>
+
+                <!-- Text Input -->
+                <div>
+                  <input type="text" id="inputOverlayText" placeholder="Teks judul/hook video..." class="w-full px-2.5 py-1.5 bg-[#0D1017] border border-[#222938] focus:border-indigo-500 rounded-lg text-xs text-white placeholder-gray-600 outline-none transition">
+                </div>
+
+                <!-- Font & Color -->
+                <div class="grid grid-cols-2 gap-2 text-[11px]">
+                  <div>
+                    <label class="block text-gray-400 mb-0.5">Font:</label>
+                    <select id="selectOverlayFont" class="w-full px-2 py-1 bg-[#0D1017] border border-[#222938] rounded text-gray-200 outline-none text-xs">
+                      <option value="Impact">Impact</option>
+                      <option value="Montserrat" selected>Montserrat</option>
+                      <option value="Roboto">Roboto</option>
+                      <option value="Arial">Arial</option>
+                      <option value="Trebuchet MS">Trebuchet</option>
+                      <option value="Georgia">Georgia</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-gray-400 mb-0.5">Warna Teks:</label>
+                    <div class="flex items-center space-x-1 bg-[#0D1017] border border-[#222938] rounded px-1.5 py-0.5">
+                      <input type="color" id="pickerOverlayTextColor" value="#FFFFFF" class="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0">
+                      <span id="lblOverlayTextColor" class="text-[10px] font-mono text-gray-300">#FFF</span>
+                    </div>
+                  </div>
+
+                  <div class="col-span-2">
+                    <label class="block text-gray-400 mb-0.5">Background Teks:</label>
+                    <select id="selectOverlayBgStyle" class="w-full px-2 py-1 bg-[#0D1017] border border-[#222938] rounded text-gray-200 outline-none text-xs">
+                      <option value="solid_black" selected>Box Hitam Solid</option>
+                      <option value="semi_black">Box Hitam 60%</option>
+                      <option value="yellow_viral">Box Kuning Viral</option>
+                      <option value="red_alert">Box Merah Alert</option>
+                      <option value="none">Tanpa Box</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Free Roam Positioning Slider / Quick Preset -->
+                <div class="space-y-1.5 pt-1.5 border-t border-[#1C2230]">
+                  <div class="flex items-center justify-between text-[11px]">
+                    <span class="text-gray-400 font-medium">Posisi (Free Roam):</span>
+                    <div class="flex space-x-1">
+                      <button type="button" id="btnPosPresetTop" class="px-1.5 py-0.5 bg-[#1C2230] hover:bg-indigo-600 text-gray-300 hover:text-white rounded text-[10px] transition">Atas</button>
+                      <button type="button" id="btnPosPresetCenter" class="px-1.5 py-0.5 bg-[#1C2230] hover:bg-indigo-600 text-gray-300 hover:text-white rounded text-[10px] transition">Tengah</button>
+                      <button type="button" id="btnPosPresetBottom" class="px-1.5 py-0.5 bg-[#1C2230] hover:bg-indigo-600 text-gray-300 hover:text-white rounded text-[10px] transition">Bawah</button>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 text-[10px]">
+                    <div>
+                      <div class="flex justify-between text-gray-400 mb-0.5">
+                        <span>X:</span>
+                        <span id="lblTextPosX" class="font-mono text-indigo-300">50%</span>
+                      </div>
+                      <input type="range" id="inputRangeTextX" min="5" max="95" value="50" class="w-full h-1.5 accent-indigo-500 cursor-pointer">
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-gray-400 mb-0.5">
+                        <span>Y:</span>
+                        <span id="lblTextPosY" class="font-mono text-indigo-300">12%</span>
+                      </div>
+                      <input type="range" id="inputRangeTextY" min="5" max="95" value="12" class="w-full h-1.5 accent-indigo-500 cursor-pointer">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="space-y-1.5 pt-2 border-t border-[#1C2230]">
+                <button id="btnApplyOverlay" class="w-full py-1.5 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition flex items-center justify-center space-x-1 shadow">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  <span id="lblApplyOverlay">Terapkan & Render</span>
+                </button>
+                <button id="btnRemoveOverlay" class="w-full py-1 px-2 bg-gray-800/80 hover:bg-red-900/60 text-gray-300 hover:text-red-300 border border-[#222938] rounded-lg text-[11px] transition" title="Hapus Teks & Kembalikan Klip Asli">
+                  Hapus Teks
+                </button>
+              </div>
+            </div>
+
+            <!-- Kolom Kanan: Image / Watermark / Logo Overlay Panel -->
+            <div class="p-3.5 bg-[#131722] border border-[#222938] rounded-xl text-xs space-y-3 flex flex-col justify-between shadow-md">
+              <div class="space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold text-gray-200 flex items-center space-x-1.5">
+                    <span>🖼️</span>
+                    <span>Logo / Watermark</span>
+                  </span>
+                  <span id="badgeImageOverlayStatus" class="text-[10px] text-gray-400 font-mono">Belum Ada</span>
+                </div>
+
+                <!-- Image Select Bar -->
+                <div class="space-y-1.5">
+                  <input type="file" id="fileImageInput" accept="image/*" class="hidden">
+                  <button id="btnPickImage" type="button" class="w-full py-1.5 px-2.5 bg-[#1C2230] hover:bg-cyan-600 text-gray-200 hover:text-white border border-[#2B3548] rounded-lg text-xs transition flex items-center justify-center space-x-1.5 shadow">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <span>Pilih File Logo/Gambar</span>
+                  </button>
+                  <div id="imageInfoBox" class="flex items-center justify-between px-2 py-1 bg-[#0D1017] rounded border border-[#222938] text-[10px] text-gray-400 truncate">
+                    <span id="lblImageFileName" class="truncate">Belum ada file</span>
+                    <button id="btnClearImage" type="button" class="text-gray-500 hover:text-red-400 ml-1 font-bold hidden" title="Batalkan gambar">✕</button>
+                  </div>
+                </div>
+
+                <!-- Image Controls Wrapper -->
+                <div id="imageControlsWrapper" class="space-y-2 text-[11px] opacity-50 pointer-events-none transition-opacity">
+                  <!-- Scale & Opacity Sliders -->
+                  <div class="grid grid-cols-2 gap-2 text-[10px]">
+                    <div>
+                      <div class="flex justify-between text-gray-400 mb-0.5">
+                        <span>Skala:</span>
+                        <span id="lblImageScale" class="font-mono text-cyan-300">16%</span>
+                      </div>
+                      <input type="range" id="inputRangeImageScale" min="5" max="50" value="16" class="w-full h-1.5 accent-cyan-500 cursor-pointer">
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-gray-400 mb-0.5">
+                        <span>Opasitas:</span>
+                        <span id="lblImageOpacity" class="font-mono text-cyan-300">90%</span>
+                      </div>
+                      <input type="range" id="inputRangeImageOpacity" min="10" max="100" value="90" class="w-full h-1.5 accent-cyan-500 cursor-pointer">
+                    </div>
+                  </div>
+
+                  <!-- Free Roam Positioning & Presets -->
+                  <div class="space-y-1 pt-1 border-t border-[#1C2230]">
+                    <div class="flex items-center justify-between text-[10px]">
+                      <span class="text-gray-400 font-medium">Posisi Logo:</span>
+                      <div class="flex space-x-1">
+                        <button type="button" id="btnImgPresetTopRight" class="px-1 py-0.5 bg-[#1C2230] hover:bg-cyan-600 text-gray-300 hover:text-white rounded text-[9px] transition">Kanan Atas</button>
+                        <button type="button" id="btnImgPresetTopLeft" class="px-1 py-0.5 bg-[#1C2230] hover:bg-cyan-600 text-gray-300 hover:text-white rounded text-[9px] transition">Kiri Atas</button>
+                        <button type="button" id="btnImgPresetBottomRight" class="px-1 py-0.5 bg-[#1C2230] hover:bg-cyan-600 text-gray-300 hover:text-white rounded text-[9px] transition">Bawah</button>
+                        <button type="button" id="btnImgPresetCenter" class="px-1 py-0.5 bg-[#1C2230] hover:bg-cyan-600 text-gray-300 hover:text-white rounded text-[9px] transition">Tengah</button>
+                      </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[10px]">
+                      <div>
+                        <div class="flex justify-between text-gray-400 mb-0.5">
+                          <span>X:</span>
+                          <span id="lblImagePosX" class="font-mono text-cyan-300">85%</span>
+                        </div>
+                        <input type="range" id="inputRangeImageX" min="5" max="95" value="85" class="w-full h-1.5 accent-cyan-500 cursor-pointer">
+                      </div>
+                      <div>
+                        <div class="flex justify-between text-gray-400 mb-0.5">
+                          <span>Y:</span>
+                          <span id="lblImagePosY" class="font-mono text-cyan-300">8%</span>
+                        </div>
+                        <input type="range" id="inputRangeImageY" min="5" max="95" value="8" class="w-full h-1.5 accent-cyan-500 cursor-pointer">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="space-y-1.5 pt-2 border-t border-[#1C2230]">
+                <button id="btnApplyImageOverlay" type="button" class="w-full py-1.5 px-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold transition flex items-center justify-center space-x-1 shadow">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  <span id="lblApplyImageOverlay">Bakar Logo</span>
+                </button>
+                <button id="btnRemoveImageOverlay" type="button" class="w-full py-1 px-2 bg-gray-800/80 hover:bg-red-900/60 text-gray-300 hover:text-red-300 border border-[#222938] rounded-lg text-[11px] transition" title="Hapus Logo dari Video">
+                  Hapus Logo
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- ================= CENTER PREVIEW STAGE: PINNED VIDEO MONITOR ================= -->
+        <div class="flex-1 flex flex-col items-center justify-center p-6 bg-[#07090E] overflow-hidden min-w-[340px]">
           
           <!-- 9:16 Video Canvas Box with Free Roam Drag Support -->
-          <div id="videoCanvasBox" class="relative bg-black rounded-lg overflow-hidden border border-[#222938] shadow-2xl h-[480px] aspect-9-16 flex items-center justify-center select-none">
+          <div id="videoCanvasBox" class="relative bg-black rounded-2xl overflow-hidden border border-[#222938] shadow-2xl h-[520px] max-h-[calc(100vh-210px)] aspect-9-16 flex items-center justify-center select-none ring-1 ring-white/5">
             <video id="mainVideo" class="w-full h-full object-contain" preload="metadata" playsinline></video>
             
             <!-- Draggable Free Roam Live Text Overlay Layer -->
@@ -513,8 +738,8 @@
             </div>
           </div>
 
-          <!-- Video Controls Bar -->
-          <div class="w-full max-w-[360px] mt-3 space-y-2">
+          <!-- Video Playback Controls Bar -->
+          <div class="w-full max-w-[340px] mt-3 space-y-2">
             <!-- Scrubber Timeline -->
             <input type="range" id="videoScrubber" min="0" max="1000" value="0" class="w-full">
             
@@ -536,226 +761,12 @@
                 <input type="range" id="volumeSlider" min="0" max="100" value="40" class="w-20" title="Volume: 40%">
               </div>
             </div>
-
-            <!-- Active Clip Info (Full, Selectable & Copyable) -->
-            <div class="p-3 bg-[#131722] border border-[#222938] rounded-lg mt-2 text-xs space-y-2 select-text">
-              <div class="flex items-start justify-between gap-2">
-                <div class="flex-1 min-w-0">
-                  <span id="activeClipTitle" class="font-bold text-gray-100 text-sm leading-snug break-words select-text">Judul Klip</span>
-                </div>
-                <span id="activeClipScore" class="shrink-0 px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">95 Score</span>
-              </div>
-              
-              <!-- Viral Hook Card -->
-              <div class="p-2 rounded bg-indigo-950/40 border border-indigo-500/20">
-                <div class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-indigo-400 mb-0.5">
-                  <span>Viral Hook</span>
-                  <button type="button" id="btnCopyHook" class="text-indigo-400 hover:text-white transition flex items-center space-x-1" title="Salin Hook">
-                    <span>📋 Salin</span>
-                  </button>
-                </div>
-                <p id="activeClipHook" class="text-indigo-200 italic text-xs leading-relaxed break-words select-text"></p>
-              </div>
-
-              <!-- Full Reasoning / Description -->
-              <div class="space-y-1">
-                <div class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                  <span>Alasan / Deskripsi Lengkap</span>
-                  <div class="flex items-center space-x-2">
-                    <button type="button" id="btnCopyReason" class="text-gray-400 hover:text-indigo-300 transition flex items-center space-x-1" title="Salin Deskripsi Saja">
-                      <span>📋 Salin</span>
-                    </button>
-                    <button type="button" id="btnCopyAll" class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-bold text-[10px] transition shadow flex items-center space-x-1" title="Salin Judul, Hook & Deskripsi Lengkap">
-                      <span>📋 Salin Semua</span>
-                    </button>
-                  </div>
-                </div>
-                <div id="activeClipReason" class="text-gray-300 text-xs leading-relaxed break-words whitespace-pre-wrap max-h-48 overflow-y-auto bg-[#0A0D14] p-2.5 rounded border border-[#1E2533] select-text"></div>
-              </div>
-            </div>
-
-            <!-- Video Text Overlay Panel -->
-            <div class="p-3 bg-[#131722] border border-[#222938] rounded-lg mt-2 text-xs space-y-2.5">
-              <div class="flex items-center justify-between">
-                <span class="font-semibold text-gray-200 flex items-center space-x-1.5">
-                  <span>✍️</span>
-                  <span>Tambah / Edit Teks Video</span>
-                </span>
-                <span id="badgeOverlayStatus" class="text-[10px] text-gray-400 font-mono">Live Preview</span>
-              </div>
-
-              <!-- Text Input -->
-              <div>
-                <input type="text" id="inputOverlayText" placeholder="Tulis teks judul/hook video di sini..." class="w-full px-2.5 py-1.5 bg-[#0D1017] border border-[#222938] focus:border-indigo-500 rounded text-xs text-white placeholder-gray-600 outline-none transition">
-              </div>
-
-              <!-- Controls Grid: Font, Color, Background -->
-              <div class="grid grid-cols-2 gap-2 text-[11px]">
-                <!-- Font Selection -->
-                <div>
-                  <label class="block text-gray-400 mb-0.5">Font:</label>
-                  <select id="selectOverlayFont" class="w-full px-2 py-1 bg-[#0D1017] border border-[#222938] rounded text-gray-200 outline-none">
-                    <option value="Impact">Impact (Viral Punchy)</option>
-                    <option value="Montserrat" selected>Montserrat (Modern)</option>
-                    <option value="Roboto">Roboto (Clean)</option>
-                    <option value="Arial">Arial (Sans-Serif)</option>
-                    <option value="Trebuchet MS">Trebuchet MS</option>
-                    <option value="Georgia">Georgia (Serif)</option>
-                  </select>
-                </div>
-
-                <!-- Text Color -->
-                <div>
-                  <label class="block text-gray-400 mb-0.5">Warna Teks:</label>
-                  <div class="flex items-center space-x-1.5">
-                    <input type="color" id="pickerOverlayTextColor" value="#FFFFFF" class="w-6 h-6 rounded cursor-pointer border border-[#222938] bg-transparent">
-                    <span id="lblOverlayTextColor" class="text-[10px] font-mono text-gray-300">#FFFFFF</span>
-                  </div>
-                </div>
-
-                <!-- Background Style -->
-                <div class="col-span-2">
-                  <label class="block text-gray-400 mb-0.5">Background Teks:</label>
-                  <select id="selectOverlayBgStyle" class="w-full px-2 py-1 bg-[#0D1017] border border-[#222938] rounded text-gray-200 outline-none">
-                    <option value="solid_black" selected>Box Hitam Solid</option>
-                    <option value="semi_black">Box Hitam 60%</option>
-                    <option value="yellow_viral">Box Kuning Viral</option>
-                    <option value="red_alert">Box Merah Alert</option>
-                    <option value="none">Tanpa Background</option>
-                  </select>
-                </div>
-              </div>
-
-              <!-- Free Roam Positioning Slider / Quick Preset -->
-              <div class="space-y-1.5 pt-1 border-t border-[#1C2230]">
-                <div class="flex items-center justify-between text-[11px]">
-                  <span class="text-gray-400 font-medium">Posisi Bebas (Free Roam):</span>
-                  <div class="flex space-x-1">
-                    <button type="button" id="btnPosPresetTop" class="px-1.5 py-0.5 bg-[#1C2230] hover:bg-indigo-600 text-gray-300 hover:text-white rounded text-[10px] transition">Atas</button>
-                    <button type="button" id="btnPosPresetCenter" class="px-1.5 py-0.5 bg-[#1C2230] hover:bg-indigo-600 text-gray-300 hover:text-white rounded text-[10px] transition">Tengah</button>
-                    <button type="button" id="btnPosPresetBottom" class="px-1.5 py-0.5 bg-[#1C2230] hover:bg-indigo-600 text-gray-300 hover:text-white rounded text-[10px] transition">Bawah</button>
-                  </div>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-[10px]">
-                  <div>
-                    <div class="flex justify-between text-gray-400 mb-0.5">
-                      <span>X (Horizontal):</span>
-                      <span id="lblTextPosX" class="font-mono text-indigo-300">50%</span>
-                    </div>
-                    <input type="range" id="inputRangeTextX" min="5" max="95" value="50" class="w-full h-1.5 accent-indigo-500 cursor-pointer">
-                  </div>
-                  <div>
-                    <div class="flex justify-between text-gray-400 mb-0.5">
-                      <span>Y (Vertikal):</span>
-                      <span id="lblTextPosY" class="font-mono text-indigo-300">12%</span>
-                    </div>
-                    <input type="range" id="inputRangeTextY" min="5" max="95" value="12" class="w-full h-1.5 accent-indigo-500 cursor-pointer">
-                  </div>
-                </div>
-              </div>
-
-              <!-- Action Buttons -->
-              <div class="flex items-center space-x-2 pt-1">
-                <button id="btnApplyOverlay" class="flex-1 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-semibold transition flex items-center justify-center space-x-1 shadow">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                  <span id="lblApplyOverlay">Terapkan & Render Ulang</span>
-                </button>
-                <button id="btnRemoveOverlay" class="py-1.5 px-2.5 bg-gray-800 hover:bg-red-900/60 text-gray-300 hover:text-red-300 border border-[#222938] rounded text-xs transition" title="Hapus Teks & Kembalikan Klip Asli">
-                  Hapus Teks
-                </button>
-              </div>
-            </div>
-
-            <!-- Image / Watermark / Logo Overlay Panel -->
-            <div class="p-3 bg-[#131722] border border-[#222938] rounded-lg mt-2 text-xs space-y-2.5">
-              <div class="flex items-center justify-between">
-                <span class="font-semibold text-gray-200 flex items-center space-x-1.5">
-                  <span>🖼️</span>
-                  <span>Tambah Logo / Watermark Gambar</span>
-                </span>
-                <span id="badgeImageOverlayStatus" class="text-[10px] text-gray-400 font-mono">Belum Ada</span>
-              </div>
-
-              <!-- Image Select Bar -->
-              <div class="flex items-center space-x-2">
-                <input type="file" id="fileImageInput" accept="image/*" class="hidden">
-                <button id="btnPickImage" type="button" class="py-1.5 px-3 bg-[#1C2230] hover:bg-cyan-600 text-gray-200 hover:text-white border border-[#2B3548] rounded text-xs transition flex items-center space-x-1.5 shadow shrink-0">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                  <span>Pilih Logo/Gambar</span>
-                </button>
-                <div id="imageInfoBox" class="flex-1 min-w-0 flex items-center justify-between px-2.5 py-1 bg-[#0D1017] rounded border border-[#222938] text-[11px] text-gray-400 truncate">
-                  <span id="lblImageFileName" class="truncate">Belum ada file dipilih</span>
-                  <button id="btnClearImage" type="button" class="text-gray-500 hover:text-red-400 ml-1.5 font-bold hidden" title="Batalkan gambar terpilih">✕</button>
-                </div>
-              </div>
-
-              <!-- Image Controls Wrapper -->
-              <div id="imageControlsWrapper" class="space-y-2 text-[11px] opacity-50 pointer-events-none transition-opacity">
-                <!-- Scale & Opacity Sliders -->
-                <div class="grid grid-cols-2 gap-2 text-[10px]">
-                  <div>
-                    <div class="flex justify-between text-gray-400 mb-0.5">
-                      <span>Ukuran (Scale):</span>
-                      <span id="lblImageScale" class="font-mono text-cyan-300">16%</span>
-                    </div>
-                    <input type="range" id="inputRangeImageScale" min="5" max="50" value="16" class="w-full h-1.5 accent-cyan-500 cursor-pointer">
-                  </div>
-                  <div>
-                    <div class="flex justify-between text-gray-400 mb-0.5">
-                      <span>Opasitas:</span>
-                      <span id="lblImageOpacity" class="font-mono text-cyan-300">90%</span>
-                    </div>
-                    <input type="range" id="inputRangeImageOpacity" min="10" max="100" value="90" class="w-full h-1.5 accent-cyan-500 cursor-pointer">
-                  </div>
-                </div>
-
-                <!-- Free Roam Positioning & Presets -->
-                <div class="space-y-1.5 pt-1 border-t border-[#1C2230]">
-                  <div class="flex items-center justify-between text-[11px]">
-                    <span class="text-gray-400 font-medium">Posisi Logo (Free Roam):</span>
-                    <div class="flex space-x-1">
-                      <button type="button" id="btnImgPresetTopRight" class="px-1.5 py-0.5 bg-[#1C2230] hover:bg-cyan-600 text-gray-300 hover:text-white rounded text-[10px] transition">Kanan Atas</button>
-                      <button type="button" id="btnImgPresetTopLeft" class="px-1.5 py-0.5 bg-[#1C2230] hover:bg-cyan-600 text-gray-300 hover:text-white rounded text-[10px] transition">Kiri Atas</button>
-                      <button type="button" id="btnImgPresetBottomRight" class="px-1.5 py-0.5 bg-[#1C2230] hover:bg-cyan-600 text-gray-300 hover:text-white rounded text-[10px] transition">Kanan Bawah</button>
-                      <button type="button" id="btnImgPresetCenter" class="px-1.5 py-0.5 bg-[#1C2230] hover:bg-cyan-600 text-gray-300 hover:text-white rounded text-[10px] transition">Tengah</button>
-                    </div>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2 text-[10px]">
-                    <div>
-                      <div class="flex justify-between text-gray-400 mb-0.5">
-                        <span>X:</span>
-                        <span id="lblImagePosX" class="font-mono text-cyan-300">85%</span>
-                      </div>
-                      <input type="range" id="inputRangeImageX" min="5" max="95" value="85" class="w-full h-1.5 accent-cyan-500 cursor-pointer">
-                    </div>
-                    <div>
-                      <div class="flex justify-between text-gray-400 mb-0.5">
-                        <span>Y:</span>
-                        <span id="lblImagePosY" class="font-mono text-cyan-300">8%</span>
-                      </div>
-                      <input type="range" id="inputRangeImageY" min="5" max="95" value="8" class="w-full h-1.5 accent-cyan-500 cursor-pointer">
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="flex items-center space-x-2 pt-1">
-                  <button id="btnApplyImageOverlay" type="button" class="flex-1 py-1.5 px-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-semibold transition flex items-center justify-center space-x-1 shadow">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    <span id="lblApplyImageOverlay">Bakar Logo ke Video</span>
-                  </button>
-                  <button id="btnRemoveImageOverlay" type="button" class="py-1.5 px-2.5 bg-gray-800 hover:bg-red-900/60 text-gray-300 hover:text-red-300 border border-[#222938] rounded text-xs transition" title="Hapus Logo dari Video">
-                    Hapus Logo
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
 
         </div>
 
-        <!-- Right: Curated Clips Gallery Strip -->
-        <div class="w-[360px] shrink-0 border-l border-[#222938] bg-[#121620] flex flex-col h-full">
+        <!-- ================= RIGHT PANEL: CURATED CLIPS GALLERY STRIP ================= -->
+        <div class="w-[330px] shrink-0 border-l border-[#222938] bg-[#121620] flex flex-col h-full">
           <div class="p-3 border-b border-[#222938] flex items-center justify-between">
             <span class="text-xs font-semibold uppercase tracking-wider text-gray-300">Curated Clips (<span id="clipsCount">0</span>)</span>
             <button id="btnNewTask" class="text-xs text-indigo-400 hover:text-indigo-300 transition">Proyek Baru</button>
