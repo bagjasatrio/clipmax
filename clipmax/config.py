@@ -100,13 +100,15 @@ class AppConfig(BaseModel):
         with open(p, "w", encoding="utf-8") as f:
             json.dump(self.model_dump(), f, indent=2)
 
-def clear_temp_cache(temp_dir_path: Optional[str] = None) -> int:
-    """Removes all temporary cache files, subclips, wav chunks, and directories."""
+def clear_temp_cache(temp_dir_path: Optional[str] = None, purge_staging: bool = False) -> int:
+    """Removes temporary cache files, subclips, wav chunks, and directories while preserving staging unless purge_staging=True."""
     target = Path(temp_dir_path or AppConfig().temp_dir).resolve()
     removed_count = 0
     if target.exists():
         for item in target.iterdir():
             try:
+                if item.name in ("staging", "downloads") and not purge_staging:
+                    continue
                 if item.is_file():
                     item.unlink()
                     removed_count += 1

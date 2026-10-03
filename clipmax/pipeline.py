@@ -197,12 +197,15 @@ class PipelineOrchestrator:
             self.status = PipelineStatus.TRANSCRIBING
             if progress_callback:
                 progress_callback(self.status, 35, "Transkripsi kata via Faster-Whisper (CUDA float16)...")
-            words, full_text = transcribe_audio(
+            trans_res = transcribe_audio(
                 temp_wav,
                 model_size=self.config.whisper_model,
                 device="cuda",
                 compute_type="float16"
             )
+            words = trans_res[0]
+            full_text = trans_res[1]
+            detected_lang = getattr(trans_res, "language", "id")
 
             if self.cancel_requested.is_set():
                 self.status = PipelineStatus.CANCELLED
@@ -221,7 +224,8 @@ class PipelineOrchestrator:
                 min_duration=min_dur,
                 max_duration=max_dur,
                 campaign_rules=rules,
-                clip_mode=mode_type
+                clip_mode=mode_type,
+                detected_language=detected_lang
             )
 
             if not candidates:

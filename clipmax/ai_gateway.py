@@ -92,6 +92,12 @@ def discover_models(endpoint_url: str, api_key: str = "") -> List[str]:
 SYSTEM_PROMPT = """Anda adalah kurator video viral profesional untuk TikTok, Instagram Reels, dan YouTube Shorts.
 Analisis transkrip dan pilih segmen klip terbaik berdasarkan kriteria dan instruksi khusus.
 
+ATURAN KESELARASAN BAHASA (STRICT LANGUAGE ALIGNMENT - WAJIB):
+1. Periksa bahasa utama dari teks transkrip audio sumber:
+   - JIKA TRANSKRIP BERBAHASA INGGRIS (ENGLISH): Seluruh teks output: 'title', 'hook', dan 'reasoning' WAJIB DITULIS DALAM BAHASA INGGRIS (English) yang tajam, punchy, viral, dan natural! JANGAN PERNAH menerjemahkan ke bahasa Indonesia!
+   - JIKA TRANSKRIP BERBAHASA INDONESIA: Seluruh teks output: 'title', 'hook', dan 'reasoning' WAJIB DITULIS DALAM BAHASA INDONESIA yang menarik dan natural.
+2. Selalu gunakan bahasa yang sama persis dengan bahasa asli pembicara pada transkrip sumber!
+
 ATURAN UTAMA (ENFORCE MANDATORY CONSTRAINTS):
 Periksa 'Campaign Brief & Custom Rules'. Jika ada syarat akhir spesifik (seperti diakhiri kemenangan/victory/end-game):
 1. Cari segmen transkrip paling relevan di bagian akhir sesi pertandingan (analisis kata penutup, seruan 'menang', 'kelar', 'push base', 'GG', atau segmen audio intens di menit-menit akhir).
@@ -108,18 +114,24 @@ Kriteria seleksi umum:
 Format output WAJIB berupa JSON array murni tanpa markdown wrapper:
 [
   {
-    "title": "Judul singkat klip",
-    "hook": "Kalimat pembuka pemikat perhatian",
+    "title": "Short punchy title (match transcript language)",
+    "hook": "Attention-grabbing opening hook (match transcript language)",
     "start_time": 754.20,
     "end_time": 784.50,
     "virality_score": 95,
-    "reasoning": "Penjelasan mengapa klip ini viral"
+    "reasoning": "Explanation why this clip is viral (match transcript language)"
   }
 ]
 PENTING: Gunakan stempel waktu 'start_time' dan 'end_time' presisi angka float detik dari penanda waktu transkrip (contoh: 754.20), JANGAN membulatkan ke integer agar pemotongan FFmpeg presisi frame-accurate."""
 
 MONTAGE_SYSTEM_PROMPT = """Anda adalah editor dan kurator video montage profesional untuk TikTok, Instagram Reels, dan YouTube Shorts.
 Tugas Anda adalah merangkai video Multi-Cut Montage dengan menggabungkan beberapa momen penting atau klimaks berbeda dari transkrip video.
+
+ATURAN KESELARASAN BAHASA (STRICT LANGUAGE ALIGNMENT - WAJIB):
+1. Periksa bahasa utama dari teks transkrip audio sumber:
+   - JIKA TRANSKRIP BERBAHASA INGGRIS (ENGLISH): Seluruh teks output: 'title', 'hook', 'reasoning', serta label deskripsi 'event' pada cuts WAJIB DITULIS DALAM BAHASA INGGRIS (English) yang tajam, punchy, viral, dan natural! JANGAN PERNAH menerjemahkan ke bahasa Indonesia!
+   - JIKA TRANSKRIP BERBAHASA INDONESIA: Seluruh teks output: 'title', 'hook', 'reasoning', dan label 'event' WAJIB DITULIS DALAM BAHASA INDONESIA.
+2. Selalu gunakan bahasa yang sama persis dengan bahasa asli pembicara pada transkrip sumber!
 
 ATURAN UTAMA (ENFORCE MANDATORY CONSTRAINTS):
 Periksa 'Campaign Brief & Custom Rules'. Jika ada syarat akhir spesifik (seperti diakhiri kemenangan/victory/end-game):
@@ -149,20 +161,37 @@ Format output WAJIB berupa JSON array murni tanpa markdown wrapper:
 ]"""
 
 def evaluate_viral_clips(
-    transcript: str,
     endpoint_url: str,
-    api_key: str = "",
-    model: str = "default",
+    api_key: str,
+    model: str,
+    transcript: str,
     target_clip_count: int = 3,
     min_duration: float = 30.0,
     max_duration: float = 60.0,
     campaign_rules: str = "",
-    clip_mode: str = "single"
+    clip_mode: str = "single",
+    detected_language: Optional[str] = None
 ) -> List[ViralClipCandidate]:
     client = OpenAI(
         base_url=endpoint_url,
         api_key=api_key or "no-key-required"
     )
+
+    lang_section = ""
+    if detected_language:
+        if detected_language.lower().startswith("en"):
+            lang_section = (
+                "\n[LANGUAGE MANDATE: SOURCE IS IN ENGLISH]\n"
+                "The source video audio and transcript are in ENGLISH.\n"
+                "All output fields ('title', 'hook', 'reasoning', and 'event') MUST BE WRITTEN IN PUNCHY, VIRAL ENGLISH.\n"
+                "DO NOT translate into Indonesian!\n"
+            )
+        elif detected_language.lower().startswith("id"):
+            lang_section = (
+                "\n[LANGUAGE MANDATE: AUDIO BERBAHASA INDONESIA]\n"
+                "Transkrip audio video sumber dalam BAHASA INDONESIA.\n"
+                "Seluruh output ('title', 'hook', 'reasoning', dan 'event') WAJIB DITULIS DALAM BAHASA INDONESIA.\n"
+            )
 
     rules_section = ""
     if campaign_rules and campaign_rules.strip():
@@ -187,26 +216,28 @@ Kamu WAJIB memilih dan memotong klip yang memenuhi aturan di atas.
         prompt = f"""Instruksi Pemilihan Multi-Cut Montage:
 - Hasilkan tepat {target_clip_count} montage terbaik.
 - Setiap montage menggabungkan beberapa momen (cuts) berbeda.
-- Pastikan TOTAL akumulasi durasi dari seluruh cuts di setiap montage berada di dalam rentang {int(min_duration)} sampai {int(max_duration)} detik.{rules_section}
+- Pastikan TOTAL akumulasi durasi dari seluruh cuts di setiap montage berada di dalam rentang {int(min_duration)} sampai {int(max_duration)} detik.{lang_section}{rules_section}
 
 Transkrip Video:
 
 {transcript}
 
 PENGINGAT AKHIR (RECENCY BIAS):
-Wajib patuhi CRITICAL CAMPAIGN RULES dan ATURAN UTAMA di atas. Jika ada syarat kemenangan/ending wajib, pastikan klip berlabuh di momen penutup tersebut."""
+Wajib patuhi ATURAN BAHASA: Jika transkrip berbahasa Inggris, tulis title/hook/reasoning/event dalam BAHASA INGGRIS. Jika bahasa Indonesia, tulis dalam BAHASA INDONESIA.
+Patuhi CRITICAL CAMPAIGN RULES dan ATURAN UTAMA di atas jika ada syarat kemenangan/ending wajib."""
     else:
         system_content = SYSTEM_PROMPT
         prompt = f"""Instruksi Pemilihan Klip:
 - Hasilkan tepat {target_clip_count} klip terbaik.
-- Pastikan durasi setiap klip berada di dalam rentang {int(min_duration)} sampai {int(max_duration)} detik.{rules_section}
+- Pastikan durasi setiap klip berada di dalam rentang {int(min_duration)} sampai {int(max_duration)} detik.{lang_section}{rules_section}
 
 Transkrip Video:
 
 {transcript}
 
 PENGINGAT AKHIR (RECENCY BIAS):
-Wajib patuhi CRITICAL CAMPAIGN RULES dan ATURAN UTAMA di atas. Jika ada syarat kemenangan/ending wajib, pastikan klip berlabuh di momen penutup tersebut."""
+Wajib patuhi ATURAN BAHASA: Jika transkrip berbahasa Inggris, tulis title/hook/reasoning dalam BAHASA INGGRIS. Jika bahasa Indonesia, tulis dalam BAHASA INDONESIA.
+Patuhi CRITICAL CAMPAIGN RULES dan ATURAN UTAMA di atas jika ada syarat kemenangan/ending wajib."""
 
     response = client.chat.completions.create(
         model=model,

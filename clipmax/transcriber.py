@@ -16,6 +16,15 @@ class WordSegment(BaseModel):
     end: float
     probability: float
 
+class TranscriptionResult(tuple):
+    def __new__(cls, words: List[WordSegment], text: str, language: str = "id"):
+        return super().__new__(cls, (words, text))
+
+    def __init__(self, words: List[WordSegment], text: str, language: str = "id"):
+        self.words = words
+        self.text = text
+        self.language = language
+
 def cleanup_vram() -> None:
     gc.collect()
     if torch.cuda.is_available():
@@ -26,8 +35,7 @@ def cleanup_vram() -> None:
             pass
 
 DEFAULT_INITIAL_PROMPT = (
-    "Mobile Legends, gameplay, bang, bro, cuy, gank, war, turtle, lord, "
-    "wiped out, ulti, flicker, push tower, solo kill, GGWP, rata, nice try, by one."
+    "Podcast, interview, conversation, commentary, storytelling, gaming, highlights, Mobile Legends."
 )
 
 def transcribe_audio(
@@ -46,6 +54,7 @@ def transcribe_audio(
     whisper_model = None
     all_words: List[WordSegment] = []
     text_segments: List[str] = []
+    detected_lang: str = language or "id"
 
     try:
         print(f"[ClipMax Whisper] Menginisialisasi WhisperModel('{model_size}', device='{device}', compute_type='{compute_type}')...")
@@ -57,6 +66,11 @@ def transcribe_audio(
             language=language,
             initial_prompt=prompt
         )
+        if hasattr(info, "language") and info.language:
+            detected_lang = info.language
+            prob = getattr(info, "language_probability", 1.0)
+            prob_val = float(prob) if isinstance(prob, (int, float)) else 1.0
+            print(f"[ClipMax Whisper] Bahasa terdeteksi: {detected_lang} (probabilitas: {prob_val:.2f})")
 
         for segment in segments:
             t_text = segment.text.strip()
@@ -87,4 +101,4 @@ def transcribe_audio(
         cleanup_vram()
 
     full_transcript = "\n".join(text_segments)
-    return all_words, full_transcript
+    return TranscriptionResult(all_words, full_transcript, detected_lang)

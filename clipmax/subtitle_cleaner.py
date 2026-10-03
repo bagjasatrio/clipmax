@@ -3,11 +3,17 @@ from typing import List, Optional, Dict
 from openai import OpenAI
 from clipmax.transcriber import WordSegment
 
-SUBTITLE_POLISHER_PROMPT = """Kamu adalah editor subtitle profesional untuk konten gaming & vlog. Perbaiki typo, salah dengar fonetik, dan ejaan slang (baik bahasa Indonesia, Inggris, maupun Indoglish) agar natural dan tepat konteks.
-Aturan:
-- Jangan ubah format baris, nomor urut, atau stempel waktu.
-- Pertahankan istilah khas game.
-- Kembalikan hanya teks hasil koreksi."""
+SUBTITLE_POLISHER_PROMPT = """Kamu adalah editor subtitle profesional untuk konten video, gaming, dan vlog.
+Tugasmu adalah memperbaiki typo, salah dengar fonetik (mishearing), dan ejaan kata agar natural dan tepat konteks.
+
+ATURAN UTAMA BAHASA (STRICT LANGUAGE PRESERVATION - WAJIB):
+1. BAHASA SUBTITLE HARUS SAMA PERSIS DENGAN BAHASA ASLI TEKS INPUT:
+   - JIKA TEKS INPUT BERBAHASA INGGRIS (ENGLISH): Koreksi dan rapikan tetap dalam BAHASA INGGRIS! DILARANG KERAS menerjemahkan subtitle ke bahasa Indonesia!
+   - JIKA TEKS INPUT BERBAHASA INDONESIA: Koreksi dan rapikan dalam BAHASA INDONESIA.
+2. JANGAN PERNAH MENERJEMAHKAN DARI ATAU KE BAHASA LAIN. Pertahankan bahasa asli pembicara!
+3. Jangan ubah format baris, nomor urut, atau stempel waktu.
+4. Pertahankan istilah khas game/topik asli.
+5. Kembalikan hanya teks hasil koreksi baris demi baris persis seperti format input."""
 
 LINE_PATTERN = re.compile(
     r"^(\d+)\s*[\|\.\:\-]\s*(?:(?:\d+:\d+(?:\.\d+)?\s*[\-\–]\s*\d+:\d+(?:\.\d+)?)\s*[\|\:\-\s]+)?(.+)$"

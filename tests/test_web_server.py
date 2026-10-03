@@ -255,5 +255,45 @@ def test_api_projects_endpoints(tmp_path, monkeypatch):
     assert res_del.status_code == 200
     assert len(pm.list_projects()) == 0
 
+def test_stream_and_thumbnail_endpoints(tmp_path, monkeypatch):
+    staging_dir = tmp_path / "temp" / "staging"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(state.config, "temp_dir", str(tmp_path / "temp"))
+
+    vid_file = staging_dir / "clipmax_9_10.mp4"
+    vid_file.write_text("mp4 streaming content")
+    thumb_file = staging_dir / "thumb_9_10.jpg"
+    thumb_file.write_text("jpg thumbnail content")
+
+    state.clips = [
+        ClipResult(
+            clip_id=9,
+            title="Clip 9",
+            hook="Hook 9",
+            virality_score=92,
+            reasoning="Reason",
+            start_time=10.0,
+            end_time=30.0,
+            staging_path=str(vid_file),
+            thumbnail_path=str(thumb_file)
+        )
+    ]
+
+    # Test stream video endpoint
+    res_vid = client.get("/api/clips/9/stream")
+    assert res_vid.status_code == 200
+    assert res_vid.headers["content-type"] == "video/mp4"
+
+    # Test thumbnail endpoint
+    res_th = client.get("/api/clips/9/thumbnail")
+    assert res_th.status_code == 200
+    assert res_th.headers["content-type"] == "image/jpeg"
+
+    # Test staging fallback endpoint
+    res_fallback = client.get("/staging/clipmax_9_10.mp4")
+    assert res_fallback.status_code == 200
+    assert res_fallback.headers["content-type"] == "video/mp4"
+
+
 
 

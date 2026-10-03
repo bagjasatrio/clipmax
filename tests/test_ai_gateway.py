@@ -242,3 +242,41 @@ def test_evaluate_viral_clips_mandatory_ending_and_penalty():
         assert clips[0].start_time == 14 * 60 + 20
         assert clips[0].end_time == 15 * 60 + 5
 
+def test_evaluate_viral_clips_english_language_mandate():
+    mock_json = '''
+    [
+      {
+        "title": "Shocking Football Insight",
+        "hook": "You won't believe what happened here",
+        "start_time": 10.0,
+        "end_time": 40.0,
+        "virality_score": 95,
+        "reasoning": "High tension and clear revelation"
+      }
+    ]
+    '''
+    with patch("clipmax.ai_gateway.OpenAI") as mock_openai:
+        mock_client = MagicMock()
+        mock_choice = MagicMock()
+        mock_choice.message.content = mock_json
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice])
+        mock_openai.return_value = mock_client
+
+        clips = evaluate_viral_clips(
+            transcript="English conversation about football and tactics...",
+            endpoint_url="http://localhost:20128/v1",
+            api_key="test-key",
+            model="gemini-flash",
+            detected_language="en"
+        )
+
+        create_kwargs = mock_client.chat.completions.create.call_args.kwargs
+        sys_message = create_kwargs["messages"][0]["content"]
+        user_message = create_kwargs["messages"][1]["content"]
+
+        assert "ATURAN KESELARASAN BAHASA" in sys_message
+        assert "LANGUAGE MANDATE: SOURCE IS IN ENGLISH" in user_message
+        assert len(clips) == 1
+        assert clips[0].title == "Shocking Football Insight"
+
+

@@ -110,25 +110,25 @@ state = AppState()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     state.loop = asyncio.get_running_loop()
-    # Auto-clean cache on startup
-    clear_temp_cache(state.config.temp_dir)
+    # Auto-clean cache on startup (intermediate temp files only, keep staging videos safe)
+    clear_temp_cache(state.config.temp_dir, purge_staging=False)
     yield
-    # Auto-clean cache on shutdown
-    clear_temp_cache(state.config.temp_dir)
+    # Auto-clean cache on shutdown (intermediate temp files only, keep staging videos safe)
+    clear_temp_cache(state.config.temp_dir, purge_staging=False)
 
 app = FastAPI(title="ClipMax Studio Backend", version="2.4.0", lifespan=lifespan)
 
 @app.on_event("startup")
 def on_startup():
-    clear_temp_cache(state.config.temp_dir)
+    clear_temp_cache(state.config.temp_dir, purge_staging=False)
 
 @app.on_event("shutdown")
 def on_shutdown():
-    clear_temp_cache(state.config.temp_dir)
+    clear_temp_cache(state.config.temp_dir, purge_staging=False)
 
 @app.post("/api/cache/clear")
 def api_clear_cache():
-    count = clear_temp_cache(state.config.temp_dir)
+    count = clear_temp_cache(state.config.temp_dir, purge_staging=True)
     state.clips = []
     return {"status": "ok", "message": f"Cache cleared ({count} items removed)"}
 
@@ -310,6 +310,72 @@ def get_pipeline_status():
         "message": state.message,
         "clips": [c.model_dump() for c in state.clips]
     }
+
+@app.get("/api/clips/{clip_id}/stream")
+def stream_clip_video(clip_id: str):
+    target_clip = None
+    try:
+        cid_int = int(clip_id)
+        target_clip = next((c for c in state.clips if c.clip_id == cid_int), None)
+    except ValueError:
+        target_clip = next((c for c in state.clips if str(c.clip_id) == clip_id or c.title == clip_id), None)
+
+    # 1. Try clip.staging_path directly
+    if target_clip and target_clip.staging_path and os.path.isfile(target_clip.staging_path):
+        return FileResponse(target_clip.staging_path, media_type="video/mp4")
+
+    # 2. Try looking in staging directory
+    staging_dir = Path(state.config.temp_dir) / "staging"
+    possible_files = list(staging_dir.glob(f"*{clip_id}*.mp4"))
+    possible_files = [p for p in possible_files if not p.stem.endswith("_base")]
+    if possible_files:
+        if target_clip:
+            target_clip.staging_path = str(possible_files[0].resolve())
+        return FileResponse(str(possible_files[0]), media_type="video/mp4")
+
+    # 3. Try looking in projects directory
+    projects_dir = Path("./projects").resolve()
+    if projects_dir.exists():
+        proj_matches = list(projects_dir.glob(f"**/*{clip_id}*.mp4"))
+        proj_matches = [p for p in proj_matches if not p.stem.endswith("_base")]
+        if proj_matches:
+            dest = staging_dir / proj_matches[0].name
+            staging_dir.mkdir(parents=True, exist_ok=True)
+            if not dest.exists():
+                try:
+                    shutil.copy2(str(proj_matches[0]), str(dest))
+                except Exception:
+                    dest = proj_matches[0]
+            if target_clip:
+                target_clip.staging_path = str(dest.resolve())
+            return FileResponse(str(dest), media_type="video/mp4")
+
+    raise HTTPException(status_code=404, detail="Clip video not found on disk")
+
+@app.get("/api/clips/{clip_id}/thumbnail")
+def get_clip_thumbnail(clip_id: str):
+    target_clip = None
+    try:
+        cid_int = int(clip_id)
+        target_clip = next((c for c in state.clips if c.clip_id == cid_int), None)
+    except ValueError:
+        target_clip = next((c for c in state.clips if str(c.clip_id) == clip_id or c.title == clip_id), None)
+
+    if target_clip and target_clip.thumbnail_path and os.path.isfile(target_clip.thumbnail_path):
+        return FileResponse(target_clip.thumbnail_path, media_type="image/jpeg")
+
+    staging_dir = Path(state.config.temp_dir) / "staging"
+    thumb_files = list(staging_dir.glob(f"thumb_{clip_id}*.jpg"))
+    if thumb_files:
+        return FileResponse(str(thumb_files[0]), media_type="image/jpeg")
+
+    projects_dir = Path("./projects").resolve()
+    if projects_dir.exists():
+        proj_thumbs = list(projects_dir.glob(f"**/thumb_{clip_id}*.jpg"))
+        if proj_thumbs:
+            return FileResponse(str(proj_thumbs[0]), media_type="image/jpeg")
+
+    raise HTTPException(status_code=404, detail="Thumbnail not found")
 
 @app.get("/api/export/{clip_id}")
 def download_clip_direct(clip_id: str):
@@ -632,10 +698,33 @@ async def websocket_endpoint(websocket: WebSocket):
         if websocket in state.active_websockets:
             state.active_websockets.remove(websocket)
 
-# Mount Staging Directory for Video & Thumbnail Streaming
+# Fallback Staging File Resolver (Checks temp/staging and projects/)
 project_root = Path(__file__).resolve().parent.parent.parent
 staging_path = project_root / "temp" / "staging"
 staging_path.mkdir(parents=True, exist_ok=True)
+
+@app.get("/staging/{filename:path}")
+def get_staging_file_fallback(filename: str):
+    staging_dir = Path(state.config.temp_dir) / "staging"
+    target = staging_dir / filename
+    if target.exists() and target.is_file():
+        media_type = "video/mp4" if target.suffix == ".mp4" else ("image/jpeg" if target.suffix in [".jpg", ".jpeg"] else None)
+        return FileResponse(str(target), media_type=media_type)
+
+    # Search in projects/
+    projects_dir = Path("./projects").resolve()
+    if projects_dir.exists():
+        found = list(projects_dir.glob(f"**/{filename}"))
+        if found and found[0].is_file():
+            staging_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(str(found[0]), str(target))
+                return FileResponse(str(target), media_type="video/mp4" if target.suffix == ".mp4" else None)
+            except Exception:
+                return FileResponse(str(found[0]), media_type="video/mp4" if found[0].suffix == ".mp4" else None)
+
+    raise HTTPException(status_code=404, detail="File not found in staging or projects")
+
 app.mount("/staging", StaticFiles(directory=str(staging_path)), name="staging")
 
 # Mount Projects Directory for Saved Project Media

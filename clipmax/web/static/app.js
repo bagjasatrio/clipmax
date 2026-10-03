@@ -734,9 +734,8 @@ document.addEventListener("DOMContentLoaded", () => {
           : "bg-[#151923] border-[#222938] hover:border-[#374151]"
       }`;
 
-      // Thumbnail url
-      const thumbName = clip.thumbnail_path ? clip.thumbnail_path.split(/[\\/]/).pop() : "";
-      const thumbSrc = thumbName ? `/staging/${thumbName}` : "";
+      // Thumbnail url with dynamic fallback endpoint
+      const thumbSrc = `/api/clips/${clip.clip_id}/thumbnail?t=${Date.now()}`;
 
       const durSec = Math.round((clip.end_time || 0) - (clip.start_time || 0));
 
@@ -769,8 +768,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function selectClip(clip) {
     selectedClip = clip;
-    const vidName = clip.staging_path ? clip.staging_path.split(/[\\/]/).pop() : "";
-    mainVideo.src = `/staging/${vidName}`;
+    const streamUrl = `/api/clips/${clip.clip_id}/stream?t=${Date.now()}`;
+    mainVideo.src = streamUrl;
     mainVideo.load();
     mainVideo.play().catch(() => {});
 
@@ -865,6 +864,18 @@ document.addEventListener("DOMContentLoaded", () => {
   mainVideo.addEventListener("pause", () => {
     iconPlay.classList.remove("hidden");
     iconPause.classList.add("hidden");
+  });
+
+  mainVideo.addEventListener("error", () => {
+    if (selectedClip && selectedClip.staging_path) {
+      const vidName = selectedClip.staging_path.split(/[\\/]/).pop();
+      const fallbackUrl = `/staging/${vidName}?t=${Date.now()}`;
+      if (!mainVideo.src.includes(`/staging/${vidName}`)) {
+        console.warn("Video stream fallback to direct staging path:", fallbackUrl);
+        mainVideo.src = fallbackUrl;
+        mainVideo.load();
+      }
+    }
   });
 
   mainVideo.addEventListener("timeupdate", () => {
@@ -1598,14 +1609,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 14. Auto-Clear on Window Close / Unload
+  // 14. Reset Form Fields on Window Unload
   window.addEventListener("beforeunload", () => {
     localStorage.removeItem("clipmax_campaign_brief");
     localStorage.removeItem("clipmax_youtube_url");
     sessionStorage.clear();
-    try {
-      navigator.sendBeacon("/api/cache/clear");
-    } catch (e) {}
   });
 
   // Initialization
