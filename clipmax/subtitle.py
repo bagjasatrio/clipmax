@@ -146,6 +146,22 @@ Style: OverlayText,{font_name},{font_size},{t_ass},{t_ass},{bg_ass},{bg_ass},-1,
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     clean_text = text.strip().replace("\r", "").replace("\n", r"\N")
+    # Smart line-wrapping for long titles without manual line-breaks
+    max_c = max(14, int(1200 / max(20, font_size)))
+    raw_lines = text.strip().splitlines()
+    wrapped_lines = []
+    for line in raw_lines:
+        line_clean = line.strip()
+        if not line_clean:
+            continue
+        if len(line_clean) > max_c:
+            import textwrap
+            wrapped_lines.extend(textwrap.wrap(line_clean, width=max_c, break_long_words=False))
+        else:
+            wrapped_lines.append(line_clean)
+    if wrapped_lines:
+        clean_text = r"\N".join(wrapped_lines)
+
     end_str = format_ass_time(max(0.1, duration))
     event_line = f"Dialogue: 2,0:00:00.00,{end_str},OverlayText,,0,0,0,,{pos_tag}{clean_text}\n"
 

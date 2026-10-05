@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 from clipmax.transcriber import WordSegment
-from clipmax.subtitle import generate_kinetic_ass, format_ass_time, to_ass_color
+from clipmax.subtitle import generate_kinetic_ass, format_ass_time, to_ass_color, generate_overlay_ass
 
 def test_format_ass_time():
     assert format_ass_time(0.0) == "0:00:00.00"
@@ -99,5 +99,26 @@ def test_generate_overlay_ass_free_roam(tmp_path):
     assert "Style: OverlayText,Montserrat,50" in content
     # Pos tag at 40% of 1080 = 432, 65% of 1920 = 1248
     assert r"{\an5\pos(432,1248)}FREE ROAM TITLE" in content
+
+def test_generate_overlay_ass_smart_wrapping(tmp_path):
+    out_file = tmp_path / "wrapped_overlay.ass"
+    # Long text exceeding character width limit
+    long_text = "Aaron Rodgers Fiance Wild Ultimatum"
+    res = generate_overlay_ass(
+        text=long_text,
+        duration=5.0,
+        output_ass_path=str(out_file),
+        font_name="Montserrat",
+        font_size=56,
+        x_pct=50.0,
+        y_pct=12.0
+    )
+    assert Path(res).exists()
+    content = out_file.read_text(encoding="utf-8")
+    # Must be wrapped with \N rather than spanning on single giant line
+    assert r"\N" in content
+    assert "Aaron Rodgers Fiance" in content
+    assert "Wild Ultimatum" in content
+
 
 

@@ -551,34 +551,45 @@
                   <span id="badgeOverlayStatus" class="text-[10px] text-gray-400 font-mono">Live</span>
                 </div>
 
-                <!-- Text Input -->
+                <!-- Text Input (Textarea for easy multi-line support) -->
                 <div>
-                  <input type="text" id="inputOverlayText" placeholder="Teks judul/hook video..." class="w-full px-2.5 py-1.5 bg-[#0D1017] border border-[#222938] focus:border-indigo-500 rounded-lg text-xs text-white placeholder-gray-600 outline-none transition">
+                  <textarea id="inputOverlayText" rows="2" placeholder="Teks judul/hook video (Enter untuk baris baru)..." class="w-full px-2.5 py-1.5 bg-[#0D1017] border border-[#222938] focus:border-indigo-500 rounded-lg text-xs text-white placeholder-gray-600 outline-none transition resize-none"></textarea>
                 </div>
 
-                <!-- Font & Color -->
-                <div class="grid grid-cols-2 gap-2 text-[11px]">
-                  <div>
-                    <label class="block text-gray-400 mb-0.5">Font:</label>
-                    <select id="selectOverlayFont" class="w-full px-2 py-1 bg-[#0D1017] border border-[#222938] rounded text-gray-200 outline-none text-xs">
-                      <option value="Impact">Impact</option>
-                      <option value="Montserrat" selected>Montserrat</option>
-                      <option value="Roboto">Roboto</option>
-                      <option value="Arial">Arial</option>
-                      <option value="Trebuchet MS">Trebuchet</option>
-                      <option value="Georgia">Georgia</option>
-                    </select>
-                  </div>
+                <!-- Font, Color & Size -->
+                <div class="space-y-2 text-[11px]">
+                  <div class="grid grid-cols-2 gap-2">
+                    <div>
+                      <label class="block text-gray-400 mb-0.5">Font:</label>
+                      <select id="selectOverlayFont" class="w-full px-2 py-1 bg-[#0D1017] border border-[#222938] rounded text-gray-200 outline-none text-xs">
+                        <option value="Impact">Impact (Viral Punchy)</option>
+                        <option value="Montserrat" selected>Montserrat (Modern)</option>
+                        <option value="Roboto">Roboto (Clean)</option>
+                        <option value="Arial">Arial (Sans-Serif)</option>
+                        <option value="Trebuchet MS">Trebuchet MS</option>
+                        <option value="Georgia">Georgia (Serif)</option>
+                      </select>
+                    </div>
 
-                  <div>
-                    <label class="block text-gray-400 mb-0.5">Warna Teks:</label>
-                    <div class="flex items-center space-x-1 bg-[#0D1017] border border-[#222938] rounded px-1.5 py-0.5">
-                      <input type="color" id="pickerOverlayTextColor" value="#FFFFFF" class="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0">
-                      <span id="lblOverlayTextColor" class="text-[10px] font-mono text-gray-300">#FFF</span>
+                    <div>
+                      <label class="block text-gray-400 mb-0.5">Warna Teks:</label>
+                      <div class="flex items-center space-x-1.5 bg-[#0D1017] border border-[#222938] rounded px-2 py-1">
+                        <input type="color" id="pickerOverlayTextColor" value="#FFFFFF" class="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0">
+                        <span id="lblOverlayTextColor" class="text-[10px] font-mono text-gray-300">#FFF</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div class="col-span-2">
+                  <!-- Text Size (Font Size) Slider -->
+                  <div>
+                    <div class="flex justify-between text-gray-400 mb-0.5 text-[10px]">
+                      <span>Ukuran Font Teks (Size):</span>
+                      <span id="lblOverlayFontSize" class="font-mono text-indigo-300">56px</span>
+                    </div>
+                    <input type="range" id="inputRangeTextSize" min="28" max="96" value="56" class="w-full h-1.5 accent-indigo-500 cursor-pointer">
+                  </div>
+
+                  <div>
                     <label class="block text-gray-400 mb-0.5">Background Teks:</label>
                     <select id="selectOverlayBgStyle" class="w-full px-2 py-1 bg-[#0D1017] border border-[#222938] rounded text-gray-200 outline-none text-xs">
                       <option value="solid_black" selected>Box Hitam Solid</option>
@@ -725,16 +736,22 @@
         <!-- ================= CENTER PREVIEW STAGE: PINNED VIDEO MONITOR ================= -->
         <div class="flex-1 flex flex-col items-center justify-center p-6 bg-[#07090E] overflow-hidden min-w-[340px]">
           
-          <!-- 9:16 Video Canvas Box with Free Roam Drag Support -->
+          <!-- 9:16 Video Canvas Box with Free Roam Drag & Resize Support -->
           <div id="videoCanvasBox" class="relative bg-black rounded-2xl overflow-hidden border border-[#222938] shadow-2xl h-[520px] max-h-[calc(100vh-210px)] aspect-9-16 flex items-center justify-center select-none ring-1 ring-white/5">
             <video id="mainVideo" class="w-full h-full object-contain" preload="metadata" playsinline></video>
             
-            <!-- Draggable Free Roam Live Text Overlay Layer -->
-            <div id="liveTextOverlay" class="absolute pointer-events-auto cursor-move select-none z-20 max-w-[90%] text-center font-bold px-3 py-1.5 rounded transition-shadow leading-tight border border-dashed border-indigo-400/80 hover:border-indigo-300 shadow-lg shadow-black/80 hidden" title="Klik & drag langsung untuk pindah posisi bebas (Free Roam)"></div>
+            <!-- Draggable & Resizable Free Roam Live Text Overlay Layer -->
+            <div id="liveTextOverlay" class="absolute pointer-events-auto cursor-move select-none z-20 max-w-[90%] text-center font-bold px-2 py-1 transition-shadow leading-tight border border-dashed border-indigo-400/80 hover:border-indigo-300 shadow-lg shadow-black/80 hidden group" title="Klik & drag untuk pindah posisi | Tarik sudut kanan-bawah atau scroll mouse untuk atur ukuran">
+              <span id="liveTextContent"></span>
+              <!-- Interactive Corner Resize Handle for Text -->
+              <div id="textResizeHandle" class="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-indigo-500 hover:bg-indigo-400 rounded-full cursor-se-resize border-2 border-white shadow-md flex items-center justify-center transition-transform hover:scale-125" title="Tarik sudut ini untuk memperbesar / memperkecil ukuran teks"></div>
+            </div>
 
-            <!-- Draggable Free Roam Live Image/Logo Overlay Layer -->
-            <div id="liveImageOverlayContainer" class="absolute pointer-events-auto cursor-move select-none z-20 border border-dashed border-cyan-400/80 hover:border-cyan-300 shadow-lg shadow-black/80 hidden" title="Klik & drag logo untuk pindah posisi bebas (Free Roam)">
+            <!-- Draggable & Resizable Free Roam Live Image/Logo Overlay Layer -->
+            <div id="liveImageOverlayContainer" class="absolute pointer-events-auto cursor-move select-none z-20 border border-dashed border-cyan-400/80 hover:border-cyan-300 shadow-lg shadow-black/80 hidden group" title="Klik & drag logo untuk pindah posisi | Tarik sudut kanan-bawah atau scroll mouse untuk atur ukuran">
               <img id="liveImageOverlay" class="w-full h-full object-contain pointer-events-none select-none" />
+              <!-- Interactive Corner Resize Handle for Image -->
+              <div id="imageResizeHandle" class="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-cyan-500 hover:bg-cyan-400 rounded-full cursor-se-resize border-2 border-white shadow-md flex items-center justify-center transition-transform hover:scale-125" title="Tarik sudut ini untuk memperbesar / memperkecil ukuran logo"></div>
             </div>
           </div>
 

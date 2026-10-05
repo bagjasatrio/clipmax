@@ -80,10 +80,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Video Text Overlay Elements
   const liveTextOverlay = document.getElementById("liveTextOverlay");
+  const liveTextContent = document.getElementById("liveTextContent");
+  const textResizeHandle = document.getElementById("textResizeHandle");
   const inputOverlayText = document.getElementById("inputOverlayText");
   const selectOverlayFont = document.getElementById("selectOverlayFont");
   const pickerOverlayTextColor = document.getElementById("pickerOverlayTextColor");
   const lblOverlayTextColor = document.getElementById("lblOverlayTextColor");
+  const inputRangeTextSize = document.getElementById("inputRangeTextSize");
+  const lblOverlayFontSize = document.getElementById("lblOverlayFontSize");
   const selectOverlayBgStyle = document.getElementById("selectOverlayBgStyle");
   const btnApplyOverlay = document.getElementById("btnApplyOverlay");
   const lblApplyOverlay = document.getElementById("lblApplyOverlay");
@@ -102,6 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Image / Logo Overlay Elements
   const liveImageOverlayContainer = document.getElementById("liveImageOverlayContainer");
   const liveImageOverlay = document.getElementById("liveImageOverlay");
+  const imageResizeHandle = document.getElementById("imageResizeHandle");
   const fileImageInput = document.getElementById("fileImageInput");
   const btnPickImage = document.getElementById("btnPickImage");
   const lblImageFileName = document.getElementById("lblImageFileName");
@@ -790,6 +795,10 @@ document.addEventListener("DOMContentLoaded", () => {
         inputRangeTextY.value = clip.overlay_y_pct !== undefined ? clip.overlay_y_pct : 12;
         if (lblTextPosY) lblTextPosY.textContent = `${inputRangeTextY.value}%`;
       }
+      if (inputRangeTextSize) {
+        inputRangeTextSize.value = clip.overlay_font_size || 56;
+        if (lblOverlayFontSize) lblOverlayFontSize.textContent = `${inputRangeTextSize.value}px`;
+      }
       if (pickerOverlayTextColor) {
         pickerOverlayTextColor.value = clip.overlay_text_color || "#FFFFFF";
         if (lblOverlayTextColor) lblOverlayTextColor.textContent = pickerOverlayTextColor.value.toUpperCase();
@@ -984,60 +993,114 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // --- Video Text Overlay Live Preview & Handlers (Free Roam) ---
+  // --- Video Text Overlay Live Preview & Handlers (Free Roam & WYSIWYG) ---
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   function updateLiveOverlayPreview() {
     if (!liveTextOverlay || !inputOverlayText) return;
-    const txt = inputOverlayText.value.trim();
-    if (!txt) {
+    const rawTxt = inputOverlayText.value.trim();
+    if (!rawTxt) {
       liveTextOverlay.classList.add("hidden");
       return;
     }
 
     liveTextOverlay.classList.remove("hidden");
-    liveTextOverlay.textContent = txt;
 
     // Font Family
     const font = selectOverlayFont ? selectOverlayFont.value : "Montserrat";
     liveTextOverlay.style.fontFamily = font;
 
+    // Font Size relative to preview canvas height (WYSIWYG 1:1 with 1080x1920 video)
+    const fontSize = inputRangeTextSize ? parseInt(inputRangeTextSize.value, 10) : 56;
+    const canvasH = videoCanvasBox ? videoCanvasBox.clientHeight : 520;
+    const previewFontSize = Math.max(10, Math.round(canvasH * (fontSize / 1920.0)));
+    liveTextOverlay.style.fontSize = `${previewFontSize}px`;
+    liveTextOverlay.style.lineHeight = "1.22";
+
     // Text Color
-    const textColor = pickerOverlayTextColor ? pickerOverlayTextColor.value : "#FFFFFF";
-    liveTextOverlay.style.color = textColor;
+    let textColor = pickerOverlayTextColor ? pickerOverlayTextColor.value : "#FFFFFF";
 
     // Background Style
     const bgStyle = selectOverlayBgStyle ? selectOverlayBgStyle.value : "solid_black";
     liveTextOverlay.style.textShadow = "none";
-    liveTextOverlay.style.border = "none";
 
+    let bgColor = "#000000";
     if (bgStyle === "solid_black") {
       liveTextOverlay.style.backgroundColor = "#000000";
     } else if (bgStyle === "semi_black") {
-      liveTextOverlay.style.backgroundColor = "rgba(0, 0, 0, 0.65)";
+      liveTextOverlay.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
     } else if (bgStyle === "yellow_viral") {
       liveTextOverlay.style.backgroundColor = "#FFE81F";
-      liveTextOverlay.style.color = "#000000";
+      textColor = "#000000";
     } else if (bgStyle === "red_alert") {
       liveTextOverlay.style.backgroundColor = "#FF2A2A";
     } else if (bgStyle === "none") {
       liveTextOverlay.style.backgroundColor = "transparent";
-      liveTextOverlay.style.textShadow = "2px 2px 4px #000, -2px -2px 4px #000, 2px -2px 4px #000, -2px 2px 4px #000";
+      liveTextOverlay.style.textShadow = "2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000";
+    }
+    liveTextOverlay.style.color = textColor;
+
+    // Auto-wrap matching the exact Python subtitle generator logic
+    const maxChars = Math.max(14, Math.floor(1200 / fontSize));
+    const lines = [];
+    rawTxt.split("\n").forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      if (trimmed.length > maxChars) {
+        const words = trimmed.split(/\s+/);
+        let cur = "";
+        words.forEach(w => {
+          if (!cur) cur = w;
+          else if ((cur + " " + w).length <= maxChars) cur += " " + w;
+          else {
+            lines.push(cur);
+            cur = w;
+          }
+        });
+        if (cur) lines.push(cur);
+      } else {
+        lines.push(trimmed);
+      }
+    });
+
+    const displayText = lines.length > 0 ? lines.join("\n") : rawTxt;
+    if (liveTextContent) {
+      liveTextContent.innerHTML = displayText.split("\n").map(escapeHtml).join("<br>");
+    } else {
+      liveTextOverlay.textContent = displayText;
     }
 
+    // Proportional padding matching ASS Outline 8-10 (approx 0.5% of height)
+    const padY = Math.max(2, Math.round(previewFontSize * 0.18));
+    const padX = Math.max(4, Math.round(previewFontSize * 0.36));
+    liveTextOverlay.style.padding = `${padY}px ${padX}px`;
+    liveTextOverlay.style.borderRadius = "3px";
+
     // Free Roam Coordinates
-    const xPct = inputRangeTextX ? inputRangeTextX.value : 50;
-    const yPct = inputRangeTextY ? inputRangeTextY.value : 12;
+    const xPct = inputRangeTextX ? parseFloat(inputRangeTextX.value) : 50;
+    const yPct = inputRangeTextY ? parseFloat(inputRangeTextY.value) : 12;
     liveTextOverlay.style.left = `${xPct}%`;
     liveTextOverlay.style.top = `${yPct}%`;
     liveTextOverlay.style.transform = "translate(-50%, -50%)";
   }
 
-  // Draggable Free Roam for Text Overlay
+  // Draggable Free Roam & Resizable Text Overlay
   let isDraggingText = false;
+  let isResizingText = false;
+  let textResizeStartY = 0;
+  let textResizeStartSize = 56;
+
   if (liveTextOverlay && videoCanvasBox) {
     liveTextOverlay.addEventListener("pointerdown", (e) => {
+      if (e.target.id === "textResizeHandle" || e.target === textResizeHandle) return;
       isDraggingText = true;
       liveTextOverlay.setPointerCapture(e.pointerId);
     });
+
     liveTextOverlay.addEventListener("pointermove", (e) => {
       if (!isDraggingText) return;
       const rect = videoCanvasBox.getBoundingClientRect();
@@ -1051,6 +1114,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (lblTextPosY) lblTextPosY.textContent = `${yPct}%`;
       updateLiveOverlayPreview();
     });
+
     const stopTextDrag = (e) => {
       if (isDraggingText) {
         isDraggingText = false;
@@ -1059,6 +1123,47 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     liveTextOverlay.addEventListener("pointerup", stopTextDrag);
     liveTextOverlay.addEventListener("pointercancel", stopTextDrag);
+
+    // Mouse wheel resizing directly on text in preview
+    liveTextOverlay.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      let cur = inputRangeTextSize ? parseInt(inputRangeTextSize.value, 10) : 56;
+      let step = e.deltaY < 0 ? 3 : -3;
+      let nextVal = Math.max(28, Math.min(96, cur + step));
+      if (inputRangeTextSize) inputRangeTextSize.value = nextVal;
+      if (lblOverlayFontSize) lblOverlayFontSize.textContent = `${nextVal}px`;
+      updateLiveOverlayPreview();
+    }, { passive: false });
+  }
+
+  // Corner Resize Handle for Text in preview
+  if (textResizeHandle) {
+    textResizeHandle.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      isResizingText = true;
+      textResizeStartY = e.clientY;
+      textResizeStartSize = inputRangeTextSize ? parseInt(inputRangeTextSize.value, 10) : 56;
+      textResizeHandle.setPointerCapture(e.pointerId);
+    });
+
+    textResizeHandle.addEventListener("pointermove", (e) => {
+      if (!isResizingText) return;
+      const deltaY = e.clientY - textResizeStartY;
+      const deltaSize = Math.round(deltaY * 0.4);
+      const newSize = Math.max(28, Math.min(96, textResizeStartSize + deltaSize));
+      if (inputRangeTextSize) inputRangeTextSize.value = newSize;
+      if (lblOverlayFontSize) lblOverlayFontSize.textContent = `${newSize}px`;
+      updateLiveOverlayPreview();
+    });
+
+    const stopTextResize = (e) => {
+      if (isResizingText) {
+        isResizingText = false;
+        try { textResizeHandle.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+    };
+    textResizeHandle.addEventListener("pointerup", stopTextResize);
+    textResizeHandle.addEventListener("pointercancel", stopTextResize);
   }
 
   if (inputOverlayText) {
@@ -1070,6 +1175,12 @@ document.addEventListener("DOMContentLoaded", () => {
   if (pickerOverlayTextColor) {
     pickerOverlayTextColor.addEventListener("input", () => {
       if (lblOverlayTextColor) lblOverlayTextColor.textContent = pickerOverlayTextColor.value.toUpperCase();
+      updateLiveOverlayPreview();
+    });
+  }
+  if (inputRangeTextSize) {
+    inputRangeTextSize.addEventListener("input", () => {
+      if (lblOverlayFontSize) lblOverlayFontSize.textContent = `${inputRangeTextSize.value}px`;
       updateLiveOverlayPreview();
     });
   }
@@ -1153,7 +1264,7 @@ document.addEventListener("DOMContentLoaded", () => {
             clip_id: selectedClip.clip_id,
             text: text,
             font_name: selectOverlayFont ? selectOverlayFont.value : "Montserrat",
-            font_size: 56,
+            font_size: inputRangeTextSize ? parseInt(inputRangeTextSize.value, 10) : 56,
             text_color: textColor,
             bg_color: bgColor,
             has_bg: hasBg,
@@ -1169,6 +1280,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           selectedClip.overlay_text = text;
           selectedClip.overlay_font = selectOverlayFont ? selectOverlayFont.value : "Montserrat";
+          selectedClip.overlay_font_size = inputRangeTextSize ? parseInt(inputRangeTextSize.value, 10) : 56;
           selectedClip.overlay_x_pct = xVal;
           selectedClip.overlay_y_pct = yVal;
           selectedClip.overlay_text_color = textColor;
@@ -1248,10 +1360,15 @@ document.addEventListener("DOMContentLoaded", () => {
     liveImageOverlayContainer.style.opacity = opacity;
   }
 
-  // Draggable Free Roam for Logo / Image Overlay
+  // Draggable Free Roam & Resizable Logo / Image Overlay
   let isDraggingImage = false;
+  let isResizingImage = false;
+  let imgResizeStartX = 0;
+  let imgResizeStartScale = 16;
+
   if (liveImageOverlayContainer && videoCanvasBox) {
     liveImageOverlayContainer.addEventListener("pointerdown", (e) => {
+      if (e.target.id === "imageResizeHandle" || e.target === imageResizeHandle) return;
       isDraggingImage = true;
       liveImageOverlayContainer.setPointerCapture(e.pointerId);
     });
@@ -1276,6 +1393,47 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     liveImageOverlayContainer.addEventListener("pointerup", stopImgDrag);
     liveImageOverlayContainer.addEventListener("pointercancel", stopImgDrag);
+
+    // Mouse wheel resizing directly on image in preview
+    liveImageOverlayContainer.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      let cur = inputRangeImageScale ? parseInt(inputRangeImageScale.value, 10) : 16;
+      let step = e.deltaY < 0 ? 1 : -1;
+      let nextVal = Math.max(5, Math.min(50, cur + step));
+      if (inputRangeImageScale) inputRangeImageScale.value = nextVal;
+      if (lblImageScale) lblImageScale.textContent = `${nextVal}%`;
+      updateLiveImageOverlayPreview();
+    }, { passive: false });
+  }
+
+  // Corner Resize Handle for Image in preview
+  if (imageResizeHandle) {
+    imageResizeHandle.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      isResizingImage = true;
+      imgResizeStartX = e.clientX;
+      imgResizeStartScale = inputRangeImageScale ? parseInt(inputRangeImageScale.value, 10) : 16;
+      imageResizeHandle.setPointerCapture(e.pointerId);
+    });
+
+    imageResizeHandle.addEventListener("pointermove", (e) => {
+      if (!isResizingImage) return;
+      const rect = videoCanvasBox.getBoundingClientRect();
+      const deltaPct = Math.round(((e.clientX - imgResizeStartX) / rect.width) * 100);
+      const newScale = Math.max(5, Math.min(50, imgResizeStartScale + deltaPct));
+      if (inputRangeImageScale) inputRangeImageScale.value = newScale;
+      if (lblImageScale) lblImageScale.textContent = `${newScale}%`;
+      updateLiveImageOverlayPreview();
+    });
+
+    const stopImgResize = (e) => {
+      if (isResizingImage) {
+        isResizingImage = false;
+        try { imageResizeHandle.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+    };
+    imageResizeHandle.addEventListener("pointerup", stopImgResize);
+    imageResizeHandle.addEventListener("pointercancel", stopImgResize);
   }
 
   function handleImageSelected(filePath, displayName, isNative) {
@@ -1614,6 +1772,12 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.removeItem("clipmax_campaign_brief");
     localStorage.removeItem("clipmax_youtube_url");
     sessionStorage.clear();
+  });
+
+  // Re-scale WYSIWYG preview font size on window resize
+  window.addEventListener("resize", () => {
+    updateLiveOverlayPreview();
+    updateLiveImageOverlayPreview();
   });
 
   // Initialization
