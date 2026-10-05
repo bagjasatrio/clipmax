@@ -760,17 +760,26 @@
             <video id="mainVideo" class="w-full h-full object-contain" preload="metadata" playsinline></video>
             
             <!-- Draggable & Resizable Free Roam Live Text Overlay Layer -->
-            <div id="liveTextOverlay" class="absolute pointer-events-auto cursor-move select-none z-20 max-w-[90%] text-center font-bold px-2 py-1 transition-shadow leading-tight border border-dashed border-indigo-400/80 hover:border-indigo-300 shadow-lg shadow-black/80 hidden group" title="Klik & drag untuk pindah posisi | Tarik sudut kanan-bawah atau scroll mouse untuk atur ukuran">
-              <span id="liveTextContent"></span>
-              <!-- Interactive Corner Resize Handle for Text -->
-              <div id="textResizeHandle" class="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-indigo-500 hover:bg-indigo-400 rounded-full cursor-se-resize border-2 border-white shadow-md flex items-center justify-center transition-transform hover:scale-125" title="Tarik sudut ini untuk memperbesar / memperkecil ukuran teks"></div>
+            <div id="liveTextOverlay" class="absolute pointer-events-auto cursor-move select-none z-20 text-center font-bold p-1 transition-shadow leading-tight border border-dashed border-indigo-400/90 hover:border-indigo-300 shadow-xl shadow-black/90 hidden group" style="width: max-content; max-width: 90%;" title="Drag tengah: pindah posisi | Drag sudut: ubah ukuran font | Drag samping: atur lebar box">
+              <div id="liveTextContent" class="overlay-line-container"></div>
+              <!-- 4 Corner Handles (Free Roam Scaling) -->
+              <div class="overlay-handle handle-nw" data-texthandle="nw" title="Tarik sudut untuk ubah ukuran teks"></div>
+              <div class="overlay-handle handle-ne" data-texthandle="ne" title="Tarik sudut untuk ubah ukuran teks"></div>
+              <div class="overlay-handle handle-sw" data-texthandle="sw" title="Tarik sudut untuk ubah ukuran teks"></div>
+              <div class="overlay-handle handle-se" data-texthandle="se" title="Tarik sudut untuk ubah ukuran teks"></div>
+              <!-- 2 Side Handles (Box Width & Word Wrap) -->
+              <div class="overlay-handle handle-w" data-texthandle="w" title="Tarik samping untuk ubah lebar box"></div>
+              <div class="overlay-handle handle-e" data-texthandle="e" title="Tarik samping untuk ubah lebar box"></div>
             </div>
 
             <!-- Draggable & Resizable Free Roam Live Image/Logo Overlay Layer -->
-            <div id="liveImageOverlayContainer" class="absolute pointer-events-auto cursor-move select-none z-20 border border-dashed border-cyan-400/80 hover:border-cyan-300 shadow-lg shadow-black/80 hidden group" title="Klik & drag logo untuk pindah posisi | Tarik sudut kanan-bawah atau scroll mouse untuk atur ukuran">
+            <div id="liveImageOverlayContainer" class="absolute pointer-events-auto cursor-move select-none z-20 border border-dashed border-cyan-400/90 hover:border-cyan-300 shadow-xl shadow-black/90 hidden group" title="Drag tengah: pindah posisi | Drag sudut: ubah ukuran logo">
               <img id="liveImageOverlay" class="w-full h-full object-contain pointer-events-none select-none" />
-              <!-- Interactive Corner Resize Handle for Image -->
-              <div id="imageResizeHandle" class="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-cyan-500 hover:bg-cyan-400 rounded-full cursor-se-resize border-2 border-white shadow-md flex items-center justify-center transition-transform hover:scale-125" title="Tarik sudut ini untuk memperbesar / memperkecil ukuran logo"></div>
+              <!-- 4 Corner Handles (Free Roam Logo Scaling) -->
+              <div class="overlay-handle img-handle handle-nw" data-imghandle="nw" title="Tarik sudut untuk ubah ukuran logo"></div>
+              <div class="overlay-handle img-handle handle-ne" data-imghandle="ne" title="Tarik sudut untuk ubah ukuran logo"></div>
+              <div class="overlay-handle img-handle handle-sw" data-imghandle="sw" title="Tarik sudut untuk ubah ukuran logo"></div>
+              <div class="overlay-handle img-handle handle-se" data-imghandle="se" title="Tarik sudut untuk ubah ukuran logo"></div>
             </div>
           </div>
 

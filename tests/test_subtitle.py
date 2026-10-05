@@ -117,8 +117,22 @@ def test_generate_overlay_ass_smart_wrapping(tmp_path):
     content = out_file.read_text(encoding="utf-8")
     # Must be wrapped with \N rather than spanning on single giant line
     assert r"\N" in content
-    assert "Aaron Rodgers Fiance" in content
-    assert "Wild Ultimatum" in content
+    assert "Aaron Rodgers" in content
+    assert "Ultimatum" in content
+
+    # Test preserving explicit user lines
+    out_file2 = tmp_path / "explicit_overlay.ass"
+    generate_overlay_ass(
+        text="Custom Line 1\nCustom Line 2",
+        duration=5.0,
+        output_ass_path=str(out_file2),
+        font_name="Montserrat",
+        font_size=56,
+        x_pct=50.0,
+        y_pct=12.0
+    )
+    content2 = out_file2.read_text(encoding="utf-8")
+    assert r"Custom Line 1\NCustom Line 2" in content2
 
 
 

@@ -65,6 +65,7 @@ class ClipOverlayRequest(BaseModel):
     text_color: str = "#FFFFFF"
     bg_color: str = "#000000"
     has_bg: bool = True
+    bg_alpha: float = 1.0
     position: str = "top"
     x_pct: Optional[float] = None
     y_pct: Optional[float] = None
@@ -481,6 +482,7 @@ def rebuild_clip_overlays(clip_id: int) -> Path:
             text_color=text_cfg.get("text_color", "#FFFFFF"),
             bg_color=text_cfg.get("bg_color", "#000000"),
             has_bg=text_cfg.get("has_bg", True),
+            bg_alpha=float(text_cfg.get("bg_alpha", 1.0)),
             position=text_cfg.get("position", "top"),
             x_pct=text_cfg.get("x_pct"),
             y_pct=text_cfg.get("y_pct")

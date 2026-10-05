@@ -1073,6 +1073,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- Video Text Overlay Live Preview & Handlers (Free Roam & WYSIWYG) ---
+  let currentCalculatedLines = [];
+  let currentBoxWidthPct = 86;
+
   function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text;
@@ -1084,6 +1087,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const rawTxt = inputOverlayText.value.trim();
     if (!rawTxt) {
       liveTextOverlay.classList.add("hidden");
+      currentCalculatedLines = [];
       return;
     }
 
@@ -1098,7 +1102,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const canvasH = videoCanvasBox ? videoCanvasBox.clientHeight : 520;
     const previewFontSize = Math.max(10, Math.round(canvasH * (fontSize / 1920.0)));
     liveTextOverlay.style.fontSize = `${previewFontSize}px`;
-    liveTextOverlay.style.lineHeight = "1.22";
+    liveTextOverlay.style.lineHeight = "1.25";
 
     // Text Color
     let textColor = pickerOverlayTextColor ? pickerOverlayTextColor.value : "#FFFFFF";
@@ -1107,57 +1111,69 @@ document.addEventListener("DOMContentLoaded", () => {
     const bgStyle = selectOverlayBgStyle ? selectOverlayBgStyle.value : "solid_black";
     liveTextOverlay.style.textShadow = "none";
 
-    let bgColor = "#000000";
+    let bgRgba = "rgba(0, 0, 0, 0.95)";
+    let shadowStyle = "";
+
     if (bgStyle === "solid_black") {
-      liveTextOverlay.style.backgroundColor = "#000000";
+      bgRgba = "rgba(0, 0, 0, 0.95)";
     } else if (bgStyle === "semi_black") {
-      liveTextOverlay.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+      bgRgba = "rgba(0, 0, 0, 0.60)";
     } else if (bgStyle === "yellow_viral") {
-      liveTextOverlay.style.backgroundColor = "#FFE81F";
+      bgRgba = "rgba(255, 232, 31, 0.98)";
       textColor = "#000000";
     } else if (bgStyle === "red_alert") {
-      liveTextOverlay.style.backgroundColor = "#FF2A2A";
+      bgRgba = "rgba(255, 42, 42, 0.98)";
     } else if (bgStyle === "none") {
-      liveTextOverlay.style.backgroundColor = "transparent";
-      liveTextOverlay.style.textShadow = "2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000";
+      bgRgba = "transparent";
+      shadowStyle = "text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;";
     }
     liveTextOverlay.style.color = textColor;
 
-    // Auto-wrap matching the exact Python subtitle generator logic
-    const maxChars = Math.max(14, Math.floor(1200 / fontSize));
-    const lines = [];
-    rawTxt.split("\n").forEach(line => {
-      const trimmed = line.trim();
-      if (!trimmed) return;
-      if (trimmed.length > maxChars) {
-        const words = trimmed.split(/\s+/);
-        let cur = "";
+    // Dynamic auto-wrap calculation using exact box width constraint
+    // In a 1080x1920 video, effective box width in px = 1080 * (currentBoxWidthPct / 100.0)
+    // Character width in bold sans font is approximately fontSize * 0.56
+    const effectiveWidthPx = 1080 * (currentBoxWidthPct / 100.0);
+    const maxCharsPerLine = Math.max(12, Math.floor(effectiveWidthPx / (fontSize * 0.56)));
+
+    const finalLines = [];
+    const rawParagraphs = rawTxt.split("\n");
+    rawParagraphs.forEach(para => {
+      const cleanP = para.trim();
+      if (!cleanP) return;
+      if (cleanP.length <= maxCharsPerLine) {
+        finalLines.push(cleanP);
+      } else {
+        const words = cleanP.split(/\s+/);
+        let curLine = "";
         words.forEach(w => {
-          if (!cur) cur = w;
-          else if ((cur + " " + w).length <= maxChars) cur += " " + w;
-          else {
-            lines.push(cur);
-            cur = w;
+          if (!curLine) {
+            curLine = w;
+          } else if ((curLine + " " + w).length <= maxCharsPerLine) {
+            curLine += " " + w;
+          } else {
+            finalLines.push(curLine);
+            curLine = w;
           }
         });
-        if (cur) lines.push(cur);
-      } else {
-        lines.push(trimmed);
+        if (curLine) finalLines.push(curLine);
       }
     });
 
-    const displayText = lines.length > 0 ? lines.join("\n") : rawTxt;
-    if (liveTextContent) {
-      liveTextContent.innerHTML = displayText.split("\n").map(escapeHtml).join("<br>");
-    } else {
-      liveTextOverlay.textContent = displayText;
-    }
+    currentCalculatedLines = finalLines.length > 0 ? finalLines : [rawTxt];
 
-    // Proportional padding matching ASS Outline 8-10 (approx 0.5% of height)
+    // Proportional padding matching ASS Outline 8-10 (stepped badge look per line)
     const padY = Math.max(2, Math.round(previewFontSize * 0.18));
-    const padX = Math.max(4, Math.round(previewFontSize * 0.36));
-    liveTextOverlay.style.padding = `${padY}px ${padX}px`;
-    liveTextOverlay.style.borderRadius = "3px";
+    const padX = Math.max(4, Math.round(previewFontSize * 0.38));
+
+    if (liveTextContent) {
+      liveTextContent.innerHTML = currentCalculatedLines.map(line => {
+        return `<div class="overlay-line" style="display: block; line-height: 1.25; margin: 1px 0;">
+          <span class="overlay-badge-span" style="display: inline-block; background-color: ${bgRgba}; color: ${textColor}; padding: ${padY}px ${padX}px; white-space: nowrap; ${shadowStyle}">${escapeHtml(line)}</span>
+        </div>`;
+      }).join("");
+    } else {
+      liveTextOverlay.textContent = currentCalculatedLines.join("\n");
+    }
 
     // Free Roam Coordinates
     const xPct = inputRangeTextX ? parseFloat(inputRangeTextX.value) : 50;
@@ -1165,84 +1181,104 @@ document.addEventListener("DOMContentLoaded", () => {
     liveTextOverlay.style.left = `${xPct}%`;
     liveTextOverlay.style.top = `${yPct}%`;
     liveTextOverlay.style.transform = "translate(-50%, -50%)";
+    liveTextOverlay.style.width = "max-content";
+    liveTextOverlay.style.maxWidth = `${currentBoxWidthPct}%`;
   }
 
-  // Draggable Free Roam & Resizable Text Overlay
+  // Draggable Free Roam & Multi-Handle Resizable Text Overlay
   let isDraggingText = false;
-  let isResizingText = false;
-  let textResizeStartY = 0;
-  let textResizeStartSize = 56;
+  let activeTextHandle = null;
+  let textHandleStartX = 0;
+  let textHandleStartY = 0;
+  let textStartFontSize = 56;
+  let textStartBoxWidth = 86;
 
   if (liveTextOverlay && videoCanvasBox) {
     liveTextOverlay.addEventListener("pointerdown", (e) => {
-      if (e.target.id === "textResizeHandle" || e.target === textResizeHandle) return;
+      const handle = e.target.closest("[data-texthandle]");
+      if (handle) {
+        e.stopPropagation();
+        activeTextHandle = handle.dataset.texthandle;
+        textHandleStartX = e.clientX;
+        textHandleStartY = e.clientY;
+        textStartFontSize = inputRangeTextSize ? parseInt(inputRangeTextSize.value, 10) : 56;
+        textStartBoxWidth = currentBoxWidthPct || 86;
+        handle.setPointerCapture(e.pointerId);
+        return;
+      }
+
       isDraggingText = true;
       liveTextOverlay.setPointerCapture(e.pointerId);
     });
 
     liveTextOverlay.addEventListener("pointermove", (e) => {
-      if (!isDraggingText) return;
       const rect = videoCanvasBox.getBoundingClientRect();
-      let xPct = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-      let yPct = Math.round(((e.clientY - rect.top) / rect.height) * 100);
-      xPct = Math.max(5, Math.min(95, xPct));
-      yPct = Math.max(5, Math.min(95, yPct));
-      if (inputRangeTextX) inputRangeTextX.value = xPct;
-      if (inputRangeTextY) inputRangeTextY.value = yPct;
-      if (lblTextPosX) lblTextPosX.textContent = `${xPct}%`;
-      if (lblTextPosY) lblTextPosY.textContent = `${yPct}%`;
-      updateLiveOverlayPreview();
+
+      // Handling handles (Corner Scale & Side Width)
+      if (activeTextHandle) {
+        const deltaX = e.clientX - textHandleStartX;
+        const deltaY = e.clientY - textHandleStartY;
+
+        if (activeTextHandle === "w" || activeTextHandle === "e") {
+          // Adjust box width percentage (controls word wrap / line breaks)
+          const factor = activeTextHandle === "e" ? 1 : -1;
+          const deltaPct = ((deltaX * factor) / rect.width) * 100 * 2;
+          const nextWidth = Math.max(35, Math.min(94, Math.round(textStartBoxWidth + deltaPct)));
+          currentBoxWidthPct = nextWidth;
+          updateLiveOverlayPreview();
+          return;
+        }
+
+        // Corner handles: NW, NE, SW, SE for scaling font size freely
+        let scaleDelta = 0;
+        if (activeTextHandle === "se") scaleDelta = (deltaX + deltaY) * 0.35;
+        else if (activeTextHandle === "nw") scaleDelta = (-deltaX - deltaY) * 0.35;
+        else if (activeTextHandle === "ne") scaleDelta = (deltaX - deltaY) * 0.35;
+        else if (activeTextHandle === "sw") scaleDelta = (-deltaX + deltaY) * 0.35;
+
+        const nextSize = Math.max(20, Math.min(110, Math.round(textStartFontSize + scaleDelta)));
+        if (inputRangeTextSize) inputRangeTextSize.value = nextSize;
+        if (lblOverlayFontSize) lblOverlayFontSize.textContent = `${nextSize}px`;
+        updateLiveOverlayPreview();
+        return;
+      }
+
+      // Handling position move (Free Roam)
+      if (isDraggingText) {
+        let xPct = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+        let yPct = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+        xPct = Math.max(5, Math.min(95, xPct));
+        yPct = Math.max(5, Math.min(95, yPct));
+        if (inputRangeTextX) inputRangeTextX.value = xPct;
+        if (inputRangeTextY) inputRangeTextY.value = yPct;
+        if (lblTextPosX) lblTextPosX.textContent = `${xPct}%`;
+        if (lblTextPosY) lblTextPosY.textContent = `${yPct}%`;
+        updateLiveOverlayPreview();
+      }
     });
 
-    const stopTextDrag = (e) => {
+    const stopTextPointer = (e) => {
+      if (activeTextHandle) {
+        activeTextHandle = null;
+      }
       if (isDraggingText) {
         isDraggingText = false;
         try { liveTextOverlay.releasePointerCapture(e.pointerId); } catch (_) {}
       }
     };
-    liveTextOverlay.addEventListener("pointerup", stopTextDrag);
-    liveTextOverlay.addEventListener("pointercancel", stopTextDrag);
+    liveTextOverlay.addEventListener("pointerup", stopTextPointer);
+    liveTextOverlay.addEventListener("pointercancel", stopTextPointer);
 
     // Mouse wheel resizing directly on text in preview
     liveTextOverlay.addEventListener("wheel", (e) => {
       e.preventDefault();
       let cur = inputRangeTextSize ? parseInt(inputRangeTextSize.value, 10) : 56;
       let step = e.deltaY < 0 ? 3 : -3;
-      let nextVal = Math.max(28, Math.min(96, cur + step));
+      let nextVal = Math.max(20, Math.min(110, cur + step));
       if (inputRangeTextSize) inputRangeTextSize.value = nextVal;
       if (lblOverlayFontSize) lblOverlayFontSize.textContent = `${nextVal}px`;
       updateLiveOverlayPreview();
     }, { passive: false });
-  }
-
-  // Corner Resize Handle for Text in preview
-  if (textResizeHandle) {
-    textResizeHandle.addEventListener("pointerdown", (e) => {
-      e.stopPropagation();
-      isResizingText = true;
-      textResizeStartY = e.clientY;
-      textResizeStartSize = inputRangeTextSize ? parseInt(inputRangeTextSize.value, 10) : 56;
-      textResizeHandle.setPointerCapture(e.pointerId);
-    });
-
-    textResizeHandle.addEventListener("pointermove", (e) => {
-      if (!isResizingText) return;
-      const deltaY = e.clientY - textResizeStartY;
-      const deltaSize = Math.round(deltaY * 0.4);
-      const newSize = Math.max(28, Math.min(96, textResizeStartSize + deltaSize));
-      if (inputRangeTextSize) inputRangeTextSize.value = newSize;
-      if (lblOverlayFontSize) lblOverlayFontSize.textContent = `${newSize}px`;
-      updateLiveOverlayPreview();
-    });
-
-    const stopTextResize = (e) => {
-      if (isResizingText) {
-        isResizingText = false;
-        try { textResizeHandle.releasePointerCapture(e.pointerId); } catch (_) {}
-      }
-    };
-    textResizeHandle.addEventListener("pointerup", stopTextResize);
-    textResizeHandle.addEventListener("pointercancel", stopTextResize);
   }
 
   if (inputOverlayText) {
@@ -1325,15 +1361,23 @@ document.addEventListener("DOMContentLoaded", () => {
       const bgStyle = selectOverlayBgStyle ? selectOverlayBgStyle.value : "solid_black";
       let bgColor = "#000000";
       let hasBg = true;
+      let bgAlpha = 1.0;
       if (bgStyle === "yellow_viral") bgColor = "#FFE81F";
       else if (bgStyle === "red_alert") bgColor = "#FF2A2A";
-      else if (bgStyle === "none") { bgColor = "#000000"; hasBg = false; }
+      else if (bgStyle === "semi_black") { bgColor = "#000000"; bgAlpha = 0.60; }
+      else if (bgStyle === "none") { bgColor = "#000000"; hasBg = false; bgAlpha = 0.0; }
 
       let textColor = pickerOverlayTextColor ? pickerOverlayTextColor.value : "#FFFFFF";
       if (bgStyle === "yellow_viral") textColor = "#000000";
 
       const xVal = inputRangeTextX ? parseFloat(inputRangeTextX.value) : 50.0;
       const yVal = inputRangeTextY ? parseFloat(inputRangeTextY.value) : 12.0;
+      const fontSize = inputRangeTextSize ? parseInt(inputRangeTextSize.value, 10) : 56;
+
+      // Pass the EXACT lines calculated & visible on screen
+      const textPayload = (currentCalculatedLines && currentCalculatedLines.length > 0)
+        ? currentCalculatedLines.join("\n")
+        : text;
 
       try {
         const resp = await fetch("/api/clips/overlay", {
@@ -1341,12 +1385,13 @@ document.addEventListener("DOMContentLoaded", () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             clip_id: selectedClip.clip_id,
-            text: text,
+            text: textPayload,
             font_name: selectOverlayFont ? selectOverlayFont.value : "Montserrat",
-            font_size: inputRangeTextSize ? parseInt(inputRangeTextSize.value, 10) : 56,
+            font_size: fontSize,
             text_color: textColor,
             bg_color: bgColor,
             has_bg: hasBg,
+            bg_alpha: bgAlpha,
             position: "free",
             x_pct: xVal,
             y_pct: yVal
@@ -1439,80 +1484,87 @@ document.addEventListener("DOMContentLoaded", () => {
     liveImageOverlayContainer.style.opacity = opacity;
   }
 
-  // Draggable Free Roam & Resizable Logo / Image Overlay
+  // Draggable Free Roam & Multi-Handle Resizable Logo / Image Overlay
   let isDraggingImage = false;
-  let isResizingImage = false;
-  let imgResizeStartX = 0;
-  let imgResizeStartScale = 16;
+  let activeImgHandle = null;
+  let imgHandleStartX = 0;
+  let imgHandleStartY = 0;
+  let imgStartScale = 16;
 
   if (liveImageOverlayContainer && videoCanvasBox) {
     liveImageOverlayContainer.addEventListener("pointerdown", (e) => {
-      if (e.target.id === "imageResizeHandle" || e.target === imageResizeHandle) return;
+      const handle = e.target.closest("[data-imghandle]");
+      if (handle) {
+        e.stopPropagation();
+        activeImgHandle = handle.dataset.imghandle;
+        imgHandleStartX = e.clientX;
+        imgHandleStartY = e.clientY;
+        imgStartScale = inputRangeImageScale ? parseInt(inputRangeImageScale.value, 10) : 16;
+        handle.setPointerCapture(e.pointerId);
+        return;
+      }
+
       isDraggingImage = true;
       liveImageOverlayContainer.setPointerCapture(e.pointerId);
     });
+
     liveImageOverlayContainer.addEventListener("pointermove", (e) => {
-      if (!isDraggingImage) return;
       const rect = videoCanvasBox.getBoundingClientRect();
-      let xPct = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-      let yPct = Math.round(((e.clientY - rect.top) / rect.height) * 100);
-      xPct = Math.max(5, Math.min(95, xPct));
-      yPct = Math.max(5, Math.min(95, yPct));
-      if (inputRangeImageX) inputRangeImageX.value = xPct;
-      if (inputRangeImageY) inputRangeImageY.value = yPct;
-      if (lblImagePosX) lblImagePosX.textContent = `${xPct}%`;
-      if (lblImagePosY) lblImagePosY.textContent = `${yPct}%`;
-      updateLiveImageOverlayPreview();
+
+      // Corner handles: NW, NE, SW, SE for scaling logo freely
+      if (activeImgHandle) {
+        const deltaX = e.clientX - imgHandleStartX;
+        const deltaY = e.clientY - imgHandleStartY;
+        let scaleDelta = 0;
+        if (activeImgHandle === "se") scaleDelta = (deltaX + deltaY);
+        else if (activeImgHandle === "nw") scaleDelta = (-deltaX - deltaY);
+        else if (activeImgHandle === "ne") scaleDelta = (deltaX - deltaY);
+        else if (activeImgHandle === "sw") scaleDelta = (-deltaX + deltaY);
+
+        const deltaPct = Math.round((scaleDelta / rect.width) * 50);
+        const newScale = Math.max(5, Math.min(65, imgStartScale + deltaPct));
+        if (inputRangeImageScale) inputRangeImageScale.value = newScale;
+        if (lblImageScale) lblImageScale.textContent = `${newScale}%`;
+        updateLiveImageOverlayPreview();
+        return;
+      }
+
+      // Handling position move (Free Roam)
+      if (isDraggingImage) {
+        let xPct = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+        let yPct = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+        xPct = Math.max(5, Math.min(95, xPct));
+        yPct = Math.max(5, Math.min(95, yPct));
+        if (inputRangeImageX) inputRangeImageX.value = xPct;
+        if (inputRangeImageY) inputRangeImageY.value = yPct;
+        if (lblImagePosX) lblImagePosX.textContent = `${xPct}%`;
+        if (lblImagePosY) lblImagePosY.textContent = `${yPct}%`;
+        updateLiveImageOverlayPreview();
+      }
     });
-    const stopImgDrag = (e) => {
+
+    const stopImgPointer = (e) => {
+      if (activeImgHandle) {
+        activeImgHandle = null;
+      }
       if (isDraggingImage) {
         isDraggingImage = false;
         try { liveImageOverlayContainer.releasePointerCapture(e.pointerId); } catch (_) {}
       }
     };
-    liveImageOverlayContainer.addEventListener("pointerup", stopImgDrag);
-    liveImageOverlayContainer.addEventListener("pointercancel", stopImgDrag);
+    liveImageOverlayContainer.addEventListener("pointerup", stopImgPointer);
+    liveImageOverlayContainer.addEventListener("pointercancel", stopImgPointer);
 
     // Mouse wheel resizing directly on image in preview
     liveImageOverlayContainer.addEventListener("wheel", (e) => {
       e.preventDefault();
       let cur = inputRangeImageScale ? parseInt(inputRangeImageScale.value, 10) : 16;
-      let step = e.deltaY < 0 ? 1 : -1;
-      let nextVal = Math.max(5, Math.min(50, cur + step));
+      let step = e.deltaY < 0 ? 2 : -2;
+      let nextVal = Math.max(5, Math.min(65, cur + step));
       if (inputRangeImageScale) inputRangeImageScale.value = nextVal;
       if (lblImageScale) lblImageScale.textContent = `${nextVal}%`;
       updateLiveImageOverlayPreview();
     }, { passive: false });
-  }
-
-  // Corner Resize Handle for Image in preview
-  if (imageResizeHandle) {
-    imageResizeHandle.addEventListener("pointerdown", (e) => {
-      e.stopPropagation();
-      isResizingImage = true;
-      imgResizeStartX = e.clientX;
-      imgResizeStartScale = inputRangeImageScale ? parseInt(inputRangeImageScale.value, 10) : 16;
-      imageResizeHandle.setPointerCapture(e.pointerId);
-    });
-
-    imageResizeHandle.addEventListener("pointermove", (e) => {
-      if (!isResizingImage) return;
-      const rect = videoCanvasBox.getBoundingClientRect();
-      const deltaPct = Math.round(((e.clientX - imgResizeStartX) / rect.width) * 100);
-      const newScale = Math.max(5, Math.min(50, imgResizeStartScale + deltaPct));
-      if (inputRangeImageScale) inputRangeImageScale.value = newScale;
-      if (lblImageScale) lblImageScale.textContent = `${newScale}%`;
-      updateLiveImageOverlayPreview();
-    });
-
-    const stopImgResize = (e) => {
-      if (isResizingImage) {
-        isResizingImage = false;
-        try { imageResizeHandle.releasePointerCapture(e.pointerId); } catch (_) {}
-      }
-    };
-    imageResizeHandle.addEventListener("pointerup", stopImgResize);
-    imageResizeHandle.addEventListener("pointercancel", stopImgResize);
   }
 
   function handleImageSelected(filePath, displayName, isNative) {

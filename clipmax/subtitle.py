@@ -2,19 +2,26 @@ from pathlib import Path
 from typing import List, Optional
 from clipmax.transcriber import WordSegment
 
-def to_ass_color(hex_color: str) -> str:
-    """Converts HEX color (#RRGGBB, RRGGBB, #RGB) or passes through ASS color (&H00BBGGRR&)."""
+def to_ass_color(hex_color: str, alpha: float = 1.0) -> str:
+    """Converts HEX color (#RRGGBB, #AARRGGBB, #RGB) or passes through ASS color (&HAABBGGRR&)."""
     if not hex_color:
         return "&H00FFFFFF&"
     if hex_color.startswith("&H") or hex_color.startswith("&h"):
         return hex_color
     hex_clean = hex_color.lstrip('#')
+    ass_alpha = int(round((1.0 - max(0.0, min(1.0, alpha))) * 255))
+    if len(hex_clean) == 8:
+        # User passed 8-digit hex #RRGGBBAA
+        r, g, b, a_hex = hex_clean[0:2], hex_clean[2:4], hex_clean[4:6], hex_clean[6:8]
+        css_a = int(a_hex, 16) / 255.0
+        ass_alpha = int(round((1.0 - css_a) * 255))
+        return f"&H{ass_alpha:02X}{b.upper()}{g.upper()}{r.upper()}&"
     if len(hex_clean) == 3:
         hex_clean = "".join([c * 2 for c in hex_clean])
-    if len(hex_clean) != 6:
-        return "&H00FFFFFF&"
-    r, g, b = hex_clean[0:2], hex_clean[2:4], hex_clean[4:6]
-    return f"&H00{b.upper()}{g.upper()}{r.upper()}&"
+    if len(hex_clean) == 6:
+        r, g, b = hex_clean[0:2], hex_clean[2:4], hex_clean[4:6]
+        return f"&H{ass_alpha:02X}{b.upper()}{g.upper()}{r.upper()}&"
+    return f"&H{ass_alpha:02X}FFFFFF&"
 
 def build_ass_header(base_ass_color: str = "&H00FFFFFF&") -> str:
     return f"""[Script Info]
@@ -106,6 +113,7 @@ def generate_overlay_ass(
     text_color: str = "#FFFFFF",
     bg_color: str = "#000000",
     has_bg: bool = True,
+    bg_alpha: float = 1.0,
     position: str = "top",
     x_pct: Optional[float] = None,
     y_pct: Optional[float] = None
@@ -114,8 +122,8 @@ def generate_overlay_ass(
     out_p = Path(output_ass_path)
     out_p.parent.mkdir(parents=True, exist_ok=True)
 
-    t_ass = to_ass_color(text_color)
-    bg_ass = to_ass_color(bg_color)
+    t_ass = to_ass_color(text_color, alpha=1.0)
+    bg_ass = to_ass_color(bg_color, alpha=bg_alpha)
     border_style = 3 if has_bg else 1
     outline_pad = 10 if has_bg else 4
     shadow_depth = 0 if has_bg else 2
@@ -145,22 +153,20 @@ Style: OverlayText,{font_name},{font_size},{t_ass},{t_ass},{bg_ass},{bg_ass},-1,
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
-    clean_text = text.strip().replace("\r", "").replace("\n", r"\N")
-    # Smart line-wrapping for long titles without manual line-breaks
-    max_c = max(14, int(1200 / max(20, font_size)))
-    raw_lines = text.strip().splitlines()
-    wrapped_lines = []
-    for line in raw_lines:
-        line_clean = line.strip()
-        if not line_clean:
-            continue
-        if len(line_clean) > max_c:
-            import textwrap
-            wrapped_lines.extend(textwrap.wrap(line_clean, width=max_c, break_long_words=False))
-        else:
-            wrapped_lines.append(line_clean)
-    if wrapped_lines:
-        clean_text = r"\N".join(wrapped_lines)
+    # Clean text and preserve user's explicit lines verbatim
+    clean_raw = text.strip().replace("\r", "")
+    if r"\N" in clean_raw:
+        lines = [l.strip() for l in clean_raw.split(r"\N") if l.strip()]
+    else:
+        lines = [l.strip() for l in clean_raw.split("\n") if l.strip()]
+
+    # If the text has only 1 long line without explicit line breaks, apply smart wrap:
+    if len(lines) == 1 and len(lines[0]) > 22:
+        max_c = max(14, int(1000 / max(20, font_size)))
+        import textwrap
+        lines = textwrap.wrap(lines[0], width=max_c, break_long_words=False)
+
+    clean_text = r"\N".join(lines) if lines else clean_raw
 
     end_str = format_ass_time(max(0.1, duration))
     event_line = f"Dialogue: 2,0:00:00.00,{end_str},OverlayText,,0,0,0,,{pos_tag}{clean_text}\n"
