@@ -100,3 +100,48 @@ def test_pipeline_montage_mode_execution(tmp_path):
         assert mock_render.call_count == 2
         # Verify generate_kinetic_ass called
         assert mock_ass.call_count == 1
+
+def test_pipeline_audio_language_passed(tmp_path):
+    from clipmax.ai_gateway import ViralClipCandidate
+    from clipmax.transcriber import WordSegment, TranscriptionResult
+    from clipmax.reframe import SceneSegment
+
+    cfg = AppConfig(temp_dir=str(tmp_path / "temp"), staging_dir=str(tmp_path / "staging"))
+    orchestrator = PipelineOrchestrator(cfg)
+
+    dummy_video = tmp_path / "input.mp4"
+    dummy_video.touch()
+
+    candidate = ViralClipCandidate(
+        title="Klip Bahasa Indonesia",
+        hook="Hook menarik",
+        start_time=0.0,
+        end_time=15.0,
+        virality_score=95,
+        reasoning="Alasan viral",
+        mode="single"
+    )
+
+    with patch("clipmax.pipeline.extract_audio"), \
+         patch("clipmax.pipeline.transcribe_audio") as mock_transcribe, \
+         patch("clipmax.pipeline.evaluate_viral_clips") as mock_eval, \
+         patch("clipmax.pipeline.segment_clip_scenes") as mock_scenes, \
+         patch("clipmax.pipeline.render_clip"), \
+         patch("clipmax.pipeline.generate_kinetic_ass"), \
+         patch("clipmax.pipeline.generate_thumbnail"), \
+         patch("subprocess.run"):
+
+        mock_transcribe.return_value = TranscriptionResult([], "Transkrip Indonesia", language="id")
+        mock_eval.return_value = [candidate]
+        mock_scenes.return_value = [SceneSegment(start_time=0.0, end_time=15.0, mode="BLURRED_BACKGROUND", crop_x="0")]
+
+        orchestrator.run(
+            input_source=str(dummy_video),
+            audio_language="id"
+        )
+
+        # Ensure language was passed to transcribe_audio
+        assert mock_transcribe.call_args.kwargs.get("language") == "id"
+        # Ensure detected_language passed to evaluate_viral_clips is "id"
+        assert mock_eval.call_args.kwargs.get("detected_language") == "id"
+

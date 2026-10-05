@@ -256,35 +256,38 @@ def get_ydl_options(output_path: str, audio_lang: Optional[str] = None, **kwargs
     Forces highest resolution (up to 4K 2160p / 1440p / 1080p).
     Supports selecting specific audio track language if multi-language audio is available.
     """
-    if audio_lang and audio_lang != "default":
-        base_lang = audio_lang.split("-")[0]
-        fmt = (
-            f"bestvideo[height<=2160][ext=mp4]+bestaudio[language={audio_lang}][ext=m4a]/"
-            f"bestvideo[height<=2160][ext=mp4]+bestaudio[language*={base_lang}][ext=m4a]/"
-            f"bestvideo[height<=2160]+bestaudio[language={audio_lang}]/"
-            f"bestvideo[height<=2160]+bestaudio[language*={base_lang}]/"
-            f"bestvideo[height<=2160]+bestaudio[format_note*={base_lang}]/"
-            f"bestvideo[height<=2160]+bestaudio/best"
-        )
-    else:
-        fmt = "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/bestvideo+bestaudio/best[height>=1080]/best[ext=mp4]/best"
-
-    return {
-        "format": fmt,
+    opts: Dict[str, Any] = {
         "outtmpl": output_path,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["tv_embedded", "creator", "android", "ios"],
-                "player_skip": ["webpage", "configs"]
-            }
-        },
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (PlayStation 4 9.00) AppleWebKit/537.78 (KHTML, like Gecko)"
-        },
         "nocheckcertificate": True,
         "no_warnings": True,
         "quiet": False
     }
+
+    if audio_lang and audio_lang != "default":
+        base_lang = audio_lang.split("-")[0].lower()
+        opts["format"] = (
+            f"bestvideo[height<=2160]+bestaudio[language={audio_lang}]/"
+            f"bestvideo[height<=2160]+bestaudio[language*={base_lang}]/"
+            f"bestvideo[height<=2160]+bestaudio[format_note*={base_lang}]/"
+            f"bestvideo+bestaudio[language={audio_lang}]/"
+            f"bestvideo+bestaudio[language*={base_lang}]/"
+            f"bestvideo[height<=2160]+bestaudio/best"
+        )
+        # Multi-track audio: Do not restrict player_client to tv_embedded,
+        # which omits dub tracks and forces fallback to format 18.
+    else:
+        opts["format"] = "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/bestvideo+bestaudio/best[height>=1080]/best[ext=mp4]/best"
+        opts["extractor_args"] = {
+            "youtube": {
+                "player_client": ["tv_embedded", "creator", "android", "ios"],
+                "player_skip": ["webpage", "configs"]
+            }
+        }
+        opts["http_headers"] = {
+            "User-Agent": "Mozilla/5.0 (PlayStation 4 9.00) AppleWebKit/537.78 (KHTML, like Gecko)"
+        }
+
+    return opts
 
 def download_video(
     url: str,

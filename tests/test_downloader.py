@@ -158,7 +158,12 @@ def test_get_ydl_options_with_audio_lang():
     from clipmax.downloader import get_ydl_options
     opts_id = get_ydl_options("out.mp4", audio_lang="id")
     assert "bestaudio[language=id]" in opts_id["format"]
+    # Multi-track dubbing must not use tv_embedded extractor or PS4 headers
+    assert "extractor_args" not in opts_id
+    assert "http_headers" not in opts_id
 
     opts_default = get_ydl_options("out.mp4", audio_lang="default")
     assert "bestaudio[ext=m4a]" in opts_default["format"]
+    assert "tv_embedded" in opts_default["extractor_args"]["youtube"]["player_client"]
+
 
