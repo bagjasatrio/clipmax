@@ -17,6 +17,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const dropZone = document.getElementById("dropZone");
   const lblLocalFile = document.getElementById("lblLocalFile");
   const fileVideoInput = document.getElementById("fileVideoInput");
+  const boxAudioTracks = document.getElementById("boxAudioTracks");
+  const selectAudioTrack = document.getElementById("selectAudioTrack");
+  const lblAudioTrackCount = document.getElementById("lblAudioTrackCount");
 
   const inputEndpoint = document.getElementById("inputEndpoint");
   const inputApiKey = document.getElementById("inputApiKey");
@@ -421,6 +424,77 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // YouTube Multi-Language Audio Tracks Probing
+  let audioTracksTimer = null;
+  async function checkAudioTracks(rawUrl) {
+    const url = (rawUrl || "").trim();
+    if (!url || !url.startsWith("http")) {
+      if (boxAudioTracks) boxAudioTracks.classList.add("hidden");
+      if (selectAudioTrack) selectAudioTrack.innerHTML = '<option value="default">Default / Original</option>';
+      return;
+    }
+
+    try {
+      if (boxAudioTracks) boxAudioTracks.classList.remove("hidden");
+      if (lblAudioTrackCount) {
+        lblAudioTrackCount.textContent = "Mengecek Trek Audio...";
+        lblAudioTrackCount.className = "text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-indigo-950/80 text-indigo-400 border border-indigo-500/30";
+      }
+
+      const res = await fetch("/api/youtube/audio-tracks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url })
+      });
+      if (!res.ok) {
+        if (boxAudioTracks) boxAudioTracks.classList.add("hidden");
+        return;
+      }
+      const data = await res.json();
+      const tracks = data.tracks || [];
+
+      if (tracks.length > 1) {
+        if (boxAudioTracks) boxAudioTracks.classList.remove("hidden");
+        if (lblAudioTrackCount) {
+          lblAudioTrackCount.textContent = `${tracks.length} Bahasa Tersedia`;
+          lblAudioTrackCount.className = "text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30";
+        }
+        if (selectAudioTrack) {
+          selectAudioTrack.innerHTML = "";
+          tracks.forEach(t => {
+            const opt = document.createElement("option");
+            opt.value = t.code;
+            opt.textContent = `${t.label}${t.is_original ? " ⭐" : ""}`;
+            selectAudioTrack.appendChild(opt);
+          });
+        }
+      } else {
+        if (boxAudioTracks) boxAudioTracks.classList.add("hidden");
+        if (selectAudioTrack) selectAudioTrack.innerHTML = '<option value="default">Default / Original</option>';
+      }
+    } catch (e) {
+      console.warn("Audio tracks probe failed:", e);
+      if (boxAudioTracks) boxAudioTracks.classList.add("hidden");
+    }
+  }
+
+  if (inputUrl) {
+    inputUrl.addEventListener("input", () => {
+      clearTimeout(audioTracksTimer);
+      audioTracksTimer = setTimeout(() => {
+        checkAudioTracks(inputUrl.value);
+      }, 700);
+    });
+    inputUrl.addEventListener("paste", () => {
+      setTimeout(() => {
+        checkAudioTracks(inputUrl.value);
+      }, 100);
+    });
+    inputUrl.addEventListener("change", () => {
+      checkAudioTracks(inputUrl.value);
+    });
+  }
+
   // 4. Initial System & Config Loading
   async function loadInitialData() {
     try {
@@ -650,6 +724,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (studioBadgeDot) studioBadgeDot.classList.remove("hidden");
       updateProgressUI("STARTING", 5, "Mempersiapkan pipeline...");
 
+      const selectedAudioLang = (activeTab === "url" && selectAudioTrack && selectAudioTrack.value !== "default") 
+        ? selectAudioTrack.value 
+        : null;
+
       const res = await fetch("/api/pipeline/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -661,7 +739,8 @@ document.addEventListener("DOMContentLoaded", () => {
           campaign_rules: inputRules.value.trim(),
           clip_mode: clipModeVal,
           subtitle_base_color: subBaseVal,
-          subtitle_highlight_color: subHighlightVal
+          subtitle_highlight_color: subHighlightVal,
+          audio_language: selectedAudioLang
         })
       });
       if (!res.ok) {
@@ -1746,6 +1825,8 @@ document.addEventListener("DOMContentLoaded", () => {
       inputUrl.value = "";
       inputRules.value = "";
       localVideoPath = "";
+      if (boxAudioTracks) boxAudioTracks.classList.add("hidden");
+      if (selectAudioTrack) selectAudioTrack.innerHTML = '<option value="default">Default / Original</option>';
       lblLocalFile.textContent = "Pilih video MP4 dari komputer...";
       localStorage.removeItem("clipmax_campaign_brief");
       localStorage.removeItem("clipmax_youtube_url");

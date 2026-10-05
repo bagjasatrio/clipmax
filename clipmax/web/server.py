@@ -29,7 +29,11 @@ class PipelineStartRequest(BaseModel):
     clip_mode: str = "single"
     subtitle_base_color: str = "#FFFFFF"
     subtitle_highlight_color: str = "#FF2A2A"
+    audio_language: Optional[str] = None
     cookie_file: Optional[str] = None
+
+class AudioTracksProbeRequest(BaseModel):
+    url: str
 
 class ConfigUpdateRequest(BaseModel):
     endpoint_url: Optional[str] = None
@@ -205,6 +209,12 @@ def get_models():
     models = discover_models(state.config.endpoint_url, state.config.api_key)
     return {"models": models}
 
+@app.post("/api/youtube/audio-tracks")
+def probe_youtube_audio_tracks_api(req: AudioTracksProbeRequest):
+    from clipmax.downloader import probe_youtube_audio_tracks
+    tracks = probe_youtube_audio_tracks(req.url)
+    return {"tracks": tracks}
+
 @app.post("/api/pipeline/start")
 def start_pipeline(req: PipelineStartRequest):
     if state.worker_thread and state.worker_thread.is_alive():
@@ -237,7 +247,8 @@ def start_pipeline(req: PipelineStartRequest):
                 campaign_rules=req.campaign_rules,
                 clip_mode=req.clip_mode,
                 subtitle_base_color=req.subtitle_base_color,
-                subtitle_highlight_color=req.subtitle_highlight_color
+                subtitle_highlight_color=req.subtitle_highlight_color,
+                audio_language=req.audio_language
             )
 
             if state.orchestrator.cancel_requested.is_set():

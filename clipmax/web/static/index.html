@@ -223,8 +223,27 @@
             <input type="text" id="inputUrl" placeholder="https://www.youtube.com/watch?v=..." 
               class="w-full px-3.5 py-2.5 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none transition text-gray-100 placeholder-gray-500">
             <div class="flex items-center justify-between text-[11px] text-gray-400 px-1">
-              <span>⚡ Engine: Invidious API Stream Publik</span>
+              <span>⚡ Engine: Invidious API Stream & yt-dlp</span>
               <span class="text-emerald-400 font-medium">Bebas Login & Cookies</span>
+            </div>
+
+            <!-- YouTube Multi-Language Audio Tracks Selector -->
+            <div id="boxAudioTracks" class="p-3 bg-[#0B0E14] border border-indigo-500/30 rounded-xl space-y-2 hidden">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-indigo-300 font-semibold flex items-center space-x-1.5">
+                  <span>🎙️</span>
+                  <span>Pilihan Bahasa Audio Video (Multi-Track)</span>
+                </span>
+                <span id="lblAudioTrackCount" class="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">Tersedia Dubbing</span>
+              </div>
+              <div class="space-y-1">
+                <select id="selectAudioTrack" class="w-full px-3 py-2 text-xs bg-[#131722] border border-[#2B3548] focus:border-indigo-500 rounded-lg focus:outline-none text-white cursor-pointer font-medium">
+                  <option value="default">Default / Original</option>
+                </select>
+                <p class="text-[10px] text-gray-400 leading-relaxed pt-0.5">
+                  Audio klip, transkripsi Whisper, subtitle vertikal 9:16, serta judul dan hook kurasi AI akan otomatis mengikuti bahasa trek yang Anda pilih di atas.
+                </p>
+              </div>
             </div>
           </div>
 

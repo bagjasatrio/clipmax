@@ -127,3 +127,38 @@ def test_download_video_failure_clean_error(tmp_path):
             download_video(fake_url, str(out_dir))
         assert "Video unavailable" in str(excinfo.value)
         assert "cookies" not in str(excinfo.value).lower()
+
+def test_probe_youtube_audio_tracks_mocked():
+    from clipmax.downloader import probe_youtube_audio_tracks
+    with patch("yt_dlp.YoutubeDL") as mock_ydl_cls:
+        mock_ydl = MagicMock()
+        mock_ydl.extract_info.return_value = {
+            "formats": [
+                {"vcodec": "avc1", "acodec": "none", "height": 1080},
+                {"vcodec": "none", "acodec": "opus", "language": "en", "format_note": "English - original (default)"},
+                {"vcodec": "none", "acodec": "opus", "language": "id", "format_note": "Indonesia - dubbed"},
+                {"vcodec": "none", "acodec": "opus", "language": "es", "format_note": "Español - dubbed"},
+            ]
+        }
+        mock_ydl_cls.return_value.__enter__.return_value = mock_ydl
+
+        tracks = probe_youtube_audio_tracks("https://www.youtube.com/watch?v=kX3nB4PpJko")
+        assert len(tracks) == 3
+        # Original should be first
+        assert tracks[0]["code"] == "en"
+        assert tracks[0]["is_original"] is True
+        assert "Original" in tracks[0]["label"]
+
+        # Indonesian dubbed track
+        assert tracks[1]["code"] == "id"
+        assert "Indonesia" in tracks[1]["label"]
+        assert "Dubbed" in tracks[1]["label"]
+
+def test_get_ydl_options_with_audio_lang():
+    from clipmax.downloader import get_ydl_options
+    opts_id = get_ydl_options("out.mp4", audio_lang="id")
+    assert "bestaudio[language=id]" in opts_id["format"]
+
+    opts_default = get_ydl_options("out.mp4", audio_lang="default")
+    assert "bestaudio[ext=m4a]" in opts_default["format"]
+

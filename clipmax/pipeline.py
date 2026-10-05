@@ -131,6 +131,7 @@ class PipelineOrchestrator:
         clip_mode: Optional[str] = None,
         subtitle_base_color: Optional[str] = None,
         subtitle_highlight_color: Optional[str] = None,
+        audio_language: Optional[str] = None,
         **kwargs
     ) -> List[ClipResult]:
         self.cancel_requested.clear()
@@ -167,7 +168,8 @@ class PipelineOrchestrator:
                     input_source,
                     download_folder,
                     cancel_event=self.cancel_requested,
-                    progress_callback=on_dl_progress
+                    progress_callback=on_dl_progress,
+                    audio_lang=audio_language
                 )
                 self.temp_files.append(video_path)
             else:

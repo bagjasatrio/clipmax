@@ -294,6 +294,21 @@ def test_stream_and_thumbnail_endpoints(tmp_path, monkeypatch):
     assert res_fallback.status_code == 200
     assert res_fallback.headers["content-type"] == "video/mp4"
 
+def test_api_youtube_audio_tracks():
+    with patch("clipmax.downloader.probe_youtube_audio_tracks") as mock_probe:
+        mock_probe.return_value = [
+            {"code": "en", "label": "English (Original)", "is_original": True},
+            {"code": "id", "label": "Bahasa Indonesia (Dubbed)", "is_original": False}
+        ]
+        res = client.post("/api/youtube/audio-tracks", json={"url": "https://www.youtube.com/watch?v=kX3nB4PpJko"})
+        assert res.status_code == 200
+        data = res.json()
+        assert "tracks" in data
+        assert len(data["tracks"]) == 2
+        assert data["tracks"][0]["code"] == "en"
+        assert data["tracks"][1]["code"] == "id"
+
+
 
 
 

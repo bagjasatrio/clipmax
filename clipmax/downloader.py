@@ -4,7 +4,7 @@ import subprocess
 import threading
 import requests
 from pathlib import Path
-from typing import Optional, Callable, Dict, Any
+from typing import Optional, Callable, Dict, Any, List
 from clipmax.config import get_ffmpeg_bin
 
 def clean_error_message(text: str) -> str:
@@ -178,13 +178,99 @@ def download_via_invidious(
 
     return False
 
-def get_ydl_options(output_path: str, **kwargs) -> Dict[str, Any]:
+def probe_youtube_audio_tracks(url: str) -> List[Dict[str, Any]]:
+    """
+    Probes YouTube video metadata for available multi-language audio tracks.
+    Returns list of dicts: [{'code': 'en', 'label': 'English (Original)', 'is_original': True}, ...]
+    """
+    import yt_dlp
+
+    if not is_valid_video_url(url):
+        return []
+
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": False,
+        "skip_download": True,
+        "nocheckcertificate": True,
+        "socket_timeout": 8
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url.strip(), download=False)
+            if not info:
+                return []
+            formats = info.get("formats", [])
+            tracks_map: Dict[str, Dict[str, Any]] = {}
+            for f in formats:
+                if f.get("vcodec") == "none" and f.get("acodec") != "none":
+                    lang = (f.get("language") or "").strip().lower()
+                    note = (f.get("format_note") or "").strip()
+                    if not lang and not note:
+                        continue
+
+                    track_code = lang or "default"
+                    if track_code not in tracks_map:
+                        is_orig = "original" in note.lower() or "default" in note.lower()
+                        is_dub = "dubbed" in note.lower() or "dub" in note.lower()
+
+                        label = note if note else track_code.upper()
+                        if " - " in label:
+                            label = label.split(" - ")[0].strip()
+
+                        if "indonesia" in label.lower() or track_code == "id":
+                            label = "Bahasa Indonesia"
+                        elif "english" in label.lower() or track_code.startswith("en"):
+                            label = "English"
+
+                        if is_orig:
+                            label = f"{label} (Original)"
+                        elif is_dub or (not track_code.startswith("en") and track_code != "default"):
+                            label = f"{label} (Dubbed)"
+
+                        tracks_map[track_code] = {
+                            "code": track_code,
+                            "label": label,
+                            "is_original": is_orig
+                        }
+
+            track_list = list(tracks_map.values())
+            def sort_key(t):
+                c = t["code"].lower()
+                if t["is_original"] or c.startswith("en"):
+                    return 0
+                if c.startswith("id"):
+                    return 1
+                return 2
+            track_list.sort(key=sort_key)
+            return track_list
+    except Exception as e:
+        print(f"[Audio Tracks Probe Warning] Failed to probe tracks: {e}")
+        return []
+
+def get_ydl_options(output_path: str, audio_lang: Optional[str] = None, **kwargs) -> Dict[str, Any]:
     """
     Returns yt-dlp options configured for safe fallback without requiring login or cookies.
     Forces highest resolution (up to 4K 2160p / 1440p / 1080p).
+    Supports selecting specific audio track language if multi-language audio is available.
     """
+    if audio_lang and audio_lang != "default":
+        base_lang = audio_lang.split("-")[0]
+        fmt = (
+            f"bestvideo[height<=2160][ext=mp4]+bestaudio[language={audio_lang}][ext=m4a]/"
+            f"bestvideo[height<=2160][ext=mp4]+bestaudio[language*={base_lang}][ext=m4a]/"
+            f"bestvideo[height<=2160]+bestaudio[language={audio_lang}]/"
+            f"bestvideo[height<=2160]+bestaudio[language*={base_lang}]/"
+            f"bestvideo[height<=2160]+bestaudio[format_note*={base_lang}]/"
+            f"bestvideo[height<=2160]+bestaudio/best"
+        )
+    else:
+        fmt = "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/bestvideo+bestaudio/best[height>=1080]/best[ext=mp4]/best"
+
     return {
-        "format": "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/bestvideo+bestaudio/best[height>=1080]/best[ext=mp4]/best",
+        "format": fmt,
         "outtmpl": output_path,
         "extractor_args": {
             "youtube": {
@@ -205,11 +291,12 @@ def download_video(
     output_dir: str,
     cancel_event: Optional[threading.Event] = None,
     progress_callback: Optional[Callable[[int, str], None]] = None,
+    audio_lang: Optional[str] = None,
     **kwargs
 ) -> str:
     """
-    Downloads video using Invidious API instance as primary engine,
-    with yt-dlp as an optional fallback engine.
+    Downloads video using Invidious API instance as primary engine (for default tracks),
+    or yt-dlp directly when specific multi-language audio track is selected.
     """
     import yt_dlp
 
@@ -219,9 +306,9 @@ def download_video(
     out_dir_path = Path(output_dir)
     out_dir_path.mkdir(parents=True, exist_ok=True)
 
-    # 1. Primary Engine: Invidious API stream download
+    # 1. Primary Engine: Invidious API stream download (only if default audio track requested)
     vid_id = extract_video_id(url)
-    if vid_id:
+    if (not audio_lang or audio_lang == "default") and vid_id:
         target_file = out_dir_path / f"yt_download_{vid_id}.mp4"
         if progress_callback:
             progress_callback(0, "Mengunduh via Invidious API instance...")
@@ -241,10 +328,11 @@ def download_video(
     if cancel_event and cancel_event.is_set():
         raise RuntimeError("Download dibatalkan oleh pengguna.")
 
-    # 2. Fallback Engine: yt-dlp
+    # 2. yt-dlp engine
     auto_update_ytdlp()
 
-    out_template = str(out_dir_path / "yt_download_%(id)s.%(ext)s")
+    lang_suffix = f"_{audio_lang}" if (audio_lang and audio_lang != "default") else ""
+    out_template = str(out_dir_path / f"yt_download_%(id)s{lang_suffix}.%(ext)s")
 
     def progress_hook(d: Dict[str, Any]):
         if cancel_event and cancel_event.is_set():
@@ -253,11 +341,12 @@ def download_video(
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
             downloaded = d.get("downloaded_bytes") or 0
             pct = int((downloaded / total) * 100) if total > 0 else 0
-            progress_callback(pct, f"Mengunduh (yt-dlp): {pct}%")
+            msg = f"Mengunduh audio track [{audio_lang}] ({pct}%)" if (audio_lang and audio_lang != "default") else f"Mengunduh (yt-dlp): {pct}%"
+            progress_callback(pct, msg)
 
     ffmpeg_bin = get_ffmpeg_bin()
 
-    opts = get_ydl_options(out_template)
+    opts = get_ydl_options(out_template, audio_lang=audio_lang)
     opts.update({
         "merge_output_format": "mp4",
         "ffmpeg_location": ffmpeg_bin,
