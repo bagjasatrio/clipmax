@@ -98,6 +98,11 @@ def render_clip(
                     f"[fg_in{i}]scale=1080:-1:flags=lanczos[fg{i}];"
                     f"[bg{i}][fg{i}]overlay=(W-w)/2:(H-h)/2,setsar=1[v{i}]"
                 )
+            elif sc.mode in ("BLACK_BARS", "LETTERBOX"):
+                chain = (
+                    f"[0:v]trim=start={t_s}:end={t_e},setpts=PTS-STARTPTS,"
+                    f"scale=1080:-1:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1[v{i}]"
+                )
             else:
                 crop_x_val = f"'{sc.crop_x}'" if (isinstance(sc.crop_x, str) and not str(sc.crop_x).isdigit()) else str(sc.crop_x)
                 chain = (
@@ -133,6 +138,24 @@ def render_clip(
             f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,boxblur=20:20[bg];"
             f"[0:v]scale=1080:-1:flags=lanczos[fg];"
             f"[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1{sub_filter}[outv]"
+        )
+        cmd = [
+            get_ffmpeg_bin(),
+            "-y",
+            "-ss", f"{start_time:.2f}",
+            "-i", str(in_p.resolve()),
+            "-to", f"{clip_dur:.2f}",
+            "-filter_complex", filter_str,
+            "-map", "[outv]",
+            "-map", "0:a?",
+            *encoder_args,
+            str(out_p.resolve())
+        ]
+    elif active_mode in ("BLACK_BARS", "LETTERBOX"):
+        # Mode BLACK_BARS: Clean black background padding 1080x1920
+        sub_filter = f",subtitles='{escaped_ass}'" if escaped_ass else ""
+        filter_str = (
+            f"[0:v]scale=1080:-1:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1{sub_filter}[outv]"
         )
         cmd = [
             get_ffmpeg_bin(),

@@ -82,6 +82,12 @@ class AppConfig(BaseModel):
     subtitle_base_color: str = "#FFFFFF"
     subtitle_highlight_color: str = "#FF2A2A"
     subtitle_color_preset: str = "red_white"
+    subtitle_case: str = "upper"
+    subtitle_one_line: bool = False
+    subtitle_bottom_offset: int = 20
+    margin_backdrop: str = "BLURRED_BG"
+    filename_prefix: str = ""
+    filename_suffix: str = ""
 
     @classmethod
     def load(cls, path: str = "config.json") -> "AppConfig":

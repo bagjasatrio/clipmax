@@ -134,5 +134,91 @@ def test_generate_overlay_ass_smart_wrapping(tmp_path):
     content2 = out_file2.read_text(encoding="utf-8")
     assert r"Custom Line 1\NCustom Line 2" in content2
 
+def test_generate_srt(tmp_path):
+    from clipmax.subtitle import generate_srt
+    words = [
+        WordSegment(word="Ini", start=1.0, end=1.4, probability=0.99),
+        WordSegment(word="adalah", start=1.4, end=1.8, probability=0.99),
+        WordSegment(word="video", start=1.8, end=2.2, probability=0.99),
+        WordSegment(word="viral", start=2.2, end=2.8, probability=0.99),
+    ]
+    srt_out = tmp_path / "test.srt"
+    res = generate_srt(words, clip_start=1.0, clip_end=3.0, output_srt_path=str(srt_out), chunk_size=2, case_mode="upper")
+    assert Path(res).exists()
+    content = srt_out.read_text(encoding="utf-8")
+    assert "00:00:00,000 --> " in content
+    assert "INI ADALAH" in content
+    assert "VIDEO VIRAL" in content
+
+def test_generate_youtube_chapters_and_summary():
+    from clipmax.subtitle import generate_youtube_chapters, generate_markdown_summary
+    from clipmax.pipeline import ClipResult
+    clips = [
+        ClipResult(
+            clip_id=1,
+            title="Momen Juara",
+            hook="Gila banget!",
+            virality_score=95,
+            reasoning="Keren",
+            start_time=15.0,
+            end_time=45.0,
+            staging_path="",
+            social_caption="Momen juara seru #viral #shorts",
+            hook_timestamp=17.5
+        ),
+        ClipResult(
+            clip_id=2,
+            title="Strategi Akhir",
+            hook="Tonton sampai habis",
+            virality_score=88,
+            reasoning="Penuh taktik",
+            start_time=80.0,
+            end_time=110.0,
+            staging_path="",
+            social_caption="Strategi jitu #tips #shorts"
+        )
+    ]
+    chapters = generate_youtube_chapters(clips)
+    assert "00:00 Intro" in chapters
+    assert "00:15 Momen Juara" in chapters
+    assert "01:20 Strategi Akhir" in chapters
+
+    summary = generate_markdown_summary(clips)
+    assert "# Generated Viral Clips Summary" in summary
+    assert "Momen Juara" in summary
+    assert "95/100" in summary
+    assert "17.50s" in summary
+    assert "Momen juara seru #viral #shorts" in summary
+
+def test_subtitle_presets_and_options(tmp_path):
+    from clipmax.subtitle import SUBTITLE_PRESETS, generate_kinetic_ass
+    assert "viral_pop" in SUBTITLE_PRESETS
+    assert "beast_punch" in SUBTITLE_PRESETS
+    assert "cyber_violet" in SUBTITLE_PRESETS
+
+    words = [
+        WordSegment(word="halo", start=2.0, end=2.5, probability=0.99),
+        WordSegment(word="dunia", start=2.5, end=3.0, probability=0.99),
+    ]
+    out_ass = tmp_path / "preset_test.ass"
+    res = generate_kinetic_ass(
+        words=words,
+        clip_start=2.0,
+        clip_end=4.0,
+        output_ass_path=str(out_ass),
+        preset="viral_pop",
+        case_mode="title",
+        strictly_one_line=True,
+        bottom_offset_pct=25
+    )
+    assert Path(res).exists()
+    content = out_ass.read_text(encoding="utf-8")
+    assert "Style: Kinetic" in content
+    # MarginV at 25% of 1920 = 480
+    assert ",480,1" in content
+    # Title case format
+    assert "Halo" in content or "Dunia" in content
+
+
 
 

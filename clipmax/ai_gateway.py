@@ -20,6 +20,8 @@ class ViralClipCandidate(BaseModel):
     reasoning: str = ""
     mode: str = "single"  # "single" or "montage"
     cuts: Optional[List[MontageCut]] = None
+    social_caption: str = ""
+    hook_timestamp: Optional[float] = None
 
 def safe_extract_json(text: str) -> Any:
     # 1. Direct parse
@@ -109,17 +111,21 @@ Periksa 'Campaign Brief & Custom Rules'. Jika ada syarat akhir spesifik (seperti
 Kriteria seleksi umum:
 1. Memiliki Hook kuat di 3 detik pertama.
 2. Memiliki narasi yang utuh atau poin klimaks yang berbobot.
-3. Beri skor viralitas (1-100) dan alasan.
+3. Buat 'social_caption' siap posting untuk caption TikTok/Reels/Shorts, lengkap dengan ringkasan pendek menarik dan 3-5 tagar (#hashtag) relevan.
+4. Catat 'hook_timestamp' (angka float detik) di mana punchline/hook utama terucap.
+5. Beri skor viralitas (1-100) dan alasan (reasoning).
 
 Format output WAJIB berupa JSON array murni tanpa markdown wrapper:
 [
   {
     "title": "Short punchy title (match transcript language)",
     "hook": "Attention-grabbing opening hook (match transcript language)",
+    "hook_timestamp": 756.20,
     "start_time": 754.20,
     "end_time": 784.50,
     "virality_score": 95,
-    "reasoning": "Explanation why this clip is viral (match transcript language)"
+    "reasoning": "Explanation why this clip is viral (match transcript language)",
+    "social_caption": "Engaging caption ready for posting with hashtags #viral #shorts"
   }
 ]
 PENTING: Gunakan stempel waktu 'start_time' dan 'end_time' presisi angka float detik dari penanda waktu transkrip (contoh: 754.20), JANGAN membulatkan ke integer agar pemotongan FFmpeg presisi frame-accurate."""
@@ -284,15 +290,26 @@ Patuhi CRITICAL CAMPAIGN RULES dan ATURAN UTAMA di atas jika ada syarat kemenang
 
             if len(valid_cuts) >= 2:
                 total_dur = sum(c.end - c.start for c in valid_cuts)
+                m_title = str(item.get("title", "Montage Clip"))
+                m_hook = valid_cuts[0].event or str(item.get("hook", ""))
+                m_caption = str(item.get("social_caption", item.get("caption", ""))).strip()
+                if not m_caption:
+                    tag_token = re.sub(r'\W+', '', m_title.split()[0].lower()) if m_title.split() else "shorts"
+                    m_caption = f"{m_title}! {m_hook} #{tag_token} #viral #shorts #reels"
+
+                m_hook_ts = parse_to_seconds(item.get("hook_timestamp", valid_cuts[0].start))
+
                 candidate = ViralClipCandidate(
-                    title=str(item.get("title", "Montage Clip")),
-                    hook=valid_cuts[0].event or str(item.get("hook", "")),
+                    title=m_title,
+                    hook=m_hook,
                     start_time=valid_cuts[0].start,
                     end_time=valid_cuts[-1].end,
                     virality_score=v_score,
                     reasoning=" | ".join(c.event for c in valid_cuts if c.event),
                     mode="montage",
-                    cuts=valid_cuts
+                    cuts=valid_cuts,
+                    social_caption=m_caption,
+                    hook_timestamp=round(m_hook_ts, 2)
                 )
                 relaxed_results.append(candidate)
                 if lower_bound <= total_dur <= upper_bound:
@@ -307,14 +324,25 @@ Patuhi CRITICAL CAMPAIGN RULES dan ATURAN UTAMA di atas jika ada syarat kemenang
         if end_sec <= start_sec or dur < 5.0:
             continue
 
+        c_title = str(item.get("title", "Untitled Clip"))
+        c_hook = str(item.get("hook", ""))
+        c_caption = str(item.get("social_caption", item.get("caption", ""))).strip()
+        if not c_caption:
+            tag_token = re.sub(r'\W+', '', c_title.split()[0].lower()) if c_title.split() else "shorts"
+            c_caption = f"{c_title} - {c_hook} #{tag_token} #viral #shorts #reels"
+
+        c_hook_ts = parse_to_seconds(item.get("hook_timestamp", start_sec))
+
         candidate = ViralClipCandidate(
-            title=str(item.get("title", "Untitled Clip")),
-            hook=str(item.get("hook", "")),
+            title=c_title,
+            hook=c_hook,
             start_time=start_sec,
             end_time=end_sec,
             virality_score=v_score,
             reasoning=str(item.get("reasoning", "")),
-            mode="single"
+            mode="single",
+            social_caption=c_caption,
+            hook_timestamp=round(c_hook_ts, 2)
         )
         relaxed_results.append(candidate)
 

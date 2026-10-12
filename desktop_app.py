@@ -114,11 +114,12 @@ class DesktopJsApi:
                     if not dest_dir_str or not isinstance(dest_dir_str, str) or not dest_dir_str.strip():
                         return None
                     import shutil
+                    from clipmax.web.server import build_clip_export_filename
                     dest_dir = Path(dest_dir_str)
                     dest_dir.mkdir(parents=True, exist_ok=True)
                     for c in state.clips:
                         if os.path.exists(c.staging_path):
-                            target = dest_dir / f"clipmax_{c.clip_id}_{int(c.start_time)}.mp4"
+                            target = dest_dir / build_clip_export_filename(c)
                             shutil.copy2(c.staging_path, str(target))
                     return str(dest_dir)
             except Exception as e:

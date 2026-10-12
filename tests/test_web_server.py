@@ -308,6 +308,68 @@ def test_api_youtube_audio_tracks():
         assert data["tracks"][0]["code"] == "en"
         assert data["tracks"][1]["code"] == "id"
 
+def test_api_subtitle_presets():
+    res = client.get("/api/subtitles/presets")
+    assert res.status_code == 200
+    data = res.json()
+    assert "presets" in data
+    assert "viral_pop" in data["presets"]
+
+def test_api_export_features(tmp_path):
+    clip_file = tmp_path / "clipmax_5_20.mp4"
+    clip_file.write_text("sample content")
+    srt_file = tmp_path / "clipmax_5_20.srt"
+    srt_file.write_text("1\n00:00:01,000 --> 00:00:03,000\nHELLO VIRAL WORLD\n")
+
+    clip = ClipResult(
+        clip_id=5,
+        title="Epic Jump",
+        hook="Don't blink!",
+        virality_score=92,
+        reasoning="High thrill factor",
+        start_time=20.0,
+        end_time=50.0,
+        staging_path=str(clip_file),
+        srt_path=str(srt_file),
+        social_caption="Check out this jump! #epic #shorts"
+    )
+    state.clips = [clip]
+
+    # Test SRT download
+    res_srt = client.get("/api/clips/5/srt")
+    assert res_srt.status_code == 200
+    assert "HELLO VIRAL WORLD" in res_srt.text
+
+    # Test YouTube chapters
+    res_ch = client.get("/api/export/youtube-chapters")
+    assert res_ch.status_code == 200
+    assert "00:20 Epic Jump" in res_ch.text
+
+    # Test Markdown summary
+    res_md = client.get("/api/export/summary-markdown")
+    assert res_md.status_code == 200
+    assert "Epic Jump" in res_md.text
+    assert "#epic #shorts" in res_md.text
+
+    # Test Summary JSON
+    res_json = client.get("/api/export/summary-json")
+    assert res_json.status_code == 200
+    data = res_json.json()
+    assert data["count"] == 1
+    assert data["clips"][0]["title"] == "Epic Jump"
+
+    # Test Export with Prefix & Suffix
+    out_dir = tmp_path / "custom_exports"
+    res_exp = client.post("/api/clips/export-all", json={
+        "dest_dir": str(out_dir),
+        "filename_prefix": "Shorts",
+        "filename_suffix": "1080p"
+    })
+    assert res_exp.status_code == 200
+    expected_file = out_dir / "Shorts_Epic Jump_1080p.mp4"
+    assert expected_file.exists()
+
+
 
 
 

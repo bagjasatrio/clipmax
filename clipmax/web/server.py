@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import shutil
 import asyncio
@@ -9,7 +10,7 @@ from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -17,7 +18,12 @@ from clipmax.config import AppConfig, is_cuda_available, clear_temp_cache
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
 from clipmax.ai_gateway import discover_models
 from clipmax.downloader import is_valid_video_url, clean_error_message, extract_video_id, download_via_invidious
-from clipmax.subtitle import generate_overlay_ass
+from clipmax.subtitle import (
+    generate_overlay_ass,
+    generate_youtube_chapters,
+    generate_markdown_summary,
+    SUBTITLE_PRESETS
+)
 from clipmax.renderer import apply_ass_overlay, apply_clip_overlays
 
 class PipelineStartRequest(BaseModel):
@@ -48,14 +54,25 @@ class ConfigUpdateRequest(BaseModel):
     subtitle_base_color: Optional[str] = None
     subtitle_highlight_color: Optional[str] = None
     subtitle_color_preset: Optional[str] = None
+    subtitle_case: Optional[str] = None
+    subtitle_one_line: Optional[bool] = None
+    subtitle_bottom_offset: Optional[int] = None
+    margin_backdrop: Optional[str] = None
+    filename_prefix: Optional[str] = None
+    filename_suffix: Optional[str] = None
     cookie_file: Optional[str] = None
 
 class ExportSingleRequest(BaseModel):
     clip_id: int
-    dest_path: str
+    dest_path: Optional[str] = None
+    dest_dir: Optional[str] = None
+    filename_prefix: Optional[str] = None
+    filename_suffix: Optional[str] = None
 
 class ExportAllRequest(BaseModel):
     dest_dir: str
+    filename_prefix: Optional[str] = None
+    filename_suffix: Optional[str] = None
 
 class ClipOverlayRequest(BaseModel):
     clip_id: int
@@ -171,6 +188,12 @@ def get_config():
         "subtitle_base_color": getattr(state.config, "subtitle_base_color", "#FFFFFF"),
         "subtitle_highlight_color": getattr(state.config, "subtitle_highlight_color", "#FF2A2A"),
         "subtitle_color_preset": getattr(state.config, "subtitle_color_preset", "red_white"),
+        "subtitle_case": getattr(state.config, "subtitle_case", "upper"),
+        "subtitle_one_line": getattr(state.config, "subtitle_one_line", False),
+        "subtitle_bottom_offset": getattr(state.config, "subtitle_bottom_offset", 20),
+        "margin_backdrop": getattr(state.config, "margin_backdrop", "BLURRED_BG"),
+        "filename_prefix": getattr(state.config, "filename_prefix", ""),
+        "filename_suffix": getattr(state.config, "filename_suffix", ""),
         "engine": "invidious_api"
     }
 
@@ -200,6 +223,18 @@ def update_config(req: ConfigUpdateRequest):
         state.config.subtitle_highlight_color = req.subtitle_highlight_color
     if req.subtitle_color_preset is not None:
         state.config.subtitle_color_preset = req.subtitle_color_preset
+    if req.subtitle_case is not None:
+        state.config.subtitle_case = req.subtitle_case
+    if req.subtitle_one_line is not None:
+        state.config.subtitle_one_line = req.subtitle_one_line
+    if req.subtitle_bottom_offset is not None:
+        state.config.subtitle_bottom_offset = req.subtitle_bottom_offset
+    if req.margin_backdrop is not None:
+        state.config.margin_backdrop = req.margin_backdrop
+    if req.filename_prefix is not None:
+        state.config.filename_prefix = req.filename_prefix
+    if req.filename_suffix is not None:
+        state.config.filename_suffix = req.filename_suffix
 
     state.config.save()
     state.orchestrator = PipelineOrchestrator(state.config)
@@ -389,6 +424,82 @@ def get_clip_thumbnail(clip_id: str):
 
     raise HTTPException(status_code=404, detail="Thumbnail not found")
 
+def build_clip_export_filename(clip: Any, prefix: Optional[str] = None, suffix: Optional[str] = None) -> str:
+    pref = prefix if (prefix is not None and prefix.strip()) else getattr(state.config, "filename_prefix", "")
+    suff = suffix if (suffix is not None and suffix.strip()) else getattr(state.config, "filename_suffix", "")
+
+    if not pref and not suff:
+        return f"clipmax_{clip.clip_id}_{int(getattr(clip, 'start_time', 0))}.mp4"
+
+    raw_title = getattr(clip, "title", f"Clip_{clip.clip_id}")
+    # Sanitize title for file system
+    clean_title = re.sub(r'[\\/*?:"<>|]+', "", raw_title).strip()
+    if not clean_title:
+        clean_title = f"clip_{clip.clip_id}"
+
+    parts = []
+    if pref and pref.strip():
+        parts.append(pref.strip())
+    parts.append(clean_title)
+    if suff and suff.strip():
+        parts.append(suff.strip())
+
+    return "_".join(parts) + ".mp4"
+
+@app.get("/api/subtitles/presets")
+def get_subtitle_presets():
+    return {"presets": SUBTITLE_PRESETS}
+
+@app.get("/api/export/youtube-chapters")
+def get_youtube_chapters():
+    if not state.clips:
+        return PlainTextResponse("00:00 Intro\n")
+    chapters_txt = generate_youtube_chapters(state.clips)
+    return PlainTextResponse(chapters_txt)
+
+@app.get("/api/export/summary-markdown")
+def get_summary_markdown():
+    if not state.clips:
+        return PlainTextResponse("# No clips generated yet.\n")
+    md_txt = generate_markdown_summary(state.clips)
+    return PlainTextResponse(md_txt)
+
+@app.get("/api/export/summary-json")
+def get_summary_json():
+    return {
+        "count": len(state.clips),
+        "clips": [c.model_dump() for c in state.clips],
+        "youtube_chapters": generate_youtube_chapters(state.clips) if state.clips else ""
+    }
+
+@app.get("/api/clips/{clip_id}/srt")
+def download_clip_srt(clip_id: str):
+    target_clip = None
+    try:
+        cid_int = int(clip_id)
+        target_clip = next((c for c in state.clips if c.clip_id == cid_int), None)
+    except ValueError:
+        target_clip = next((c for c in state.clips if str(c.clip_id) == clip_id or c.title == clip_id), None)
+
+    if target_clip and getattr(target_clip, "srt_path", "") and os.path.exists(target_clip.srt_path):
+        clean_title = re.sub(r'[\\/*?:"<>|]+', "", target_clip.title).strip() or f"clip_{target_clip.clip_id}"
+        return FileResponse(
+            path=target_clip.srt_path,
+            filename=f"{clean_title}.srt",
+            media_type="text/plain"
+        )
+
+    staging_dir = Path(state.config.temp_dir) / "staging"
+    possible = list(staging_dir.glob(f"*{clip_id}*.srt"))
+    if possible:
+        return FileResponse(
+            path=str(possible[0]),
+            filename=possible[0].name,
+            media_type="text/plain"
+        )
+
+    raise HTTPException(status_code=404, detail="SRT subtitle file not found for this clip")
+
 @app.get("/api/export/{clip_id}")
 def download_clip_direct(clip_id: str):
     """Direct file download response for browser export fallback."""
@@ -410,7 +521,7 @@ def download_clip_direct(clip_id: str):
             )
         raise HTTPException(status_code=404, detail="Clip not found in staging")
 
-    clean_filename = f"clipmax_{target_clip.clip_id}_{int(target_clip.start_time)}.mp4"
+    clean_filename = build_clip_export_filename(target_clip)
     return FileResponse(
         path=target_clip.staging_path,
         filename=clean_filename,
@@ -424,11 +535,22 @@ def export_single_clip(req: ExportSingleRequest):
         raise HTTPException(status_code=404, detail="Clip not found in staging")
 
     dest_str = req.dest_path[0] if isinstance(req.dest_path, (tuple, list)) else req.dest_path
-    if not dest_str or not isinstance(dest_str, str) or not dest_str.strip():
+    if (not dest_str or not isinstance(dest_str, str) or not dest_str.strip()) and req.dest_dir:
+        dest_d = Path(req.dest_dir)
+        dest_d.mkdir(parents=True, exist_ok=True)
+        fname = build_clip_export_filename(clip, req.filename_prefix, req.filename_suffix)
+        dest = dest_d / fname
+    elif dest_str and isinstance(dest_str, str) and dest_str.strip():
+        dest = Path(dest_str)
+        if dest.is_dir() or not dest.suffix:
+            dest.mkdir(parents=True, exist_ok=True)
+            fname = build_clip_export_filename(clip, req.filename_prefix, req.filename_suffix)
+            dest = dest / fname
+        else:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+    else:
         return {"status": "cancelled"}
 
-    dest = Path(dest_str)
-    dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(clip.staging_path, str(dest))
     return {"status": "ok", "path": str(dest)}
 
@@ -446,7 +568,8 @@ def export_all_clips(req: ExportAllRequest):
     exported = []
     for c in state.clips:
         if os.path.exists(c.staging_path):
-            target = dest_dir / f"clipmax_{c.clip_id}_{int(c.start_time)}.mp4"
+            fname = build_clip_export_filename(c, req.filename_prefix, req.filename_suffix)
+            target = dest_dir / fname
             shutil.copy2(c.staging_path, str(target))
             exported.append(str(target))
 

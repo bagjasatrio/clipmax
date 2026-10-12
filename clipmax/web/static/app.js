@@ -37,6 +37,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const inputHighlightColor = document.getElementById("inputHighlightColor");
   const lblHighlightColor = document.getElementById("lblHighlightColor");
 
+  const selectSubtitleCase = document.getElementById("selectSubtitleCase");
+  const chkSubtitleOneLine = document.getElementById("chkSubtitleOneLine");
+  const rangeSubtitleOffset = document.getElementById("rangeSubtitleOffset");
+  const lblSubtitleOffset = document.getElementById("lblSubtitleOffset");
+  const selectMarginBackdrop = document.getElementById("selectMarginBackdrop");
+  const inputFilenamePrefix = document.getElementById("inputFilenamePrefix");
+  const inputFilenameSuffix = document.getElementById("inputFilenameSuffix");
+  const lblFilenameSample = document.getElementById("lblFilenameSample");
+
   const btnGenerate = document.getElementById("btnGenerate");
   const btnCancel = document.getElementById("btnCancel");
 
@@ -50,6 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const mainVideo = document.getElementById("mainVideo");
   const btnPlayPause = document.getElementById("btnPlayPause");
+  const btnToggleLoop = document.getElementById("btnToggleLoop");
   const iconPlay = document.getElementById("iconPlay");
   const iconPause = document.getElementById("iconPause");
   const videoScrubber = document.getElementById("videoScrubber");
@@ -58,13 +68,29 @@ document.addEventListener("DOMContentLoaded", () => {
   const muteIcon = document.getElementById("muteIcon");
   const volumeSlider = document.getElementById("volumeSlider");
 
+  const btnCopyChapters = document.getElementById("btnCopyChapters");
+  const btnCopyMarkdown = document.getElementById("btnCopyMarkdown");
+  const btnDownloadJson = document.getElementById("btnDownloadJson");
+
   const activeClipTitle = document.getElementById("activeClipTitle");
   const activeClipScore = document.getElementById("activeClipScore");
+  const activeClipHookTime = document.getElementById("activeClipHookTime");
   const activeClipHook = document.getElementById("activeClipHook");
   const activeClipReason = document.getElementById("activeClipReason");
+  const activeClipCaption = document.getElementById("activeClipCaption");
+  const btnCopyCaption = document.getElementById("btnCopyCaption");
+  const btnDownloadSRT = document.getElementById("btnDownloadSRT");
+  const btnToggleTranscript = document.getElementById("btnToggleTranscript");
+  const transcriptBox = document.getElementById("transcriptBox");
+  const activeClipTranscript = document.getElementById("activeClipTranscript");
+
   const btnCopyHook = document.getElementById("btnCopyHook");
   const btnCopyReason = document.getElementById("btnCopyReason");
   const btnCopyAll = document.getElementById("btnCopyAll");
+
+  const inputSearchClips = document.getElementById("inputSearchClips");
+  const selectScoreFilter = document.getElementById("selectScoreFilter");
+  const selectSortClips = document.getElementById("selectSortClips");
 
   const clipsCount = document.getElementById("clipsCount");
   const clipsGallery = document.getElementById("clipsGallery");
@@ -536,6 +562,16 @@ document.addEventListener("DOMContentLoaded", () => {
       if (cfg.subtitle_color_preset && selectColorPreset) {
         selectColorPreset.value = cfg.subtitle_color_preset;
       }
+      if (selectSubtitleCase && cfg.subtitle_case) selectSubtitleCase.value = cfg.subtitle_case;
+      if (chkSubtitleOneLine && cfg.subtitle_one_line !== undefined) chkSubtitleOneLine.checked = !!cfg.subtitle_one_line;
+      if (rangeSubtitleOffset && cfg.subtitle_bottom_offset) {
+        rangeSubtitleOffset.value = cfg.subtitle_bottom_offset;
+        if (lblSubtitleOffset) lblSubtitleOffset.textContent = `${cfg.subtitle_bottom_offset}%`;
+      }
+      if (selectMarginBackdrop && cfg.margin_backdrop) selectMarginBackdrop.value = cfg.margin_backdrop;
+      if (inputFilenamePrefix && cfg.filename_prefix) inputFilenamePrefix.value = cfg.filename_prefix;
+      if (inputFilenameSuffix && cfg.filename_suffix) inputFilenameSuffix.value = cfg.filename_suffix;
+      updateFilenameSample();
 
       await refreshModels(cfg.selected_model);
     } catch (e) {
@@ -648,11 +684,39 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Color Preset Definitions & Handlers
   const colorPresets = {
+    classic_red: { highlight: "#FF2A2A", base: "#FFFFFF" },
+    viral_pop: { highlight: "#FFE81F", base: "#FFFFFF" },
+    beast_punch: { highlight: "#39FF14", base: "#FFFFFF" },
+    cyber_violet: { highlight: "#B026FF", base: "#FFFFFF" },
+    fire_crimson: { highlight: "#FF2A2A", base: "#FFFFFF" },
+    electric_cyan: { highlight: "#00F0FF", base: "#FFFFFF" },
+    golden_aura: { highlight: "#FFD700", base: "#FFFFFF" },
+    clean_minimal: { highlight: "#00F0FF", base: "#FFFFFF" },
+    none: { highlight: "#FFFFFF", base: "#FFFFFF" },
     red_white: { highlight: "#FF2A2A", base: "#FFFFFF" },
     tiktok_yellow: { highlight: "#FFE81F", base: "#FFFFFF" },
     neon_green: { highlight: "#39FF14", base: "#FFFFFF" },
     cyan_gamer: { highlight: "#00F0FF", base: "#FFFFFF" }
   };
+
+  function updateFilenameSample() {
+    if (!lblFilenameSample) return;
+    const pref = inputFilenamePrefix ? inputFilenamePrefix.value.trim() : "";
+    const suff = inputFilenameSuffix ? inputFilenameSuffix.value.trim() : "";
+    const parts = [];
+    if (pref) parts.push(pref);
+    parts.push("Nekat_Seberangi_Sungai");
+    if (suff) parts.push(suff);
+    lblFilenameSample.textContent = parts.join("_") + ".mp4";
+  }
+
+  if (inputFilenamePrefix) inputFilenamePrefix.addEventListener("input", updateFilenameSample);
+  if (inputFilenameSuffix) inputFilenameSuffix.addEventListener("input", updateFilenameSample);
+  if (rangeSubtitleOffset) {
+    rangeSubtitleOffset.addEventListener("input", () => {
+      if (lblSubtitleOffset) lblSubtitleOffset.textContent = `${rangeSubtitleOffset.value}%`;
+    });
+  }
 
   if (selectColorPreset) {
     selectColorPreset.addEventListener("change", () => {
@@ -696,7 +760,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const clipModeVal = selectClipMode ? selectClipMode.value : "single";
     const subBaseVal = inputBaseColor ? inputBaseColor.value : "#FFFFFF";
     const subHighlightVal = inputHighlightColor ? inputHighlightColor.value : "#FF2A2A";
-    const subPresetVal = selectColorPreset ? selectColorPreset.value : "red_white";
+    const subPresetVal = selectColorPreset ? selectColorPreset.value : "classic_red";
 
     await fetch("/api/config", {
       method: "POST",
@@ -713,7 +777,13 @@ document.addEventListener("DOMContentLoaded", () => {
         clip_mode: clipModeVal,
         subtitle_base_color: subBaseVal,
         subtitle_highlight_color: subHighlightVal,
-        subtitle_color_preset: subPresetVal
+        subtitle_color_preset: subPresetVal,
+        subtitle_case: selectSubtitleCase ? selectSubtitleCase.value : "upper",
+        subtitle_one_line: chkSubtitleOneLine ? chkSubtitleOneLine.checked : false,
+        subtitle_bottom_offset: rangeSubtitleOffset ? parseInt(rangeSubtitleOffset.value, 10) : 20,
+        margin_backdrop: selectMarginBackdrop ? selectMarginBackdrop.value : "BLURRED_BG",
+        filename_prefix: inputFilenamePrefix ? inputFilenamePrefix.value.trim() : "",
+        filename_suffix: inputFilenameSuffix ? inputFilenameSuffix.value.trim() : ""
       })
     });
 
@@ -802,6 +872,36 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 9. Review Workspace & Gallery
+  function getFilteredAndSortedClips() {
+    let list = [...currentClips];
+    const q = inputSearchClips ? inputSearchClips.value.trim().toLowerCase() : "";
+    if (q) {
+      list = list.filter((c) => 
+        (c.title && c.title.toLowerCase().includes(q)) ||
+        (c.hook && c.hook.toLowerCase().includes(q)) ||
+        (c.transcript_snippet && c.transcript_snippet.toLowerCase().includes(q)) ||
+        (c.social_caption && c.social_caption.toLowerCase().includes(q))
+      );
+    }
+    const scoreVal = selectScoreFilter ? selectScoreFilter.value : "all";
+    if (scoreVal === "90") {
+      list = list.filter((c) => (c.virality_score || 0) >= 90);
+    } else if (scoreVal === "80") {
+      list = list.filter((c) => (c.virality_score || 0) >= 80);
+    }
+    const sortVal = selectSortClips ? selectSortClips.value : "score";
+    if (sortVal === "score") {
+      list.sort((a, b) => (b.virality_score || 0) - (a.virality_score || 0));
+    } else if (sortVal === "timeline") {
+      list.sort((a, b) => (a.start_time || 0) - (b.start_time || 0));
+    }
+    return list;
+  }
+
+  if (inputSearchClips) inputSearchClips.addEventListener("input", () => renderClipsGallery(getFilteredAndSortedClips()));
+  if (selectScoreFilter) selectScoreFilter.addEventListener("change", () => renderClipsGallery(getFilteredAndSortedClips()));
+  if (selectSortClips) selectSortClips.addEventListener("change", () => renderClipsGallery(getFilteredAndSortedClips()));
+
   function renderClipsGallery(clips) {
     clipsCount.textContent = clips.length;
     clipsGallery.innerHTML = "";
@@ -823,6 +923,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const durSec = Math.round((clip.end_time || 0) - (clip.start_time || 0));
 
+      let hookPill = "";
+      if (clip.hook_timestamp !== undefined && clip.hook_timestamp !== null) {
+        const hm = Math.floor(clip.hook_timestamp / 60);
+        const hs = Math.floor(clip.hook_timestamp % 60);
+        hookPill = `<span class="px-1.5 py-0.2 rounded bg-indigo-900/60 text-indigo-300 font-mono text-[9px]">⚡ ${String(hm).padStart(2, "0")}:${String(hs).padStart(2, "0")}</span>`;
+      }
+
       card.innerHTML = `
         <div class="w-12 h-20 bg-black rounded overflow-hidden shrink-0 border border-[#2A3345] flex items-center justify-center">
           ${thumbSrc ? `<img src="${thumbSrc}" class="w-full h-full object-cover">` : '<span class="text-[10px] text-gray-500">9:16</span>'}
@@ -838,6 +945,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="flex items-center space-x-2 text-[10px] text-gray-400">
             <span>⏱ ${durSec}s</span>
             <span>•</span>
+            ${hookPill ? `${hookPill}<span>•</span>` : ""}
             ${clip.reframe_mode === "MONTAGE" 
               ? '<span class="px-1.5 py-0.2 rounded bg-purple-900/60 text-purple-300 font-medium text-[9px]">✂ Multi-Cut Montage</span>' 
               : `<span class="truncate">${clip.reframe_mode || "Crop 9:16"}</span>`}
@@ -861,6 +969,25 @@ document.addEventListener("DOMContentLoaded", () => {
     activeClipScore.textContent = `${clip.virality_score} Score`;
     activeClipHook.textContent = `"${clip.hook || ""}"`;
     activeClipReason.textContent = clip.reasoning || "Tidak ada deskripsi tambahan.";
+
+    if (activeClipHookTime) {
+      if (clip.hook_timestamp !== undefined && clip.hook_timestamp !== null) {
+        const hm = Math.floor(clip.hook_timestamp / 60);
+        const hs = Math.floor(clip.hook_timestamp % 60);
+        activeClipHookTime.textContent = `⚡ Hook: ${String(hm).padStart(2, "0")}:${String(hs).padStart(2, "0")}`;
+        activeClipHookTime.classList.remove("hidden");
+      } else {
+        activeClipHookTime.classList.add("hidden");
+      }
+    }
+
+    if (activeClipCaption) {
+      activeClipCaption.value = clip.social_caption || `${clip.title} - ${clip.hook} #shorts #viral #reels`;
+    }
+
+    if (activeClipTranscript) {
+      activeClipTranscript.textContent = clip.transcript_snippet || "(Transkrip klip tidak tersedia)";
+    }
 
     // Reset or populate overlay settings for this clip
     if (inputOverlayText) {
@@ -1069,6 +1196,78 @@ document.addEventListener("DOMContentLoaded", () => {
       const durSec = Math.round((selectedClip.end_time || 0) - (selectedClip.start_time || 0));
       const fullText = `Judul: #${selectedClip.clip_id} ${selectedClip.title}\nViral Score: ${selectedClip.virality_score}\nHook: "${selectedClip.hook || ''}"\n\nAlasan & Deskripsi:\n${selectedClip.reasoning || ''}\n\nDurasi: ${durSec} detik`;
       copyToClipboard(fullText, btnCopyAll);
+    });
+  }
+
+  // Social Media Caption & Hashtag Copy
+  if (btnCopyCaption && activeClipCaption) {
+    btnCopyCaption.addEventListener("click", () => {
+      copyToClipboard(activeClipCaption.value, btnCopyCaption);
+    });
+  }
+
+  // SRT Subtitle Direct Download
+  if (btnDownloadSRT) {
+    btnDownloadSRT.addEventListener("click", () => {
+      if (!selectedClip) return;
+      window.open(`/api/clips/${selectedClip.clip_id}/srt`, "_blank");
+    });
+  }
+
+  // Accordion Toggle Transkrip
+  if (btnToggleTranscript && transcriptBox) {
+    btnToggleTranscript.addEventListener("click", () => {
+      transcriptBox.classList.toggle("hidden");
+      btnToggleTranscript.innerHTML = transcriptBox.classList.contains("hidden")
+        ? "<span>📜 Lihat Transkrip</span>"
+        : "<span>📜 Tutup Transkrip</span>";
+    });
+  }
+
+  // Multi-Format Metadata Exports (YouTube Chapters, Markdown, JSON)
+  if (btnCopyChapters) {
+    btnCopyChapters.addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/export/youtube-chapters");
+        const txt = await res.text();
+        copyToClipboard(txt, btnCopyChapters);
+      } catch (e) {
+        alert("Gagal ambil YouTube Chapters: " + e);
+      }
+    });
+  }
+
+  if (btnCopyMarkdown) {
+    btnCopyMarkdown.addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/export/summary-markdown");
+        const txt = await res.text();
+        copyToClipboard(txt, btnCopyMarkdown);
+      } catch (e) {
+        alert("Gagal ambil Markdown: " + e);
+      }
+    });
+  }
+
+  if (btnDownloadJson) {
+    btnDownloadJson.addEventListener("click", () => {
+      window.open("/api/export/summary-json", "_blank");
+    });
+  }
+
+  // Player Loop Playback Toggle
+  if (btnToggleLoop && mainVideo) {
+    btnToggleLoop.addEventListener("click", () => {
+      mainVideo.loop = !mainVideo.loop;
+      if (mainVideo.loop) {
+        btnToggleLoop.classList.add("bg-indigo-600", "text-white");
+        btnToggleLoop.classList.remove("bg-[#1A202C]", "text-gray-400");
+        btnToggleLoop.title = "Putar Ulang Otomatis (Loop: ON)";
+      } else {
+        btnToggleLoop.classList.remove("bg-indigo-600", "text-white");
+        btnToggleLoop.classList.add("bg-[#1A202C]", "text-gray-400");
+        btnToggleLoop.title = "Putar Ulang Otomatis (Loop: OFF)";
+      }
     });
   }
 
@@ -1799,9 +1998,21 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 11. Export Actions
+  function getFormattedFilename(clip) {
+    const p = inputFilenamePrefix ? inputFilenamePrefix.value.trim() : "";
+    const s = inputFilenameSuffix ? inputFilenameSuffix.value.trim() : "";
+    const rawTitle = clip.title || `Clip_${clip.clip_id}`;
+    const safeTitle = rawTitle.replace(/[\\/*?:"<>|]+/g, "").trim() || `clip_${clip.clip_id}`;
+    const parts = [];
+    if (p) parts.push(p);
+    parts.push(safeTitle);
+    if (s) parts.push(s);
+    return parts.join("_") + ".mp4";
+  }
+
   btnExportSingle.addEventListener("click", async () => {
     if (!selectedClip) return;
-    const defName = `clipmax_${selectedClip.clip_id}_${Math.round(selectedClip.start_time)}.mp4`;
+    const defName = getFormattedFilename(selectedClip);
 
     if (window.pywebview && window.pywebview.api && window.pywebview.api.save_clip_dialog) {
       try {
@@ -1844,7 +2055,7 @@ document.addEventListener("DOMContentLoaded", () => {
     currentClips.forEach((c) => {
       const a = document.createElement("a");
       a.href = `/api/export/${c.clip_id}`;
-      a.download = `clipmax_${c.clip_id}_${Math.round(c.start_time)}.mp4`;
+      a.download = getFormattedFilename(c);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

@@ -399,12 +399,17 @@
 
           <!-- Preset Selector -->
           <div class="space-y-1">
-            <label class="text-[11px] text-gray-400 font-medium">Preset Warna</label>
+            <label class="text-[11px] text-gray-400 font-medium">Preset Gaya Subtitle Populer</label>
             <select id="selectColorPreset" class="w-full px-3 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
-              <option value="red_white">Merah - Putih (Default)</option>
-              <option value="tiktok_yellow">Kuning TikTok (#FFE81F)</option>
-              <option value="neon_green">Hijau Neon (#39FF14)</option>
-              <option value="cyan_gamer">Cyan Gamer (#00F0FF)</option>
+              <option value="classic_red">Klasik Merah - Putih (Default)</option>
+              <option value="viral_pop">VIRAL POP (Hormozi Yellow Glow)</option>
+              <option value="beast_punch">BEAST PUNCH (Neon Green Impact)</option>
+              <option value="cyber_violet">CYBER VIOLET (Neon Purple Glow)</option>
+              <option value="fire_crimson">FIRE CRIMSON (High Energy Red)</option>
+              <option value="electric_cyan">ELECTRIC CYAN (Ice Blue Glow)</option>
+              <option value="golden_aura">GOLDEN AURA (Luxury Warm Gold)</option>
+              <option value="clean_minimal">Clean Minimal (Soft Dark Box)</option>
+              <option value="none">NONE (Tanpa Subtitle)</option>
               <option value="custom">Kustom Manual</option>
             </select>
           </div>
@@ -424,6 +429,64 @@
                 <input type="color" id="inputHighlightColor" value="#FF2A2A" class="w-7 h-7 rounded cursor-pointer border border-[#222938] bg-transparent">
                 <span id="lblHighlightColor" class="text-xs font-mono text-gray-300">#FF2A2A</span>
               </div>
+            </div>
+          </div>
+
+          <!-- Subtitle Layout Controls (Casing, Strictly 1 Line, Bottom Offset) -->
+          <div class="grid grid-cols-3 gap-3 pt-1">
+            <div class="space-y-1">
+              <label class="text-[11px] text-gray-400 font-medium">Format Huruf</label>
+              <select id="selectSubtitleCase" class="w-full px-2.5 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
+                <option value="upper">ALL CAPS (HURUF BESAR)</option>
+                <option value="title">Title Case (Kapital Awal)</option>
+                <option value="lower">lowercase (huruf kecil)</option>
+              </select>
+            </div>
+            <div class="space-y-1">
+              <label class="text-[11px] text-gray-400 font-medium">Batasan Baris</label>
+              <label class="flex items-center space-x-2 px-2.5 py-2 rounded-xl bg-[#0B0E14] border border-[#222938] cursor-pointer">
+                <input type="checkbox" id="chkSubtitleOneLine" class="w-3.5 h-3.5 accent-indigo-500 rounded cursor-pointer">
+                <span class="text-[11px] text-gray-300">Strictly 1 Line</span>
+              </label>
+            </div>
+            <div class="space-y-1">
+              <div class="flex justify-between items-center text-[11px] text-gray-400 font-medium">
+                <span>Offset Bawah</span>
+                <span id="lblSubtitleOffset" class="font-mono text-indigo-400">20%</span>
+              </div>
+              <input type="range" id="rangeSubtitleOffset" min="10" max="45" value="20" class="w-full h-2 accent-indigo-500 cursor-pointer mt-1">
+            </div>
+          </div>
+        </div>
+
+        <!-- Framing & Filename Templates Card -->
+        <div class="p-5 rounded-2xl bg-[#131722] border border-[#222938] space-y-4">
+          <label class="text-xs font-bold uppercase tracking-wider text-gray-300 block">Framing Video & Format File Ekspor</label>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label class="text-[11px] text-gray-400 font-medium">Mode Backdrop Margin (Jika Tanpa Wajah)</label>
+              <select id="selectMarginBackdrop" class="w-full px-2.5 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
+                <option value="BLURRED_BG">Ambient Blurred Video (Modern)</option>
+                <option value="BLACK_BARS">Pure Black Bars (Klasik Minimalis)</option>
+              </select>
+            </div>
+            <div class="space-y-1">
+              <label class="text-[11px] text-gray-400 font-medium">Preview Pola Nama File Ekspor</label>
+              <div id="lblFilenameSample" class="w-full px-2.5 py-2 text-[11px] font-mono text-indigo-300 bg-[#0B0E14] border border-[#222938] rounded-xl truncate">
+                Shorts_JudulKlip_1080p.mp4
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <div class="space-y-1">
+              <label class="text-[11px] text-gray-400 font-medium">Prefix Nama File</label>
+              <input type="text" id="inputFilenamePrefix" placeholder="Contoh: Shorts_" value="" class="w-full px-3 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 font-mono">
+            </div>
+            <div class="space-y-1">
+              <label class="text-[11px] text-gray-400 font-medium">Suffix Nama File</label>
+              <input type="text" id="inputFilenameSuffix" placeholder="Contoh: _1080p" value="" class="w-full px-3 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 font-mono">
             </div>
           </div>
         </div>
@@ -519,13 +582,32 @@
         <!-- ================= LEFT PANEL: KETERANGAN & EDIT DETAIL (DIPERLEBAR) ================= -->
         <div class="w-[580px] xl:w-[640px] shrink-0 border-r border-[#222938] bg-[#0E121A] flex flex-col h-full overflow-y-auto p-4 space-y-4">
           
+          <!-- Multi-Format Export Quick Toolbar -->
+          <div class="p-2.5 bg-[#121622] border border-[#222938] rounded-xl flex items-center justify-between gap-2 shadow-sm">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 font-mono">Ekspor Metadata:</span>
+            <div class="flex items-center space-x-1.5">
+              <button type="button" id="btnCopyChapters" class="px-2.5 py-1 bg-[#1A202C] hover:bg-indigo-600/70 text-gray-200 hover:text-white rounded-lg text-[10px] font-medium transition border border-[#2A3445]" title="Salin daftar chapter untuk deskripsi YouTube">
+                ⏱️ YouTube Chapters
+              </button>
+              <button type="button" id="btnCopyMarkdown" class="px-2.5 py-1 bg-[#1A202C] hover:bg-indigo-600/70 text-gray-200 hover:text-white rounded-lg text-[10px] font-medium transition border border-[#2A3445]" title="Salin ringkasan lengkap semua klip dalam format Markdown / Notion">
+                📑 Markdown
+              </button>
+              <button type="button" id="btnDownloadJson" class="px-2.5 py-1 bg-[#1A202C] hover:bg-indigo-600/70 text-gray-200 hover:text-white rounded-lg text-[10px] font-medium transition border border-[#2A3445]" title="Unduh data metadata JSON semua klip">
+                📥 JSON
+              </button>
+            </div>
+          </div>
+
           <!-- 1. Metadata, Hook & Deskripsi Lengkap (Diperlebar) -->
           <div class="p-4 bg-[#131722] border border-[#222938] rounded-xl text-xs space-y-3 shadow-md select-text">
             <div class="flex items-start justify-between gap-3">
               <div class="flex-1 min-w-0">
                 <span id="activeClipTitle" class="font-bold text-gray-100 text-sm leading-snug break-words select-text">Judul Klip</span>
               </div>
-              <span id="activeClipScore" class="shrink-0 px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">95 Score</span>
+              <div class="flex items-center space-x-1.5 shrink-0">
+                <span id="activeClipHookTime" class="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" title="Waktu punchline/hook utama terucap">⚡ Hook: 00:00</span>
+                <span id="activeClipScore" class="px-2 py-0.5 rounded font-mono font-bold text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30">95 Score</span>
+              </div>
             </div>
             
             <!-- Viral Hook Card -->
@@ -539,11 +621,32 @@
               <p id="activeClipHook" class="text-indigo-200 italic text-xs leading-relaxed break-words select-text"></p>
             </div>
 
+            <!-- Social Media Caption & Hashtags Card -->
+            <div class="p-3 rounded-lg bg-[#0D1017] border border-[#1E2533] space-y-2">
+              <div class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-cyan-400">
+                <span class="flex items-center space-x-1">
+                  <span>📱 Caption Media Sosial &amp; Hashtag</span>
+                </span>
+                <div class="flex items-center space-x-2">
+                  <button type="button" id="btnDownloadSRT" class="text-xs text-gray-400 hover:text-white transition flex items-center space-x-1" title="Unduh subtitle SRT klip ini">
+                    <span>📥 Unduh .SRT</span>
+                  </button>
+                  <button type="button" id="btnCopyCaption" class="px-2 py-0.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold text-[10px] transition shadow flex items-center space-x-1" title="Salin caption siap posting">
+                    <span>📋 Salin Caption</span>
+                  </button>
+                </div>
+              </div>
+              <textarea id="activeClipCaption" rows="2" class="w-full p-2.5 text-xs bg-[#07090E] border border-[#222938] focus:border-cyan-500 rounded-lg focus:outline-none text-gray-200 resize-none font-sans" placeholder="Caption sosial media otomatis..."></textarea>
+            </div>
+
             <!-- Full Reasoning / Description -->
             <div class="space-y-1.5">
               <div class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-gray-400">
                 <span>Alasan / Deskripsi Lengkap</span>
                 <div class="flex items-center space-x-2">
+                  <button type="button" id="btnToggleTranscript" class="text-indigo-400 hover:text-indigo-300 transition flex items-center space-x-1" title="Tampilkan / Sembunyikan Transkrip">
+                    <span>📜 Lihat Transkrip</span>
+                  </button>
                   <button type="button" id="btnCopyReason" class="text-gray-400 hover:text-indigo-300 transition flex items-center space-x-1" title="Salin Deskripsi Saja">
                     <span>📋 Salin</span>
                   </button>
@@ -552,7 +655,13 @@
                   </button>
                 </div>
               </div>
-              <div id="activeClipReason" class="text-gray-300 text-xs leading-relaxed break-words whitespace-pre-wrap max-h-40 overflow-y-auto bg-[#0A0D14] p-3 rounded-lg border border-[#1E2533] select-text"></div>
+              <div id="activeClipReason" class="text-gray-300 text-xs leading-relaxed break-words whitespace-pre-wrap max-h-32 overflow-y-auto bg-[#0A0D14] p-3 rounded-lg border border-[#1E2533] select-text"></div>
+              
+              <!-- Accordion Transkrip Klip -->
+              <div id="transcriptBox" class="hidden mt-2 p-3 bg-[#0A0D14] rounded-lg border border-[#1E2533] text-xs text-gray-400 max-h-40 overflow-y-auto space-y-1 select-text">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-400 block mb-1">Transkrip Ucapan:</span>
+                <p id="activeClipTranscript" class="text-gray-300 text-xs leading-relaxed"></p>
+              </div>
             </div>
           </div>
 
@@ -789,11 +898,14 @@
             <input type="range" id="videoScrubber" min="0" max="1000" value="0" class="w-full">
             
             <div class="flex items-center justify-between">
-              <!-- Play / Pause -->
+              <!-- Play / Pause & Loop -->
               <div class="flex items-center space-x-2">
                 <button id="btnPlayPause" class="w-8 h-8 rounded-full bg-[#1A202C] hover:bg-indigo-600 text-white flex items-center justify-center transition shadow">
                   <svg id="iconPlay" class="w-3.5 h-3.5 fill-current ml-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                   <svg id="iconPause" class="w-3.5 h-3.5 fill-current hidden" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                </button>
+                <button id="btnToggleLoop" class="w-8 h-8 rounded-full bg-[#1A202C] hover:bg-[#252D3D] text-gray-400 hover:text-white flex items-center justify-center transition" title="Putar Ulang Otomatis (Loop: OFF)">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                 </button>
                 <span id="timeDisplay" class="text-xs font-mono text-gray-400">00:00 / 00:00</span>
               </div>
@@ -815,6 +927,22 @@
           <div class="p-3 border-b border-[#222938] flex items-center justify-between">
             <span class="text-xs font-semibold uppercase tracking-wider text-gray-300">Curated Clips (<span id="clipsCount">0</span>)</span>
             <button id="btnNewTask" class="text-xs text-indigo-400 hover:text-indigo-300 transition">Proyek Baru</button>
+          </div>
+
+          <!-- Search, Filter & Sort Controls -->
+          <div class="p-2.5 border-b border-[#1E2533] bg-[#0E121A] space-y-2">
+            <input type="text" id="inputSearchClips" placeholder="🔍 Cari judul atau transkrip..." class="w-full px-2.5 py-1.5 text-xs bg-[#131722] border border-[#222938] focus:border-indigo-500 rounded-lg focus:outline-none text-gray-200">
+            <div class="grid grid-cols-2 gap-1.5">
+              <select id="selectScoreFilter" class="w-full px-2 py-1 text-[11px] bg-[#131722] border border-[#222938] rounded-lg text-gray-300 focus:outline-none cursor-pointer">
+                <option value="all">Semua Skor</option>
+                <option value="90">Skor &ge; 90</option>
+                <option value="80">Skor &ge; 80</option>
+              </select>
+              <select id="selectSortClips" class="w-full px-2 py-1 text-[11px] bg-[#131722] border border-[#222938] rounded-lg text-gray-300 focus:outline-none cursor-pointer">
+                <option value="score">Skor Tertinggi</option>
+                <option value="timeline">Urutan Video</option>
+              </select>
+            </div>
           </div>
 
           <!-- Cards List -->

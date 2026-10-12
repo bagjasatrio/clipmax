@@ -19,7 +19,7 @@ from clipmax.reframe import (
     segment_clip_scenes,
     SceneSegment
 )
-from clipmax.subtitle import generate_kinetic_ass
+from clipmax.subtitle import generate_kinetic_ass, generate_srt
 from clipmax.subtitle_cleaner import polish_subtitles_with_llm
 from clipmax.renderer import render_clip
 from clipmax.downloader import download_video, is_valid_video_url
@@ -47,6 +47,10 @@ class ClipResult(BaseModel):
     staging_path: str
     thumbnail_path: str = ""
     reframe_mode: str = "CROP_TRACKING"
+    social_caption: str = ""
+    hook_timestamp: Optional[float] = None
+    transcript_snippet: str = ""
+    srt_path: str = ""
 
 def kill_process_tree(pid: int) -> None:
     try:
@@ -355,7 +359,11 @@ class PipelineOrchestrator:
                         accumulated_dur,
                         temp_ass,
                         highlight_color=sub_highlight,
-                        base_color=sub_base
+                        base_color=sub_base,
+                        preset=getattr(self.config, "subtitle_color_preset", "classic_red"),
+                        case_mode=getattr(self.config, "subtitle_case", "upper"),
+                        strictly_one_line=getattr(self.config, "subtitle_one_line", False),
+                        bottom_offset_pct=getattr(self.config, "subtitle_bottom_offset", 20)
                     )
 
                     self.status = PipelineStatus.RENDERING
@@ -406,6 +414,18 @@ class PipelineOrchestrator:
                     self.staging_files.append(staging_thumb_path)
                     generate_thumbnail(staging_clip_path, staging_thumb_path)
 
+                    # Export SRT for external editing
+                    staging_srt_path = str((staging_dir / f"clipmax_{clip_num}_{int(clip.start_time)}.srt").resolve())
+                    generate_srt(
+                        words=shifted_words,
+                        clip_start=0.0,
+                        clip_end=accumulated_dur,
+                        output_srt_path=staging_srt_path,
+                        case_mode=getattr(self.config, "subtitle_case", "upper")
+                    )
+                    self.staging_files.append(staging_srt_path)
+                    m_snippet = " ".join(w.word for w in shifted_words)
+
                     results.append(
                         ClipResult(
                             clip_id=clip_num,
@@ -417,7 +437,11 @@ class PipelineOrchestrator:
                             end_time=clip.end_time,
                             staging_path=staging_clip_path,
                             thumbnail_path=staging_thumb_path,
-                            reframe_mode="MONTAGE"
+                            reframe_mode="MONTAGE",
+                            social_caption=getattr(clip, "social_caption", ""),
+                            hook_timestamp=getattr(clip, "hook_timestamp", None),
+                            transcript_snippet=m_snippet,
+                            srt_path=staging_srt_path
                         )
                     )
 
@@ -439,8 +463,15 @@ class PipelineOrchestrator:
                         mode = "CROP_TRACKING"
                         mode_label = "Crop Wajah 9:16"
                     else:
-                        mode = "BLURRED_BACKGROUND"
-                        mode_label = "Blurred BG (Utuh)"
+                        backdrop_mode = getattr(self.config, "margin_backdrop", "BLURRED_BG")
+                        if backdrop_mode in ("BLACK_BARS", "LETTERBOX"):
+                            mode = "BLACK_BARS"
+                            mode_label = "Black Bars (Utuh)"
+                            for sc in scenes:
+                                sc.mode = "BLACK_BARS"
+                        else:
+                            mode = "BLURRED_BACKGROUND"
+                            mode_label = "Blurred BG (Utuh)"
 
                     default_crop_x = scenes[0].crop_x if scenes else "0"
 
@@ -465,7 +496,11 @@ class PipelineOrchestrator:
                         clip.end_time,
                         temp_ass,
                         highlight_color=sub_highlight,
-                        base_color=sub_base
+                        base_color=sub_base,
+                        preset=getattr(self.config, "subtitle_color_preset", "classic_red"),
+                        case_mode=getattr(self.config, "subtitle_case", "upper"),
+                        strictly_one_line=getattr(self.config, "subtitle_one_line", False),
+                        bottom_offset_pct=getattr(self.config, "subtitle_bottom_offset", 20)
                     )
 
                     # Stage 6: Video Rendering into Staging Cache (NVENC Forced)
@@ -499,6 +534,19 @@ class PipelineOrchestrator:
                     self.staging_files.append(staging_thumb_path)
                     generate_thumbnail(staging_clip_path, staging_thumb_path)
 
+                    # Export SRT for external editing
+                    staging_srt_path = str((staging_dir / f"clipmax_{clip_num}_{int(clip.start_time)}.srt").resolve())
+                    generate_srt(
+                        words=words,
+                        clip_start=clip.start_time,
+                        clip_end=clip.end_time,
+                        output_srt_path=staging_srt_path,
+                        case_mode=getattr(self.config, "subtitle_case", "upper")
+                    )
+                    self.staging_files.append(staging_srt_path)
+                    scoped_words = [w.word for w in words if w.start >= (clip.start_time - 0.2) and w.end <= (clip.end_time + 0.2)]
+                    c_snippet = " ".join(scoped_words)
+
                     results.append(
                         ClipResult(
                             clip_id=clip_num,
@@ -510,7 +558,11 @@ class PipelineOrchestrator:
                             end_time=clip.end_time,
                             staging_path=staging_clip_path,
                             thumbnail_path=staging_thumb_path,
-                            reframe_mode=mode
+                            reframe_mode=mode,
+                            social_caption=getattr(clip, "social_caption", ""),
+                            hook_timestamp=getattr(clip, "hook_timestamp", None),
+                            transcript_snippet=c_snippet,
+                            srt_path=staging_srt_path
                         )
                     )
 

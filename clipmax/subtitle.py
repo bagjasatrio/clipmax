@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from clipmax.transcriber import WordSegment
 
 def to_ass_color(hex_color: str, alpha: float = 1.0) -> str:
@@ -23,7 +23,16 @@ def to_ass_color(hex_color: str, alpha: float = 1.0) -> str:
         return f"&H{ass_alpha:02X}{b.upper()}{g.upper()}{r.upper()}&"
     return f"&H{ass_alpha:02X}FFFFFF&"
 
-def build_ass_header(base_ass_color: str = "&H00FFFFFF&") -> str:
+def build_ass_header(
+    base_ass_color: str = "&H00FFFFFF&",
+    font_name: str = "Impact",
+    font_size: int = 58,
+    border_style: int = 1,
+    outline: int = 6,
+    shadow: int = 2,
+    margin_v: int = 280,
+    alignment: int = 2
+) -> str:
     return f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -32,13 +41,122 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Kinetic,Impact,58,{base_ass_color},&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,2,0,1,6,2,2,40,40,280,1
+Style: Kinetic,{font_name},{font_size},{base_ass_color},&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,2,0,{border_style},{outline},{shadow},{alignment},40,40,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
 ASS_HEADER = build_ass_header("&H00FFFFFF&")
+
+SUBTITLE_PRESETS: Dict[str, Dict[str, Any]] = {
+    "classic_red": {
+        "name": "Classic Red",
+        "label": "Klasik Merah - Putih",
+        "base_color": "#FFFFFF",
+        "highlight_color": "#FF2A2A",
+        "font_name": "Impact",
+        "font_size": 58,
+        "outline": 6,
+        "shadow": 2,
+        "border_style": 1
+    },
+    "viral_pop": {
+        "name": "VIRAL POP",
+        "label": "VIRAL POP (Hormozi Yellow Glow)",
+        "base_color": "#FFFFFF",
+        "highlight_color": "#FFE81F",
+        "font_name": "Impact",
+        "font_size": 58,
+        "outline": 6,
+        "shadow": 2,
+        "border_style": 1
+    },
+    "beast_punch": {
+        "name": "BEAST PUNCH",
+        "label": "BEAST PUNCH (High Impact Green)",
+        "base_color": "#FFFFFF",
+        "highlight_color": "#39FF14",
+        "font_name": "Impact",
+        "font_size": 58,
+        "outline": 6,
+        "shadow": 2,
+        "border_style": 1
+    },
+    "cyber_violet": {
+        "name": "CYBER VIOLET",
+        "label": "CYBER VIOLET (Neon Purple Glow)",
+        "base_color": "#FFFFFF",
+        "highlight_color": "#B026FF",
+        "font_name": "Montserrat",
+        "font_size": 56,
+        "outline": 6,
+        "shadow": 2,
+        "border_style": 1
+    },
+    "fire_crimson": {
+        "name": "FIRE CRIMSON",
+        "label": "FIRE CRIMSON (High Energy Red)",
+        "base_color": "#FFFFFF",
+        "highlight_color": "#FF2A2A",
+        "font_name": "Impact",
+        "font_size": 58,
+        "outline": 6,
+        "shadow": 2,
+        "border_style": 1
+    },
+    "electric_cyan": {
+        "name": "ELECTRIC CYAN",
+        "label": "ELECTRIC CYAN (Ice Blue Glow)",
+        "base_color": "#FFFFFF",
+        "highlight_color": "#00F0FF",
+        "font_name": "Montserrat",
+        "font_size": 56,
+        "outline": 6,
+        "shadow": 2,
+        "border_style": 1
+    },
+    "golden_aura": {
+        "name": "GOLDEN AURA",
+        "label": "GOLDEN AURA (Luxury Warm Gold)",
+        "base_color": "#FFFFFF",
+        "highlight_color": "#FFD700",
+        "font_name": "Montserrat",
+        "font_size": 56,
+        "outline": 5,
+        "shadow": 2,
+        "border_style": 1
+    },
+    "clean_minimal": {
+        "name": "Clean Minimal",
+        "label": "Clean Minimal (Soft Dark Box)",
+        "base_color": "#FFFFFF",
+        "highlight_color": "#00F0FF",
+        "font_name": "Montserrat",
+        "font_size": 52,
+        "outline": 8,
+        "shadow": 0,
+        "border_style": 3
+    },
+    "none": {
+        "name": "NONE",
+        "label": "NONE (Tanpa Subtitle)",
+        "base_color": "#FFFFFF",
+        "highlight_color": "#FFFFFF",
+        "font_name": "Impact",
+        "font_size": 58,
+        "outline": 0,
+        "shadow": 0,
+        "border_style": 1
+    }
+}
+
+def format_word_case(text: str, case_mode: str = "upper") -> str:
+    if case_mode == "lower":
+        return text.lower()
+    elif case_mode == "title":
+        return text.title()
+    return text.upper()
 
 def format_ass_time(seconds: float) -> str:
     h = int(seconds // 3600)
@@ -49,6 +167,83 @@ def format_ass_time(seconds: float) -> str:
         cs = 99
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
+def format_srt_time(seconds: float) -> str:
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    ms = int(round((seconds - int(seconds)) * 1000))
+    if ms >= 1000:
+        ms = 999
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+def generate_srt(
+    words: List[WordSegment],
+    clip_start: float,
+    clip_end: float,
+    output_srt_path: str,
+    chunk_size: int = 4,
+    case_mode: str = "upper"
+) -> str:
+    scoped_words = [
+        w for w in words
+        if w.start >= (clip_start - 0.2) and w.end <= (clip_end + 0.2)
+    ]
+    lines = []
+    srt_idx = 1
+    for i in range(0, len(scoped_words), chunk_size):
+        chunk = scoped_words[i:i + chunk_size]
+        if not chunk:
+            continue
+        c_start = max(0.0, chunk[0].start - clip_start)
+        c_end = max(c_start + 0.3, chunk[-1].end - clip_start)
+        words_text = " ".join(format_word_case(w.word, case_mode) for w in chunk)
+        lines.append(f"{srt_idx}\n{format_srt_time(c_start)} --> {format_srt_time(c_end)}\n{words_text}\n")
+        srt_idx += 1
+
+    out_p = Path(output_srt_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_p, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+    return str(out_p.resolve())
+
+def generate_youtube_chapters(clips: list) -> str:
+    lines = ["00:00 Intro"]
+    for c in sorted(clips, key=lambda x: getattr(x, "start_time", 0)):
+        st = getattr(c, "start_time", 0)
+        title = getattr(c, "title", "Clip")
+        m = int(st // 60)
+        s = int(st % 60)
+        lines.append(f"{m:02d}:{s:02d} {title}")
+    return "\n".join(lines)
+
+def generate_markdown_summary(clips: list) -> str:
+    md = ["# Generated Viral Clips Summary\n"]
+    md.append("| # | Title | Hook | Virality Score | Start - End | Hook Timestamp |")
+    md.append("|---|---|---|---|---|---|")
+    for c in sorted(clips, key=lambda x: getattr(x, "clip_id", 0)):
+        cid = getattr(c, "clip_id", 0)
+        title = getattr(c, "title", "Untitled")
+        hook = getattr(c, "hook", "")
+        score = getattr(c, "virality_score", 0)
+        st = getattr(c, "start_time", 0)
+        et = getattr(c, "end_time", 0)
+        hts = getattr(c, "hook_timestamp", None)
+        hts_str = f"{hts:.2f}s" if hts is not None else "-"
+        md.append(f"| {cid} | **{title}** | {hook} | {score}/100 | {st:.1f}s - {et:.1f}s | {hts_str} |")
+
+    md.append("\n## Social Captions & Hashtags\n")
+    for c in sorted(clips, key=lambda x: getattr(x, "clip_id", 0)):
+        cid = getattr(c, "clip_id", 0)
+        title = getattr(c, "title", "Untitled")
+        caption = getattr(c, "social_caption", "")
+        reason = getattr(c, "reasoning", "")
+        md.append(f"### Clip {cid}: {title}\n")
+        if reason:
+            md.append(f"*Viral Reasoning:* {reason}\n")
+        if caption:
+            md.append(f"```text\n{caption}\n```\n")
+    return "\n".join(md)
+
 def generate_kinetic_ass(
     words: List[WordSegment],
     clip_start: float,
@@ -56,8 +251,47 @@ def generate_kinetic_ass(
     output_ass_path: str,
     max_words_per_line: int = 3,
     highlight_color: str = "#FF2A2A",
-    base_color: str = "#FFFFFF"
+    base_color: str = "#FFFFFF",
+    preset: Optional[str] = None,
+    font_name: Optional[str] = None,
+    font_size: Optional[int] = None,
+    case_mode: str = "upper",
+    strictly_one_line: bool = False,
+    bottom_offset_pct: Optional[int] = None
 ) -> str:
+    border_style = 1
+    outline = 6
+    shadow = 2
+
+    if preset and preset in SUBTITLE_PRESETS:
+        p_info = SUBTITLE_PRESETS[preset]
+        if preset == "none":
+            out_p = Path(output_ass_path)
+            out_p.parent.mkdir(parents=True, exist_ok=True)
+            with open(out_p, "w", encoding="utf-8") as f:
+                f.write(build_ass_header())
+            return str(out_p.resolve())
+
+        if highlight_color == "#FF2A2A" and "highlight_color" in p_info:
+            highlight_color = p_info["highlight_color"]
+        if base_color == "#FFFFFF" and "base_color" in p_info:
+            base_color = p_info["base_color"]
+        if font_name is None and "font_name" in p_info:
+            font_name = p_info["font_name"]
+        if font_size is None and "font_size" in p_info:
+            font_size = p_info["font_size"]
+        border_style = p_info.get("border_style", 1)
+        outline = p_info.get("outline", 6)
+        shadow = p_info.get("shadow", 2)
+
+    font_name = font_name or "Impact"
+    font_size = font_size or 58
+
+    if bottom_offset_pct is not None:
+        margin_v = int(round(1920 * (max(5, min(60, bottom_offset_pct)) / 100.0)))
+    else:
+        margin_v = 280
+
     scoped_words = [
         w for w in words
         if w.start >= (clip_start - 0.2) and w.end <= (clip_end + 0.2)
@@ -67,7 +301,7 @@ def generate_kinetic_ass(
     highlight_ass = to_ass_color(highlight_color)
 
     events = []
-    chunk_size = max_words_per_line
+    chunk_size = 2 if strictly_one_line else max_words_per_line
 
     for i in range(0, len(scoped_words), chunk_size):
         chunk = scoped_words[i:i + chunk_size]
@@ -85,10 +319,11 @@ def generate_kinetic_ass(
 
             line_parts = []
             for other_idx, other_word in enumerate(chunk):
+                w_text = format_word_case(other_word.word, case_mode)
                 if other_idx == current_idx:
-                    line_parts.append(f"{{\\c{highlight_ass}\\fscx110\\fscy110}}{other_word.word.upper()}{{\\c{base_ass}\\r}}")
+                    line_parts.append(f"{{\\c{highlight_ass}\\fscx110\\fscy110}}{w_text}{{\\c{base_ass}\\r}}")
                 else:
-                    line_parts.append(other_word.word.upper())
+                    line_parts.append(w_text)
 
             line_text = " ".join(line_parts)
             start_str = format_ass_time(w_start)
@@ -97,8 +332,17 @@ def generate_kinetic_ass(
 
     out_p = Path(output_ass_path)
     out_p.parent.mkdir(parents=True, exist_ok=True)
+    header = build_ass_header(
+        base_ass_color=base_ass,
+        font_name=font_name,
+        font_size=font_size,
+        border_style=border_style,
+        outline=outline,
+        shadow=shadow,
+        margin_v=margin_v
+    )
     with open(out_p, "w", encoding="utf-8") as f:
-        f.write(build_ass_header(base_ass))
+        f.write(header)
         f.write("\n".join(events))
         f.write("\n")
 
