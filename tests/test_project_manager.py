@@ -21,6 +21,8 @@ def test_project_manager_lifecycle(tmp_path, monkeypatch):
     vid1.write_text("dummy video content")
     thumb1 = source_dir / "thumb_1_100.jpg"
     thumb1.write_text("dummy thumb content")
+    srt1 = source_dir / "clipmax_1_100.srt"
+    srt1.write_text("1\n00:00:00,000 --> 00:00:02,000\nHELLO TEST\n")
 
     clips = [
         ClipResult(
@@ -32,7 +34,10 @@ def test_project_manager_lifecycle(tmp_path, monkeypatch):
             start_time=10.0,
             end_time=35.0,
             staging_path=str(vid1),
-            thumbnail_path=str(thumb1)
+            thumbnail_path=str(thumb1),
+            srt_path=str(srt1),
+            social_caption="Caption #coding",
+            hook_timestamp=12.5
         )
     ]
 
@@ -60,8 +65,12 @@ def test_project_manager_lifecycle(tmp_path, monkeypatch):
     assert restored is not None
     assert len(restored) == 1
     assert restored[0].title == "Cara Sukses Coding"
+    assert restored[0].social_caption == "Caption #coding"
+    assert restored[0].hook_timestamp == 12.5
     assert Path(restored[0].staging_path).exists()
     assert Path(restored[0].staging_path).read_text() == "dummy video content"
+    assert Path(restored[0].srt_path).exists()
+    assert "HELLO TEST" in Path(restored[0].srt_path).read_text()
 
     # Verify delete
     ok = pm.delete_project(saved["project_id"])

@@ -208,8 +208,16 @@ def generate_srt(
 
 def generate_youtube_chapters(clips: list) -> str:
     lines = ["00:00 Intro"]
-    for c in sorted(clips, key=lambda x: getattr(x, "start_time", 0)):
-        st = getattr(c, "start_time", 0)
+    valid_clips = []
+    for c in clips:
+        try:
+            st = float(getattr(c, "start_time", 0) or 0.0)
+        except (ValueError, TypeError):
+            st = 0.0
+        valid_clips.append((st, c))
+
+    valid_clips.sort(key=lambda x: x[0])
+    for st, c in valid_clips:
         title = getattr(c, "title", "Clip")
         m = int(st // 60)
         s = int(st % 60)
@@ -225,10 +233,16 @@ def generate_markdown_summary(clips: list) -> str:
         title = getattr(c, "title", "Untitled")
         hook = getattr(c, "hook", "")
         score = getattr(c, "virality_score", 0)
-        st = getattr(c, "start_time", 0)
-        et = getattr(c, "end_time", 0)
+        try:
+            st = float(getattr(c, "start_time", 0) or 0.0)
+            et = float(getattr(c, "end_time", 0) or 0.0)
+        except (ValueError, TypeError):
+            st, et = 0.0, 0.0
         hts = getattr(c, "hook_timestamp", None)
-        hts_str = f"{hts:.2f}s" if hts is not None else "-"
+        try:
+            hts_str = f"{float(hts):.2f}s" if hts is not None else "-"
+        except (ValueError, TypeError):
+            hts_str = "-"
         md.append(f"| {cid} | **{title}** | {hook} | {score}/100 | {st:.1f}s - {et:.1f}s | {hts_str} |")
 
     md.append("\n## Social Captions & Hashtags\n")

@@ -100,6 +100,12 @@ def save_project(
             if not cover_thumb:
                 cover_thumb = f"/projects_media/{proj_id}/{dest_th.name}"
 
+        if getattr(c, "srt_path", "") and os.path.exists(c.srt_path):
+            src_srt = Path(c.srt_path)
+            dest_srt = proj_folder / src_srt.name
+            shutil.copy2(str(src_srt), str(dest_srt))
+            c_dict["srt_path"] = str(dest_srt.resolve())
+
         persisted_clips.append(c_dict)
 
     record = ProjectRecord(
@@ -150,6 +156,14 @@ def restore_project_to_staging(project_id: str, staging_dir: Path) -> Optional[L
             dest_th = staging_dir / th_path.name
             shutil.copy2(str(th_path), str(dest_th))
             c_data["thumbnail_path"] = str(dest_th.resolve())
+
+        # Copy SRT subtitle file
+        srt_str = c_data.get("srt_path", "").strip()
+        if srt_str and os.path.isfile(srt_str):
+            s_path = Path(srt_str)
+            dest_s = staging_dir / s_path.name
+            shutil.copy2(str(s_path), str(dest_s))
+            c_data["srt_path"] = str(dest_s.resolve())
 
         restored_clips.append(ClipResult(**c_data))
 

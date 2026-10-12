@@ -903,8 +903,19 @@ document.addEventListener("DOMContentLoaded", () => {
   if (selectSortClips) selectSortClips.addEventListener("change", () => renderClipsGallery(getFilteredAndSortedClips()));
 
   function renderClipsGallery(clips) {
-    clipsCount.textContent = clips.length;
+    if (clipsCount) {
+      if (currentClips && currentClips.length !== clips.length) {
+        clipsCount.textContent = `${clips.length}/${currentClips.length}`;
+      } else {
+        clipsCount.textContent = clips.length;
+      }
+    }
     clipsGallery.innerHTML = "";
+
+    if (!clips || clips.length === 0) {
+      clipsGallery.innerHTML = `<div class="p-6 text-center text-xs text-gray-500 italic">Tidak ada klip yang cocok dengan pencarian / filter.</div>`;
+      return;
+    }
 
     clips.forEach((clip, idx) => {
       const card = document.createElement("div");
@@ -1059,7 +1070,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    renderClipsGallery(currentClips);
+    renderClipsGallery(getFilteredAndSortedClips());
   }
 
   // 10. Video Player & Custom Controls
