@@ -46,28 +46,40 @@
       <span class="text-[10px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/70 border border-emerald-600/40 text-emerald-300">v2.5 Pro</span>
     </div>
 
-    <!-- Center: Multi-Page Navigation -->
-    <nav class="flex items-center space-x-1 bg-[#0D1510] p-0.5 rounded-lg border border-[#233527]">
-      <button id="navTabHome" type="button" class="flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-semibold transition text-white bg-[#1A281E] border border-emerald-500/40 shadow-sm">
-        <span>🏠</span>
+    <!-- Center: Professional Stepper Navigation (Soft Green & Warm Yellow) -->
+    <nav class="flex items-center space-x-1.5 bg-[#0D1510] px-1.5 py-1 rounded-xl border border-[#233527] shadow-inner">
+      <button id="navTabHome" type="button" class="group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-white bg-[#1A281E] border border-emerald-500/40 shadow-sm">
+        <span class="text-sm">🏠</span>
         <span>Beranda</span>
       </button>
-      <button id="navTabMedia" type="button" class="flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-medium transition text-gray-400 hover:text-gray-200">
-        <span class="w-4 h-4 rounded-full bg-gray-800 text-[10px] flex items-center justify-center font-bold">1</span>
+
+      <span class="text-[#233527] text-xs font-bold select-none">›</span>
+
+      <button id="navTabMedia" type="button" class="group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition text-gray-400 hover:text-gray-200 hover:bg-[#131E16]">
+        <span class="step-badge w-5 h-5 rounded-full bg-[#162319] border border-[#233528] text-gray-400 text-[10px] flex items-center justify-center font-bold transition group-hover:border-emerald-500/40 group-hover:text-emerald-300">1</span>
         <span>Media</span>
       </button>
-      <button id="navTabCuration" type="button" class="flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-medium transition text-gray-400 hover:text-gray-200">
-        <span class="w-4 h-4 rounded-full bg-gray-800 text-[10px] flex items-center justify-center font-bold">2</span>
+
+      <span class="text-[#233527] text-xs font-bold select-none">›</span>
+
+      <button id="navTabCuration" type="button" class="group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition text-gray-400 hover:text-gray-200 hover:bg-[#131E16]">
+        <span class="step-badge w-5 h-5 rounded-full bg-[#162319] border border-[#233528] text-gray-400 text-[10px] flex items-center justify-center font-bold transition group-hover:border-emerald-500/40 group-hover:text-emerald-300">2</span>
         <span>Kurasi AI</span>
       </button>
-      <button id="navTabStyling" type="button" class="flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-medium transition text-gray-400 hover:text-gray-200">
-        <span class="w-4 h-4 rounded-full bg-gray-800 text-[10px] flex items-center justify-center font-bold">3</span>
+
+      <span class="text-[#233527] text-xs font-bold select-none">›</span>
+
+      <button id="navTabStyling" type="button" class="group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition text-gray-400 hover:text-gray-200 hover:bg-[#131E16]">
+        <span class="step-badge w-5 h-5 rounded-full bg-[#162319] border border-[#233528] text-gray-400 text-[10px] flex items-center justify-center font-bold transition group-hover:border-emerald-500/40 group-hover:text-emerald-300">3</span>
         <span>Styling</span>
       </button>
-      <button id="navTabStudio" type="button" class="flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-medium transition text-gray-400 hover:text-gray-200 relative">
-        <span class="w-4 h-4 rounded-full bg-gray-800 text-[10px] flex items-center justify-center font-bold">4</span>
+
+      <span class="text-[#233527] text-xs font-bold select-none">›</span>
+
+      <button id="navTabStudio" type="button" class="group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition text-gray-400 hover:text-gray-200 hover:bg-[#131E16] relative">
+        <span class="step-badge w-5 h-5 rounded-full bg-[#162319] border border-[#233528] text-gray-400 text-[10px] flex items-center justify-center font-bold transition group-hover:border-yellow-500/40 group-hover:text-yellow-300">4</span>
         <span>Editor Timeline</span>
-        <span id="studioBadgeDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse hidden"></span>
+        <span id="studioBadgeDot" class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse hidden"></span>
       </button>
     </nav>
 
@@ -319,18 +331,18 @@
       <div class="w-full max-w-2xl space-y-6">
 
         <!-- Step Header -->
-        <div class="border-b border-[#222938] pb-3">
-          <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-400 font-mono">Langkah 1 dari 3</span>
+        <div class="border-b border-[#233527] pb-3">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400 font-mono">Langkah 1 dari 3</span>
           <h2 class="text-lg font-bold text-white">Sumber Video & Transkripsi Audio</h2>
           <p class="text-xs text-gray-400">Pilih video dari tautan YouTube atau unggah file lokal untuk diproses.</p>
         </div>
 
         <!-- 1. Source Ingestion Segmented Control -->
-        <div class="p-5 rounded-2xl bg-[#131722] border border-[#222938] space-y-4">
+        <div class="p-5 rounded-2xl bg-[#131E16] border border-[#233527] space-y-4">
           <label class="text-xs font-bold uppercase tracking-wider text-gray-300 block">Pilih Sumber Video</label>
           
           <!-- Segmented Tab -->
-          <div class="grid grid-cols-2 p-1 bg-[#0B0E14] border border-[#222938] rounded-xl">
+          <div class="grid grid-cols-2 p-1 bg-[#0C120E] border border-[#233527] rounded-xl">
             <button id="tabUrl" class="py-2 text-xs font-semibold rounded-lg transition-all text-white bg-[#1E2330] shadow-sm flex items-center justify-center space-x-1.5">
               <span>🌐</span>
               <span>YouTube URL</span>
@@ -344,23 +356,23 @@
           <!-- YouTube View -->
           <div id="viewUrl" class="space-y-2 pt-1">
             <input type="text" id="inputUrl" placeholder="https://www.youtube.com/watch?v=..." 
-              class="w-full px-3.5 py-2.5 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none transition text-gray-100 placeholder-gray-500">
+              class="w-full px-3.5 py-2.5 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none transition text-gray-100 placeholder-gray-500">
             <div class="flex items-center justify-between text-[11px] text-gray-400 px-1">
               <span>⚡ Engine: Invidious API Stream & yt-dlp</span>
               <span class="text-emerald-400 font-medium">Bebas Login & Cookies</span>
             </div>
 
             <!-- YouTube Multi-Language Audio Tracks Selector -->
-            <div id="boxAudioTracks" class="p-3 bg-[#0B0E14] border border-indigo-500/30 rounded-xl space-y-2 hidden">
+            <div id="boxAudioTracks" class="p-3 bg-[#0C120E] border border-emerald-500/30 rounded-xl space-y-2 hidden">
               <div class="flex items-center justify-between text-[11px]">
-                <span class="text-indigo-300 font-semibold flex items-center space-x-1.5">
+                <span class="text-emerald-300 font-semibold flex items-center space-x-1.5">
                   <span>🎙️</span>
                   <span>Pilihan Bahasa Audio Video (Multi-Track)</span>
                 </span>
                 <span id="lblAudioTrackCount" class="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">Tersedia Dubbing</span>
               </div>
               <div class="space-y-1">
-                <select id="selectAudioTrack" class="w-full px-3 py-2 text-xs bg-[#131722] border border-[#2B3548] focus:border-indigo-500 rounded-lg focus:outline-none text-white cursor-pointer font-medium">
+                <select id="selectAudioTrack" class="w-full px-3 py-2 text-xs bg-[#131E16] border border-[#233527] focus:border-emerald-500 rounded-lg focus:outline-none text-white cursor-pointer font-medium">
                   <option value="default">Default / Original</option>
                 </select>
                 <p class="text-[10px] text-gray-400 leading-relaxed pt-0.5">
@@ -372,7 +384,7 @@
 
           <!-- Local File View -->
           <div id="viewLocal" class="space-y-2.5 pt-1 hidden">
-            <div id="dropZone" class="border-2 border-dashed border-[#2A3345] hover:border-indigo-500 rounded-xl p-6 text-center cursor-pointer bg-[#0B0E14] transition">
+            <div id="dropZone" class="border-2 border-dashed border-[#233527] hover:border-emerald-500 rounded-xl p-6 text-center cursor-pointer bg-[#0C120E] transition">
               <svg class="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
               </svg>
@@ -384,18 +396,18 @@
         </div>
 
         <!-- 2. Transkripsi Whisper & Akselerasi GPU -->
-        <div class="p-5 rounded-2xl bg-[#131722] border border-[#222938] space-y-3">
+        <div class="p-5 rounded-2xl bg-[#131E16] border border-[#233527] space-y-3">
           <label class="text-xs font-bold uppercase tracking-wider text-gray-300 block">Engine Transkripsi Whisper</label>
           <div class="grid grid-cols-2 gap-3 text-xs">
-            <div class="p-3 rounded-xl bg-[#0B0E14] border border-[#222938] space-y-1">
+            <div class="p-3 rounded-xl bg-[#0C120E] border border-[#233527] space-y-1">
               <span class="text-[10px] text-gray-400 uppercase font-semibold">Model Transkripsi</span>
               <p class="font-bold text-gray-200">Faster-Whisper (small)</p>
               <p class="text-[10px] text-emerald-400">Word-level timestamps presisi</p>
             </div>
-            <div class="p-3 rounded-xl bg-[#0B0E14] border border-[#222938] space-y-1">
+            <div class="p-3 rounded-xl bg-[#0C120E] border border-[#233527] space-y-1">
               <span class="text-[10px] text-gray-400 uppercase font-semibold">Hardware Acceleration</span>
               <p class="font-bold text-gray-200">NVIDIA CUDA Float16</p>
-              <p class="text-[10px] text-indigo-300">VRAM 4GB Garbage Collection</p>
+              <p class="text-[10px] text-emerald-300">VRAM 4GB Garbage Collection</p>
             </div>
           </div>
         </div>
@@ -405,7 +417,7 @@
           <button id="btnCancelFromMedia" class="px-4 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white transition">
             Kembali ke Beranda
           </button>
-          <button id="btnNextToCuration" class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/30 transition flex items-center space-x-1.5">
+          <button id="btnNextToCuration" class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-900/30 transition flex items-center space-x-1.5">
             <span>Lanjut: Kurasi AI</span>
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
           </button>
@@ -419,17 +431,17 @@
       <div class="w-full max-w-2xl space-y-6">
 
         <!-- Step Header -->
-        <div class="border-b border-[#222938] pb-3">
-          <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-400 font-mono">Langkah 2 dari 3</span>
+        <div class="border-b border-[#233527] pb-3">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400 font-mono">Langkah 2 dari 3</span>
           <h2 class="text-lg font-bold text-white">Kurasi Konten AI & Parameter Klip</h2>
           <p class="text-xs text-gray-400">Tentukan preferensi AI untuk memilih momen paling viral dan menarik.</p>
         </div>
 
         <!-- AI Engine Parameters -->
-        <div class="p-5 rounded-2xl bg-[#131722] border border-[#222938] space-y-4">
+        <div class="p-5 rounded-2xl bg-[#131E16] border border-[#233527] space-y-4">
           <div class="flex items-center justify-between">
             <label class="text-xs font-bold uppercase tracking-wider text-gray-300">AI Gateway Endpoint</label>
-            <button id="btnRefreshModels" title="Refresh Model Discovery" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center space-x-1 transition">
+            <button id="btnRefreshModels" title="Refresh Model Discovery" class="text-xs text-emerald-400 hover:text-emerald-300 flex items-center space-x-1 transition">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
               <span>Auto-Discover Models</span>
             </button>
@@ -439,31 +451,31 @@
             <div class="space-y-1">
               <label class="text-[11px] text-gray-400 font-medium">Endpoint URL</label>
               <input type="text" id="inputEndpoint" value="http://localhost:20128/v1" 
-                class="w-full px-3 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200">
+                class="w-full px-3 py-2 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200">
             </div>
             <div class="space-y-1">
               <label class="text-[11px] text-gray-400 font-medium">API Key (Opsional)</label>
               <input type="password" id="inputApiKey" placeholder="sk-..." 
-                class="w-full px-3 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200">
+                class="w-full px-3 py-2 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200">
             </div>
           </div>
 
           <div class="space-y-1">
             <label class="text-[11px] text-gray-400 font-medium">Pilihan Model AI (LLM)</label>
-            <select id="selectModel" class="w-full px-3 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
+            <select id="selectModel" class="w-full px-3 py-2 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
               <option value="default">default (auto-gateway)</option>
             </select>
           </div>
         </div>
 
         <!-- Curation Directives -->
-        <div class="p-5 rounded-2xl bg-[#131722] border border-[#222938] space-y-4">
+        <div class="p-5 rounded-2xl bg-[#131E16] border border-[#233527] space-y-4">
           <label class="text-xs font-bold uppercase tracking-wider text-gray-300 block">Kriteria Klip</label>
 
           <div class="grid grid-cols-3 gap-3">
             <div class="space-y-1">
               <label class="text-[11px] text-gray-400 font-medium">Mode Klip</label>
-              <select id="selectClipMode" class="w-full px-2.5 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
+              <select id="selectClipMode" class="w-full px-2.5 py-2 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
                 <option value="single">Single Clip (Default)</option>
                 <option value="montage">Multi-Cut Montage</option>
               </select>
@@ -471,11 +483,11 @@
             <div class="space-y-1">
               <label class="text-[11px] text-gray-400 font-medium">Target Jumlah Klip</label>
               <input type="number" id="inputTargetClips" min="1" max="10" value="3" 
-                class="w-full px-2.5 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200">
+                class="w-full px-2.5 py-2 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200">
             </div>
             <div class="space-y-1">
               <label class="text-[11px] text-gray-400 font-medium">Preset Durasi</label>
-              <select id="selectDuration" class="w-full px-2.5 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
+              <select id="selectDuration" class="w-full px-2.5 py-2 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
                 <option value="auto">Auto / 30-60s</option>
                 <option value="short">Short (&lt;30s)</option>
                 <option value="long">Long (60-90s)</option>
@@ -486,7 +498,7 @@
           <div class="space-y-1">
             <label class="text-[11px] text-gray-400 font-medium">Campaign Brief & Custom Rules</label>
             <textarea id="inputRules" rows="3" placeholder="Contoh: Fokus pada momen punchline, kemenangan, dan tips praktis..." 
-              class="w-full p-3 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 resize-none"></textarea>
+              class="w-full p-3 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200 resize-none"></textarea>
           </div>
         </div>
 
@@ -496,7 +508,7 @@
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
             <span>Kembali ke Media</span>
           </button>
-          <button id="btnNextToStyling" class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/30 transition flex items-center space-x-1.5">
+          <button id="btnNextToStyling" class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-900/30 transition flex items-center space-x-1.5">
             <span>Lanjut: Styling Subtitle</span>
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
           </button>
@@ -510,20 +522,20 @@
       <div class="w-full max-w-2xl space-y-6">
 
         <!-- Step Header -->
-        <div class="border-b border-[#222938] pb-3">
-          <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-400 font-mono">Langkah 3 dari 3</span>
+        <div class="border-b border-[#233527] pb-3">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-400 font-mono">Langkah 3 dari 3</span>
           <h2 class="text-lg font-bold text-white">Gaya Subtitle Karaoke & Mulai Render</h2>
           <p class="text-xs text-gray-400">Atur skema warna subtitle karaoke dan review konfigurasi sebelum otomatisasi dijalankan.</p>
         </div>
 
         <!-- Subtitle Styling Card -->
-        <div class="p-5 rounded-2xl bg-[#131722] border border-[#222938] space-y-4">
+        <div class="p-5 rounded-2xl bg-[#131E16] border border-[#233527] space-y-4">
           <label class="text-xs font-bold uppercase tracking-wider text-gray-300 block">Kustomisasi Subtitle Style (Karaoke)</label>
 
           <!-- Preset Selector -->
           <div class="space-y-1">
             <label class="text-[11px] text-gray-400 font-medium">Preset Gaya Subtitle Populer</label>
-            <select id="selectColorPreset" class="w-full px-3 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
+            <select id="selectColorPreset" class="w-full px-3 py-2 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
               <option value="classic_red">Klasik Merah - Putih (Default)</option>
               <option value="viral_pop">VIRAL POP (Hormozi Yellow Glow)</option>
               <option value="beast_punch">BEAST PUNCH (Neon Green Impact)</option>
@@ -539,17 +551,17 @@
 
           <!-- Color Pickers -->
           <div class="grid grid-cols-2 gap-3 pt-1">
-            <div class="space-y-1.5 p-3 rounded-xl bg-[#0B0E14] border border-[#222938]">
+            <div class="space-y-1.5 p-3 rounded-xl bg-[#0C120E] border border-[#233527]">
               <label class="text-[11px] text-gray-400 block font-medium">Warna Teks Biasa (Base)</label>
               <div class="flex items-center space-x-2">
-                <input type="color" id="inputBaseColor" value="#FFFFFF" class="w-7 h-7 rounded cursor-pointer border border-[#222938] bg-transparent">
+                <input type="color" id="inputBaseColor" value="#FFFFFF" class="w-7 h-7 rounded cursor-pointer border border-[#233527] bg-transparent">
                 <span id="lblBaseColor" class="text-xs font-mono text-gray-300">#FFFFFF</span>
               </div>
             </div>
-            <div class="space-y-1.5 p-3 rounded-xl bg-[#0B0E14] border border-[#222938]">
+            <div class="space-y-1.5 p-3 rounded-xl bg-[#0C120E] border border-[#233527]">
               <label class="text-[11px] text-gray-400 block font-medium">Warna Highlight (Aktif)</label>
               <div class="flex items-center space-x-2">
-                <input type="color" id="inputHighlightColor" value="#FF2A2A" class="w-7 h-7 rounded cursor-pointer border border-[#222938] bg-transparent">
+                <input type="color" id="inputHighlightColor" value="#FF2A2A" class="w-7 h-7 rounded cursor-pointer border border-[#233527] bg-transparent">
                 <span id="lblHighlightColor" class="text-xs font-mono text-gray-300">#FF2A2A</span>
               </div>
             </div>
@@ -559,7 +571,7 @@
           <div class="grid grid-cols-3 gap-3 pt-1">
             <div class="space-y-1">
               <label class="text-[11px] text-gray-400 font-medium">Format Huruf</label>
-              <select id="selectSubtitleCase" class="w-full px-2.5 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
+              <select id="selectSubtitleCase" class="w-full px-2.5 py-2 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
                 <option value="upper">ALL CAPS (HURUF BESAR)</option>
                 <option value="title">Title Case (Kapital Awal)</option>
                 <option value="lower">lowercase (huruf kecil)</option>
@@ -567,36 +579,36 @@
             </div>
             <div class="space-y-1">
               <label class="text-[11px] text-gray-400 font-medium">Batasan Baris</label>
-              <label class="flex items-center space-x-2 px-2.5 py-2 rounded-xl bg-[#0B0E14] border border-[#222938] cursor-pointer">
-                <input type="checkbox" id="chkSubtitleOneLine" class="w-3.5 h-3.5 accent-indigo-500 rounded cursor-pointer">
+              <label class="flex items-center space-x-2 px-2.5 py-2 rounded-xl bg-[#0C120E] border border-[#233527] cursor-pointer">
+                <input type="checkbox" id="chkSubtitleOneLine" class="w-3.5 h-3.5 accent-emerald-500 rounded cursor-pointer">
                 <span class="text-[11px] text-gray-300">Strictly 1 Line</span>
               </label>
             </div>
             <div class="space-y-1">
               <div class="flex justify-between items-center text-[11px] text-gray-400 font-medium">
                 <span>Offset Bawah</span>
-                <span id="lblSubtitleOffset" class="font-mono text-indigo-400">20%</span>
+                <span id="lblSubtitleOffset" class="font-mono text-emerald-400">20%</span>
               </div>
-              <input type="range" id="rangeSubtitleOffset" min="10" max="45" value="20" class="w-full h-2 accent-indigo-500 cursor-pointer mt-1">
+              <input type="range" id="rangeSubtitleOffset" min="10" max="45" value="20" class="w-full h-2 accent-emerald-500 cursor-pointer mt-1">
             </div>
           </div>
         </div>
 
         <!-- Framing & Filename Templates Card -->
-        <div class="p-5 rounded-2xl bg-[#131722] border border-[#222938] space-y-4">
+        <div class="p-5 rounded-2xl bg-[#131E16] border border-[#233527] space-y-4">
           <label class="text-xs font-bold uppercase tracking-wider text-gray-300 block">Framing Video & Format File Ekspor</label>
 
           <div class="grid grid-cols-2 gap-3">
             <div class="space-y-1">
               <label class="text-[11px] text-gray-400 font-medium">Mode Backdrop Margin (Jika Tanpa Wajah)</label>
-              <select id="selectMarginBackdrop" class="w-full px-2.5 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
+              <select id="selectMarginBackdrop" class="w-full px-2.5 py-2 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200 cursor-pointer">
                 <option value="BLURRED_BG">Ambient Blurred Video (Modern)</option>
                 <option value="BLACK_BARS">Pure Black Bars (Klasik Minimalis)</option>
               </select>
             </div>
             <div class="space-y-1">
               <label class="text-[11px] text-gray-400 font-medium">Preview Pola Nama File Ekspor</label>
-              <div id="lblFilenameSample" class="w-full px-2.5 py-2 text-[11px] font-mono text-indigo-300 bg-[#0B0E14] border border-[#222938] rounded-xl truncate">
+              <div id="lblFilenameSample" class="w-full px-2.5 py-2 text-[11px] font-mono text-emerald-300 bg-[#0C120E] border border-[#233527] rounded-xl truncate">
                 Shorts_JudulKlip_1080p.mp4
               </div>
             </div>
@@ -605,17 +617,17 @@
           <div class="grid grid-cols-2 gap-3 pt-1">
             <div class="space-y-1">
               <label class="text-[11px] text-gray-400 font-medium">Prefix Nama File</label>
-              <input type="text" id="inputFilenamePrefix" placeholder="Contoh: Shorts_" value="" class="w-full px-3 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 font-mono">
+              <input type="text" id="inputFilenamePrefix" placeholder="Contoh: Shorts_" value="" class="w-full px-3 py-2 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200 font-mono">
             </div>
             <div class="space-y-1">
               <label class="text-[11px] text-gray-400 font-medium">Suffix Nama File</label>
-              <input type="text" id="inputFilenameSuffix" placeholder="Contoh: _1080p" value="" class="w-full px-3 py-2 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 font-mono">
+              <input type="text" id="inputFilenameSuffix" placeholder="Contoh: _1080p" value="" class="w-full px-3 py-2 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200 font-mono">
             </div>
           </div>
         </div>
 
         <!-- Auto Post to Social Card -->
-        <div class="p-5 rounded-2xl bg-[#131722] border border-[#222938] space-y-4">
+        <div class="p-5 rounded-2xl bg-[#131E16] border border-[#233527] space-y-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
               <span class="text-sm">🚀</span>
@@ -623,21 +635,21 @@
             </div>
             <label class="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" id="chkAutoPost" class="sr-only peer">
-              <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+              <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
             </label>
           </div>
 
           <div id="autoPostConfigSection" class="space-y-3 pt-2 border-t border-[#1C2230] hidden">
             <div class="text-[11px] text-gray-400">Pilih platform target untuk upload otomatis:</div>
             <div class="grid grid-cols-2 gap-3">
-              <label class="flex items-center space-x-2 p-2.5 rounded-xl bg-[#0B0E14] border border-[#222938] cursor-pointer hover:border-red-500/50 transition">
+              <label class="flex items-center space-x-2 p-2.5 rounded-xl bg-[#0C120E] border border-[#233527] cursor-pointer hover:border-red-500/50 transition">
                 <input type="checkbox" id="chkPlatformYT" class="accent-red-500 rounded" checked>
                 <div class="text-xs">
                   <span class="font-bold text-gray-200">YouTube Shorts</span>
                   <p class="text-[10px] text-gray-500">API Resmi (OAuth 2.0)</p>
                 </div>
               </label>
-              <label class="flex items-center space-x-2 p-2.5 rounded-xl bg-[#0B0E14] border border-[#222938] cursor-pointer hover:border-cyan-500/50 transition">
+              <label class="flex items-center space-x-2 p-2.5 rounded-xl bg-[#0C120E] border border-[#233527] cursor-pointer hover:border-cyan-500/50 transition">
                 <input type="checkbox" id="chkPlatformTikTok" class="accent-cyan-500 rounded" checked>
                 <div class="text-xs">
                   <span class="font-bold text-gray-200">TikTok</span>
@@ -649,7 +661,7 @@
             <div class="grid grid-cols-2 gap-3 pt-1 text-[11px]">
               <div class="space-y-1">
                 <label class="text-gray-400">Status YouTube Shorts:</label>
-                <select id="selectYTPrivacy" class="w-full px-2.5 py-1.5 text-xs bg-[#0B0E14] border border-[#222938] rounded-xl text-gray-300 focus:outline-none cursor-pointer">
+                <select id="selectYTPrivacy" class="w-full px-2.5 py-1.5 text-xs bg-[#0C120E] border border-[#233527] rounded-xl text-gray-300 focus:outline-none cursor-pointer">
                   <option value="private">Private (Pribadi)</option>
                   <option value="unlisted">Unlisted (Tak Terdaftar)</option>
                   <option value="public">Public (Publik Langsung)</option>
@@ -657,7 +669,7 @@
               </div>
               <div class="space-y-1">
                 <label class="text-gray-400">Visibilitas TikTok:</label>
-                <select id="selectTikTokPrivacy" class="w-full px-2.5 py-1.5 text-xs bg-[#0B0E14] border border-[#222938] rounded-xl text-gray-300 focus:outline-none cursor-pointer">
+                <select id="selectTikTokPrivacy" class="w-full px-2.5 py-1.5 text-xs bg-[#0C120E] border border-[#233527] rounded-xl text-gray-300 focus:outline-none cursor-pointer">
                   <option value="everyone">Semua Orang (Publik)</option>
                   <option value="friends">Teman Saja</option>
                   <option value="only_you">Hanya Saya (Private)</option>
@@ -668,7 +680,7 @@
         </div>
 
         <!-- Render Specifications Card -->
-        <div class="p-4 rounded-2xl bg-[#0F131D] border border-[#222938] flex items-center justify-between text-xs text-gray-400">
+        <div class="p-4 rounded-2xl bg-[#0F131D] border border-[#233527] flex items-center justify-between text-xs text-gray-400">
           <div class="flex items-center space-x-2">
             <span>⚙️</span>
             <span>Target Output: <strong class="text-gray-200">Full HD 1080x1920 (9:16)</strong></span>
@@ -687,7 +699,7 @@
           </button>
 
           <!-- Primary Launch Button -->
-          <button id="btnGenerate" class="px-8 py-3 rounded-xl text-xs font-bold text-white btn-primary-glow flex items-center justify-center space-x-2 shadow-xl shadow-indigo-600/30 transition transform hover:-translate-y-0.5">
+          <button id="btnGenerate" class="px-8 py-3 rounded-xl text-xs font-bold text-white btn-primary-glow flex items-center justify-center space-x-2 shadow-xl shadow-emerald-900/30 transition transform hover:-translate-y-0.5">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             <span>Mulai Kurasi & Render Klip</span>
           </button>
@@ -707,12 +719,12 @@
 
       <!-- 1. STANDBY STATE (Belum Ada Klip) -->
       <section id="stageStandby" class="flex-1 flex flex-col items-center justify-center p-8 text-center">
-        <div class="w-16 h-16 rounded-2xl bg-[#151923] border border-[#222938] flex items-center justify-center text-gray-500 mb-4 shadow-xl">
+        <div class="w-16 h-16 rounded-2xl bg-[#151923] border border-[#233527] flex items-center justify-center text-gray-500 mb-4 shadow-xl">
           <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
         <h3 class="text-base font-semibold text-gray-300">Studio Pemrosesan Belum Dimulai</h3>
         <p class="text-xs text-gray-500 mt-1 max-w-sm">Mulai proyek baru untuk melihat proses pemotongan 9:16 dan hasil kurasi klip secara langsung.</p>
-        <button id="btnStandbyGoToMedia" class="mt-4 px-4 py-2 rounded-xl text-xs font-semibold text-indigo-400 bg-indigo-950/60 border border-indigo-700/40 hover:bg-indigo-900 transition">
+        <button id="btnStandbyGoToMedia" class="mt-4 px-4 py-2 rounded-xl text-xs font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-700/40 hover:bg-emerald-950 transition">
           Mulai Pengaturan Proyek ➔
         </button>
       </section>
@@ -721,8 +733,8 @@
       <section id="stageProcessing" class="flex-1 flex flex-col items-center justify-center p-8 hidden">
         <div class="w-full max-w-md space-y-6">
           <div class="text-center space-y-2">
-            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-950/60 border border-indigo-700/50 text-indigo-300 text-xs font-mono font-medium">
-              <span class="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></span>
+            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-700/50 text-emerald-300 text-xs font-mono font-medium">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
               <span>Processing Video Pipeline</span>
             </div>
             <h2 class="text-xl font-bold text-white tracking-tight">Menghasilkan Klip Vertikal 9:16...</h2>
@@ -733,21 +745,21 @@
           <div class="space-y-2">
             <div class="flex items-center justify-between text-xs font-mono text-gray-400">
               <span>Overall Progress</span>
-              <span id="processPct" class="font-bold text-indigo-400">0%</span>
+              <span id="processPct" class="font-bold text-emerald-400">0%</span>
             </div>
-            <div class="h-2 w-full bg-[#161B26] rounded-full overflow-hidden border border-[#222938]">
-              <div id="progressBar" class="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-300 w-0"></div>
+            <div class="h-2 w-full bg-[#161B26] rounded-full overflow-hidden border border-[#233527]">
+              <div id="progressBar" class="h-full bg-gradient-to-r from-emerald-500 to-yellow-400 transition-all duration-300 w-0"></div>
             </div>
           </div>
 
           <!-- 6-Stage Stepper Pills -->
           <div class="grid grid-cols-3 gap-2 text-[10px] font-mono text-gray-400 text-center">
-            <div id="step-ingest" class="p-2 rounded bg-[#121620] border border-[#222938]">1. Ingest</div>
-            <div id="step-transcribe" class="p-2 rounded bg-[#121620] border border-[#222938]">2. Transcribe</div>
-            <div id="step-ai" class="p-2 rounded bg-[#121620] border border-[#222938]">3. AI Curation</div>
-            <div id="step-reframe" class="p-2 rounded bg-[#121620] border border-[#222938]">4. Reframe 9:16</div>
-            <div id="step-render" class="p-2 rounded bg-[#121620] border border-[#222938]">5. NVENC Render</div>
-            <div id="step-complete" class="p-2 rounded bg-[#121620] border border-[#222938]">6. Completed</div>
+            <div id="step-ingest" class="p-2 rounded bg-[#121620] border border-[#233527]">1. Ingest</div>
+            <div id="step-transcribe" class="p-2 rounded bg-[#121620] border border-[#233527]">2. Transcribe</div>
+            <div id="step-ai" class="p-2 rounded bg-[#121620] border border-[#233527]">3. AI Curation</div>
+            <div id="step-reframe" class="p-2 rounded bg-[#121620] border border-[#233527]">4. Reframe 9:16</div>
+            <div id="step-render" class="p-2 rounded bg-[#121620] border border-[#233527]">5. NVENC Render</div>
+            <div id="step-complete" class="p-2 rounded bg-[#121620] border border-[#233527]">6. Completed</div>
           </div>
         </div>
       </section>
@@ -1372,7 +1384,7 @@
   <!-- ================= MODAL: PUBLISH TO SOCIALS ================= -->
   <div id="modalPublishSocial" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md hidden transition-opacity">
     <div class="w-full max-w-lg bg-[#0F131D]/95 border border-white/10 rounded-2xl shadow-2xl p-5 space-y-4 text-gray-200">
-      <div class="flex items-center justify-between border-b border-[#222938] pb-3">
+      <div class="flex items-center justify-between border-b border-[#233527] pb-3">
         <div class="flex items-center space-x-2">
           <span class="text-lg">🚀</span>
           <div>
@@ -1384,11 +1396,11 @@
       </div>
 
       <!-- Preview Clip Header -->
-      <div class="p-3 bg-[#0A0D14] rounded-xl border border-[#222938] flex space-x-3 items-center">
+      <div class="p-3 bg-[#0A0D14] rounded-xl border border-[#233527] flex space-x-3 items-center">
         <img id="socialModalThumb" src="" alt="Thumbnail" class="w-12 h-20 object-cover rounded-lg bg-black border border-white/5 shrink-0" />
         <div class="space-y-1 flex-1 min-w-0">
           <h4 id="socialModalTitle" class="text-xs font-bold text-white truncate">Judul Klip</h4>
-          <p id="socialModalHook" class="text-[10px] text-indigo-400 line-clamp-1">Hook</p>
+          <p id="socialModalHook" class="text-[10px] text-emerald-400 line-clamp-1">Hook</p>
         </div>
       </div>
 
@@ -1398,7 +1410,7 @@
           <label class="text-[11px] font-semibold text-gray-300">Caption & Tagar</label>
           <span class="text-[10px] text-gray-500 font-mono">Siap posting</span>
         </div>
-        <textarea id="socialModalCaption" rows="3" class="w-full p-2.5 text-xs bg-[#0B0E14] border border-[#222938] focus:border-indigo-500 rounded-xl focus:outline-none text-gray-200 resize-none font-sans" placeholder="Tulis caption & tagar..."></textarea>
+        <textarea id="socialModalCaption" rows="3" class="w-full p-2.5 text-xs bg-[#0C120E] border border-[#233527] focus:border-emerald-500 rounded-xl focus:outline-none text-gray-200 resize-none font-sans" placeholder="Tulis caption & tagar..."></textarea>
       </div>
 
       <!-- Platform Selection -->
@@ -1406,17 +1418,17 @@
         <label class="text-[11px] font-semibold text-gray-300 block">Pilih Platform Target</label>
         <div class="grid grid-cols-2 gap-2.5">
           <!-- YouTube Shorts -->
-          <div class="p-2.5 rounded-xl bg-[#0B0E14] border border-[#222938] space-y-2">
+          <div class="p-2.5 rounded-xl bg-[#0C120E] border border-[#233527] space-y-2">
             <div class="flex items-center justify-between">
               <label class="flex items-center space-x-2 cursor-pointer">
                 <input type="checkbox" id="modalChkYT" class="accent-red-500 rounded" checked>
                 <span class="text-xs font-bold text-gray-200">YouTube Shorts</span>
               </label>
-              <span id="badgeYTAuth" class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-indigo-950 border border-indigo-700/50 text-indigo-300 cursor-pointer">Cek Auth</span>
+              <span id="badgeYTAuth" class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950 border border-emerald-700/50 text-emerald-300 cursor-pointer">Cek Auth</span>
             </div>
             <div class="space-y-1 text-[10px]">
               <label class="text-gray-500">Status Privasi:</label>
-              <select id="modalSelectYTPrivacy" class="w-full px-2 py-1 text-[11px] bg-[#121620] border border-[#222938] rounded-lg text-gray-300 focus:outline-none">
+              <select id="modalSelectYTPrivacy" class="w-full px-2 py-1 text-[11px] bg-[#121620] border border-[#233527] rounded-lg text-gray-300 focus:outline-none">
                 <option value="private">Private</option>
                 <option value="unlisted">Unlisted</option>
                 <option value="public">Public</option>
@@ -1425,17 +1437,17 @@
           </div>
 
           <!-- TikTok -->
-          <div class="p-2.5 rounded-xl bg-[#0B0E14] border border-[#222938] space-y-2">
+          <div class="p-2.5 rounded-xl bg-[#0C120E] border border-[#233527] space-y-2">
             <div class="flex items-center justify-between">
               <label class="flex items-center space-x-2 cursor-pointer">
                 <input type="checkbox" id="modalChkTikTok" class="accent-cyan-500 rounded" checked>
                 <span class="text-xs font-bold text-gray-200">TikTok</span>
               </label>
-              <span id="badgeTikTokAuth" class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-indigo-950 border border-indigo-700/50 text-indigo-300">Cek Cookies</span>
+              <span id="badgeTikTokAuth" class="text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950 border border-emerald-700/50 text-emerald-300">Cek Cookies</span>
             </div>
             <div class="space-y-1 text-[10px]">
               <label class="text-gray-500">Visibilitas:</label>
-              <select id="modalSelectTikTokPrivacy" class="w-full px-2 py-1 text-[11px] bg-[#121620] border border-[#222938] rounded-lg text-gray-300 focus:outline-none">
+              <select id="modalSelectTikTokPrivacy" class="w-full px-2 py-1 text-[11px] bg-[#121620] border border-[#233527] rounded-lg text-gray-300 focus:outline-none">
                 <option value="everyone">Everyone</option>
                 <option value="friends">Friends</option>
                 <option value="only_you">Only You</option>
@@ -1446,16 +1458,16 @@
       </div>
 
       <!-- Upload Status & Feedback Box -->
-      <div id="socialUploadStatusBox" class="p-3 bg-[#0A0D14] rounded-xl border border-[#222938] text-[11px] space-y-1.5 hidden">
+      <div id="socialUploadStatusBox" class="p-3 bg-[#0A0D14] rounded-xl border border-[#233527] text-[11px] space-y-1.5 hidden">
         <div id="socialUploadStatusText" class="text-gray-300 flex items-center space-x-2">
           <span>Menyiapkan proses upload...</span>
         </div>
       </div>
 
       <!-- Action Footer -->
-      <div class="flex items-center justify-end space-x-2 pt-2 border-t border-[#222938]">
+      <div class="flex items-center justify-end space-x-2 pt-2 border-t border-[#233527]">
         <button id="btnCancelPublish" type="button" class="px-4 py-2 rounded-xl text-xs font-medium text-gray-400 hover:text-white bg-[#1A202C] hover:bg-[#252D3D] transition">Batal</button>
-        <button id="btnSubmitPublish" type="button" class="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-red-600 to-indigo-600 hover:from-red-500 hover:to-indigo-500 shadow-md shadow-indigo-600/30 flex items-center space-x-1.5 transition">
+        <button id="btnSubmitPublish" type="button" class="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-red-600 to-emerald-600 hover:from-red-500 hover:to-emerald-500 shadow-md shadow-emerald-900/30 flex items-center space-x-1.5 transition">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
           <span id="lblSubmitPublish">Mulai Upload</span>
         </button>

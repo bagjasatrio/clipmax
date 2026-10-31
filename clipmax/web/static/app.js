@@ -318,12 +318,31 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
+    const stepOrder = ["home", "media", "curation", "styling", "studio"];
+    const targetIdx = stepOrder.indexOf(targetPage);
+
     Object.keys(tabs).forEach(key => {
-      if (tabs[key]) {
-        if (key === targetPage) {
-          tabs[key].className = "flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-semibold transition text-white bg-[#1A281E] border border-emerald-500/40 shadow-sm";
-        } else {
-          tabs[key].className = "flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-medium transition text-gray-400 hover:text-gray-200";
+      const tab = tabs[key];
+      if (!tab) return;
+      const idx = stepOrder.indexOf(key);
+      const badge = tab.querySelector(".step-badge");
+
+      if (key === targetPage) {
+        tab.className = "group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition text-white bg-[#1A281E] border border-emerald-500/50 shadow-sm ring-1 ring-emerald-500/20";
+        if (badge) {
+          badge.className = "step-badge w-5 h-5 rounded-full bg-emerald-500 text-black text-[10px] flex items-center justify-center font-bold shadow-md shadow-emerald-500/30 border-0";
+          badge.textContent = idx.toString();
+        }
+      } else {
+        tab.className = "group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition text-gray-400 hover:text-gray-200 hover:bg-[#131E16]";
+        if (badge) {
+          if (idx < targetIdx && idx > 0) {
+            badge.className = "step-badge w-5 h-5 rounded-full bg-emerald-950 border border-emerald-600/50 text-emerald-300 text-[10px] flex items-center justify-center font-bold";
+            badge.textContent = "✓";
+          } else {
+            badge.className = "step-badge w-5 h-5 rounded-full bg-[#162319] border border-[#233528] text-gray-400 text-[10px] flex items-center justify-center font-bold";
+            badge.textContent = idx.toString();
+          }
         }
       }
     });
@@ -597,7 +616,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (boxAudioTracks) boxAudioTracks.classList.remove("hidden");
       if (lblAudioTrackCount) {
         lblAudioTrackCount.textContent = "Mengecek Trek Audio...";
-        lblAudioTrackCount.className = "text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-indigo-950/80 text-indigo-400 border border-indigo-500/30";
+        lblAudioTrackCount.className = "text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30";
       }
 
       const res = await fetch("/api/youtube/audio-tracks", {
@@ -793,9 +812,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const el = stepElements[key];
       if (!el) return;
       if (key === activeStepKey) {
-        el.className = "p-2 rounded bg-indigo-950/70 border border-indigo-500/60 text-center text-indigo-300 font-semibold shadow-sm";
+        el.className = "p-2 rounded bg-emerald-950/80 border border-emerald-500/80 text-center text-emerald-300 font-bold shadow-md shadow-emerald-500/20";
       } else {
-        el.className = "p-2 rounded bg-[#0E121A] border border-[#222938] text-center text-gray-500 font-normal";
+        el.className = "p-2 rounded bg-[#131E16] border border-[#233527] text-center text-gray-400 font-normal";
       }
     });
   }
@@ -1081,8 +1100,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       card.className = `p-2.5 rounded-lg border cursor-pointer transition-all flex space-x-3 items-center ${
         isSelected
-          ? "bg-[#1C2230] border-indigo-500 shadow-md shadow-indigo-500/20"
-          : "bg-[#151923] border-[#222938] hover:border-[#374151]"
+          ? "bg-[#18271C] border-emerald-500 shadow-md shadow-emerald-500/20"
+          : "bg-[#131E16] border-[#233527] hover:border-[#34D399]/40"
       }`;
 
       // Thumbnail url with dynamic fallback endpoint
@@ -1094,7 +1113,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (clip.hook_timestamp !== undefined && clip.hook_timestamp !== null) {
         const hm = Math.floor(clip.hook_timestamp / 60);
         const hs = Math.floor(clip.hook_timestamp % 60);
-        hookPill = `<span class="px-1.5 py-0.2 rounded bg-indigo-900/60 text-indigo-300 font-mono text-[9px]">⚡ ${String(hm).padStart(2, "0")}:${String(hs).padStart(2, "0")}</span>`;
+        hookPill = `<span class="px-1.5 py-0.2 rounded bg-emerald-950/70 text-emerald-300 border border-emerald-600/30 font-mono text-[9px]">⚡ ${String(hm).padStart(2, "0")}:${String(hs).padStart(2, "0")}</span>`;
       }
 
       card.innerHTML = `
@@ -1105,10 +1124,10 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="flex items-center justify-between">
             <span class="font-semibold text-xs text-gray-200 truncate">#${clip.clip_id} ${clip.title}</span>
             <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
-              isHigh ? "bg-amber-500/20 text-amber-300 border border-amber-500/40" : "bg-indigo-950 text-indigo-300"
+              isHigh ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/40" : "bg-emerald-950 text-emerald-300 border border-emerald-600/30"
             }">${score}</span>
           </div>
-          <p class="text-[11px] text-indigo-300 italic truncate">${clip.hook || ""}</p>
+          <p class="text-[11px] text-emerald-300/90 italic truncate">${clip.hook || ""}</p>
           <div class="flex items-center space-x-2 text-[10px] text-gray-400">
             <span>⏱ ${durSec}s</span>
             <span>•</span>
@@ -1720,11 +1739,11 @@ document.addEventListener("DOMContentLoaded", () => {
     btnToggleLoop.addEventListener("click", () => {
       mainVideo.loop = !mainVideo.loop;
       if (mainVideo.loop) {
-        btnToggleLoop.classList.add("bg-indigo-600", "text-white");
+        btnToggleLoop.classList.add("bg-emerald-600", "text-white");
         btnToggleLoop.classList.remove("bg-[#1A202C]", "text-gray-400");
         btnToggleLoop.title = "Putar Ulang Otomatis (Loop: ON)";
       } else {
-        btnToggleLoop.classList.remove("bg-indigo-600", "text-white");
+        btnToggleLoop.classList.remove("bg-emerald-600", "text-white");
         btnToggleLoop.classList.add("bg-[#1A202C]", "text-gray-400");
         btnToggleLoop.title = "Putar Ulang Otomatis (Loop: OFF)";
       }
@@ -2570,7 +2589,7 @@ document.addEventListener("DOMContentLoaded", () => {
           bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/80 border border-emerald-500/40 text-emerald-300";
         } else if (auth.youtube_secrets_present) {
           bYT.textContent = "Login Google";
-          bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-indigo-900/80 hover:bg-indigo-700 border border-indigo-400 text-indigo-200 cursor-pointer";
+          bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/80 hover:bg-emerald-800 border border-emerald-600/50 text-emerald-300 cursor-pointer";
         } else {
           bYT.textContent = "No Secrets";
           bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-rose-950/80 border border-rose-500/40 text-rose-300";
