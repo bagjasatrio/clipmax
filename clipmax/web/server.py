@@ -823,6 +823,30 @@ def run_youtube_auth():
     )
     return res
 
+@app.post("/api/social/youtube/disconnect")
+def disconnect_youtube():
+    yt_token = getattr(state.config, "youtube_token_file", "youtube_token.json")
+    token_p = Path(yt_token).resolve()
+    if token_p.exists():
+        try:
+            token_p.unlink(missing_ok=True)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    return {"success": True, "message": "Akun YouTube berhasil diputuskan dari penyimpanan lokal."}
+
+@app.post("/api/social/tiktok/disconnect")
+def disconnect_tiktok():
+    tt_cookie = getattr(state.config, "tiktok_cookie_file", None) or getattr(state.config, "cookie_file", "cookies.txt")
+    if tt_cookie:
+        cp = Path(tt_cookie).resolve()
+        if cp.exists():
+            try:
+                cp.unlink(missing_ok=True)
+            except Exception:
+                pass
+    state.config.tiktok_session_id = ""
+    return {"success": True, "message": "Kredensial TikTok berhasil dibersihkan dari penyimpanan lokal."}
+
 def rebuild_clip_overlays(clip_id: int) -> Path:
     clip = next((c for c in state.clips if c.clip_id == clip_id), None)
     if not clip or not os.path.exists(clip.staging_path):

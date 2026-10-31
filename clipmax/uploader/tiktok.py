@@ -46,6 +46,7 @@ def upload_tiktok_video(
 
     # Resolve cookies / sessionid
     resolved_cookies_file = None
+    sanitized_p = None
     if cookies_path:
         cp = Path(cookies_path).resolve()
         if cp.exists() and cp.is_file():
@@ -110,3 +111,10 @@ def upload_tiktok_video(
     except Exception as e:
         logger.error(f"Error saat mengunggah video ke TikTok: {e}")
         return {"success": False, "platform": "tiktok", "error": str(e)}
+    finally:
+        # Immediate cleanup of temporary sanitized cookie files to prevent local disk leak
+        if sanitized_p and sanitized_p.exists():
+            try:
+                sanitized_p.unlink(missing_ok=True)
+            except Exception:
+                pass

@@ -447,6 +447,21 @@ def test_api_social_publish(tmp_path):
     assert "changelog" in data_ver
     assert len(data_ver["changelog"]) > 0
 
+    # Test social auth status and disconnect endpoints
+    res_auth = client.get("/api/social/auth-status")
+    assert res_auth.status_code == 200
+    auth_data = res_auth.json()
+    assert "youtube_authenticated" in auth_data
+    assert "tiktok_authenticated" in auth_data
+
+    res_yt_disc = client.post("/api/social/youtube/disconnect")
+    assert res_yt_disc.status_code == 200
+    assert res_yt_disc.json()["success"] is True
+
+    res_tt_disc = client.post("/api/social/tiktok/disconnect")
+    assert res_tt_disc.status_code == 200
+    assert res_tt_disc.json()["success"] is True
+
 
 
 
