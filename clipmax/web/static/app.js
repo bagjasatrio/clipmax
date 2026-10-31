@@ -1301,6 +1301,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function selectClip(clip) {
     selectedClip = clip;
+    const mobToolbarGlobal = document.getElementById("mobToolbarGlobal");
+    const mobToolbarScene = document.getElementById("mobToolbarScene");
+    if (mobToolbarGlobal && mobToolbarScene) {
+      mobToolbarGlobal.classList.add("hidden");
+      mobToolbarScene.classList.remove("hidden");
+    }
     const streamUrl = `/api/clips/${clip.clip_id}/stream?t=${Date.now()}`;
     mainVideo.src = streamUrl;
     mainVideo.load();
@@ -1738,7 +1744,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (timelineRuler && timelineScrollContainer) {
     const handleRulerScrub = (e) => {
       const rect = timelineScrollContainer.getBoundingClientRect();
-      const clickX = e.clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
+      const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
+      const clickX = clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
       const clickedTime = Math.max(0, clickX / timelinePps);
 
       const clipsList = (currentClips && currentClips.length > 0) ? currentClips : (selectedClip ? [selectedClip] : []);
@@ -1782,12 +1789,13 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    window.addEventListener("mousemove", (e) => {
+    const handlePointerMove = (e) => {
+      const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
       if (isDraggingPlayhead) {
         handleRulerScrub(e);
       } else if (isTrimmingLeft && selectedClip) {
         const rect = timelineScrollContainer.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
+        const mouseX = clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
         const selOffset = getClipTimelineOffset(selectedClip);
         const relativeSec = Math.max(0, (mouseX / timelinePps) - selOffset);
         const trim = getClipTrim(selectedClip);
@@ -1795,20 +1803,38 @@ document.addEventListener("DOMContentLoaded", () => {
         updateTimelineBlocks();
       } else if (isTrimmingRight && selectedClip) {
         const rect = timelineScrollContainer.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
+        const mouseX = clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
         const selOffset = getClipTimelineOffset(selectedClip);
         const relativeSec = (mouseX / timelinePps) - selOffset;
         const trim = getClipTrim(selectedClip);
         trim.trim_end = Math.min(trim.max_dur, Math.max(relativeSec, trim.trim_start + 0.5));
         updateTimelineBlocks();
       }
-    });
+    };
 
-    window.addEventListener("mouseup", () => {
+    window.addEventListener("mousemove", handlePointerMove);
+    window.addEventListener("touchmove", handlePointerMove, { passive: true });
+
+    const handlePointerUp = () => {
       isDraggingPlayhead = false;
       isTrimmingLeft = false;
       isTrimmingRight = false;
-    });
+    };
+
+    window.addEventListener("mouseup", handlePointerUp);
+    window.addEventListener("touchend", handlePointerUp);
+
+    timelineRuler.addEventListener("touchstart", (e) => {
+      isDraggingPlayhead = true;
+      handleRulerScrub(e);
+    }, { passive: true });
+
+    if (timelinePlayheadHead) {
+      timelinePlayheadHead.addEventListener("touchstart", (e) => {
+        isDraggingPlayhead = true;
+        e.stopPropagation();
+      }, { passive: true });
+    }
   }
 
   // Step Frame Buttons
@@ -3271,6 +3297,158 @@ document.addEventListener("DOMContentLoaded", () => {
         btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
       }
     }, 2500);
+  }
+
+
+  // ================= MOBILE ACTION TOOLBAR LOGIC (CAPCUT MOBILE) =================
+  const mobToolbarGlobal = document.getElementById("mobToolbarGlobal");
+  const mobToolbarScene = document.getElementById("mobToolbarScene");
+  const mobBtnBackToGlobal = document.getElementById("mobBtnBackToGlobal");
+  const mobBtnClipsBin = document.getElementById("mobBtnClipsBin");
+  const mobBtnEditClip = document.getElementById("mobBtnEditClip");
+  const mobBtnText = document.getElementById("mobBtnText");
+  const mobBtnLogo = document.getElementById("mobBtnLogo");
+  const mobBtnSubtitles = document.getElementById("mobBtnSubtitles");
+  const mobBtnPublish = document.getElementById("mobBtnPublish");
+
+  const mobBtnSplit = document.getElementById("mobBtnSplit");
+  const mobBtnTrim = document.getElementById("mobBtnTrim");
+  const mobBtnSpeed = document.getElementById("mobBtnSpeed");
+  const mobBtnVolume = document.getElementById("mobBtnVolume");
+  const mobBtnReframe = document.getElementById("mobBtnReframe");
+  const mobBtnDelete = document.getElementById("mobBtnDelete");
+
+  if (mobBtnBackToGlobal) {
+    mobBtnBackToGlobal.addEventListener("click", () => {
+      if (mobToolbarGlobal && mobToolbarScene) {
+        mobToolbarScene.classList.add("hidden");
+        mobToolbarGlobal.classList.remove("hidden");
+      }
+    });
+  }
+
+  if (mobBtnClipsBin) {
+    mobBtnClipsBin.addEventListener("click", () => {
+      const b = document.getElementById("tabBtnMediaClips");
+      if (b) b.click();
+      const el = document.getElementById("panelMediaClips");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
+  if (mobBtnEditClip) {
+    mobBtnEditClip.addEventListener("click", () => {
+      if (currentClips && currentClips.length > 0) {
+        if (!selectedClip) selectClip(currentClips[0]);
+        if (mobToolbarGlobal && mobToolbarScene) {
+          mobToolbarGlobal.classList.add("hidden");
+          mobToolbarScene.classList.remove("hidden");
+        }
+      } else {
+        alert("Belum ada klip yang tersedia.");
+      }
+    });
+  }
+
+  if (mobBtnText) {
+    mobBtnText.addEventListener("click", () => {
+      const b = document.getElementById("tabBtnTextOverlay");
+      if (b) b.click();
+      const el = document.getElementById("panelTextOverlay");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
+  if (mobBtnLogo) {
+    mobBtnLogo.addEventListener("click", () => {
+      const b = document.getElementById("tabBtnLogoOverlay");
+      if (b) b.click();
+      const el = document.getElementById("panelLogoOverlay");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
+  if (mobBtnSubtitles) {
+    mobBtnSubtitles.addEventListener("click", () => {
+      const b = document.getElementById("tabBtnSubtitles");
+      if (b) b.click();
+      const el = document.getElementById("panelSubtitles");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
+  if (mobBtnPublish) {
+    mobBtnPublish.addEventListener("click", () => {
+      openPublishModal("single");
+    });
+  }
+
+  if (mobBtnSplit) {
+    mobBtnSplit.addEventListener("click", () => {
+      if (btnTimelineSplit) btnTimelineSplit.click();
+    });
+  }
+
+  if (mobBtnTrim) {
+    mobBtnTrim.addEventListener("click", () => {
+      if (inputTrimStart) {
+        inputTrimStart.focus();
+        inputTrimStart.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  }
+
+  let currentSpeedIdx = 1;
+  const speedOptions = [0.5, 1.0, 1.25, 1.5, 2.0];
+  if (mobBtnSpeed) {
+    mobBtnSpeed.addEventListener("click", () => {
+      if (!mainVideo) return;
+      currentSpeedIdx = (currentSpeedIdx + 1) % speedOptions.length;
+      const spd = speedOptions[currentSpeedIdx];
+      mainVideo.playbackRate = spd;
+      const lbl = mobBtnSpeed.querySelector("span:last-child");
+      if (lbl) lbl.textContent = `${spd}x`;
+    });
+  }
+
+  if (mobBtnVolume) {
+    mobBtnVolume.addEventListener("click", () => {
+      if (!mainVideo) return;
+      mainVideo.muted = !mainVideo.muted;
+      const lbl = mobBtnVolume.querySelector("span:last-child");
+      if (lbl) lbl.textContent = mainVideo.muted ? "Bisu" : "Volume";
+    });
+  }
+
+  if (mobBtnReframe) {
+    mobBtnReframe.addEventListener("click", () => {
+      const selBackdrop = document.getElementById("selectMarginBackdrop");
+      if (selBackdrop) {
+        selBackdrop.value = (selBackdrop.value === "BLURRED_BG") ? "BLACK_BARS" : "BLURRED_BG";
+        selBackdrop.dispatchEvent(new Event("change"));
+        alert(`Backdrop dialihkan ke: ${selBackdrop.value === "BLURRED_BG" ? "Blurred Ambient" : "Black Bars"}`);
+      }
+    });
+  }
+
+  if (mobBtnDelete) {
+    mobBtnDelete.addEventListener("click", () => {
+      if (!selectedClip) return;
+      if (confirm(`Hapus klip #${selectedClip.clip_id} '${selectedClip.title}' dari proyek?`)) {
+        currentClips = currentClips.filter(c => c.clip_id !== selectedClip.clip_id);
+        if (currentClips.length > 0) {
+          selectClip(currentClips[0]);
+        } else {
+          selectedClip = null;
+          if (mobToolbarGlobal && mobToolbarScene) {
+            mobToolbarScene.classList.add("hidden");
+            mobToolbarGlobal.classList.remove("hidden");
+          }
+        }
+        renderClipsGallery(currentClips);
+        updateTimelineBlocks();
+      }
+    });
   }
 
   // --- Changelog & Version Dialog ---

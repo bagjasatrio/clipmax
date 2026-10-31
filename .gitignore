@@ -16,3 +16,5 @@ cookies.txt
 client_secrets*.json
 youtube_token*.json
 projects/
+dist/
+*.manifest

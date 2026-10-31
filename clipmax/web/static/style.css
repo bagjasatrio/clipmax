@@ -373,3 +373,82 @@ input[type=range]::-webkit-slider-thumb:hover {
   opacity: 1;
   box-shadow: 0 0 8px rgba(52, 211, 153, 0.3);
 }
+
+/* ================= RESPONSIVE MOBILE & TABLET LAYOUT (CAPCUT MOBILE) ================= */
+@media (max-width: 1024px) {
+  #stageReview > .flex-1.flex.overflow-hidden {
+    flex-direction: column !important;
+    overflow-y: auto !important;
+  }
+
+  /* Left Bin Drawer in Tablet / Mobile */
+  #stageReview .w-\[320px\] {
+    width: 100% !important;
+    max-height: 200px !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Right Inspector in Tablet / Mobile */
+  #stageReview .w-\[330px\] {
+    width: 100% !important;
+    max-height: 240px !important;
+    border-left: none !important;
+    border-top: 1px solid var(--border-subtle) !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Player canvas */
+  #videoCanvasBox {
+    height: 320px !important;
+    max-height: 45vh !important;
+  }
+
+  /* Timeline container height */
+  #stageReview .h-\[180px\] {
+    height: 140px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Stepper Navigation: Icon & Badges only */
+  nav#stepperNav {
+    padding: 0.25rem 0.5rem !important;
+    gap: 0.25rem !important;
+  }
+  nav#stepperNav button span:not(.step-badge) {
+    display: none !important;
+  }
+  #hwPillText {
+    max-width: 100px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  /* Studio Top Header compact */
+  #stageReview .h-\[42px\] {
+    padding: 0.25rem 0.5rem !important;
+  }
+  #inputProjectTitle {
+    width: 75px !important;
+  }
+
+  /* Player Stage on Small Mobile */
+  #videoCanvasBox {
+    height: 270px !important;
+    max-height: 40vh !important;
+  }
+
+  /* Mobile Touch-Friendly Trim Handles */
+  .timeline-clip-block .trim-handle {
+    width: 16px !important;
+    font-size: 12px !important;
+  }
+
+  /* Smooth touch scrolling */
+  #timelineScrollContainer, #clipsGallery, #mobileActionToolbar {
+    -webkit-overflow-scrolling: touch;
+  }
+}

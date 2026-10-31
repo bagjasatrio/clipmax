@@ -1381,6 +1381,71 @@
 
         </div>
 
+        <!-- ================= MOBILE CAPCUT ACTION TOOLBAR ================= -->
+        <div id="mobileActionToolbar" class="md:hidden flex items-center justify-between px-2 py-1.5 bg-[#0A0F0C] border-t border-[#233527] z-30 shrink-0 select-none overflow-x-auto text-gray-300">
+          
+          <!-- Mode A: Global Project Tools (No Clip Selected) -->
+          <div id="mobToolbarGlobal" class="flex items-center space-x-1 w-full justify-around min-w-[340px]">
+            <button type="button" id="mobBtnClipsBin" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-[#162319] text-[10px] space-y-1 transition text-emerald-400">
+              <span class="text-base">🎬</span>
+              <span>Klip AI</span>
+            </button>
+            <button type="button" id="mobBtnEditClip" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-[#162319] text-[10px] space-y-1 transition">
+              <span class="text-base">✂️</span>
+              <span>Edit</span>
+            </button>
+            <button type="button" id="mobBtnText" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-[#162319] text-[10px] space-y-1 transition">
+              <span class="text-base">💬</span>
+              <span>Teks</span>
+            </button>
+            <button type="button" id="mobBtnLogo" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-[#162319] text-[10px] space-y-1 transition">
+              <span class="text-base">🖼️</span>
+              <span>Logo</span>
+            </button>
+            <button type="button" id="mobBtnSubtitles" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-[#162319] text-[10px] space-y-1 transition">
+              <span class="text-base">🎨</span>
+              <span>Gaya ASS</span>
+            </button>
+            <button type="button" id="mobBtnPublish" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-[#162319] text-[10px] space-y-1 transition text-yellow-300">
+              <span class="text-base">🚀</span>
+              <span>Publish</span>
+            </button>
+          </div>
+
+          <!-- Mode B: Scene Action Tools (When a Clip is Selected) -->
+          <div id="mobToolbarScene" class="hidden flex items-center space-x-1.5 w-full justify-around min-w-[380px] overflow-x-auto py-0.5">
+            <button type="button" id="mobBtnBackToGlobal" class="flex flex-col items-center justify-center p-1.5 rounded-lg bg-[#142018] hover:bg-[#1A2C20] border border-[#233527] text-[10px] space-y-1 transition text-gray-300 shrink-0" title="Keluar dari mode edit klip">
+              <span class="text-base font-bold">‹</span>
+              <span>Tutup</span>
+            </button>
+            <button type="button" id="mobBtnSplit" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-[#162319] text-[10px] space-y-1 transition text-yellow-300 shrink-0">
+              <span class="text-base">✂️</span>
+              <span>Bagi</span>
+            </button>
+            <button type="button" id="mobBtnTrim" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-[#162319] text-[10px] space-y-1 transition shrink-0">
+              <span class="text-base">⏱️</span>
+              <span>Pangkas</span>
+            </button>
+            <button type="button" id="mobBtnSpeed" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-[#162319] text-[10px] space-y-1 transition shrink-0">
+              <span class="text-base">⚡</span>
+              <span>Kecepatan</span>
+            </button>
+            <button type="button" id="mobBtnVolume" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-[#162319] text-[10px] space-y-1 transition shrink-0">
+              <span class="text-base">🔊</span>
+              <span>Volume</span>
+            </button>
+            <button type="button" id="mobBtnReframe" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-[#162319] text-[10px] space-y-1 transition shrink-0">
+              <span class="text-base">🎯</span>
+              <span>Reframe</span>
+            </button>
+            <button type="button" id="mobBtnDelete" class="flex flex-col items-center justify-center p-1.5 rounded-lg hover:bg-rose-950/40 text-[10px] space-y-1 transition text-rose-400 shrink-0">
+              <span class="text-base">🗑️</span>
+              <span>Hapus</span>
+            </button>
+          </div>
+
+        </div>
+
       </section>
     </div>
 
