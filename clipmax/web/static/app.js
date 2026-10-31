@@ -96,6 +96,31 @@ document.addEventListener("DOMContentLoaded", () => {
   const clipsGallery = document.getElementById("clipsGallery");
   const btnExportSingle = document.getElementById("btnExportSingle");
   const btnExportAll = document.getElementById("btnExportAll");
+  const btnPublishSocial = document.getElementById("btnPublishSocial");
+  const modalPublishSocial = document.getElementById("modalPublishSocial");
+  const btnClosePublishModal = document.getElementById("btnClosePublishModal");
+  const btnCancelPublish = document.getElementById("btnCancelPublish");
+  const btnSubmitPublish = document.getElementById("btnSubmitPublish");
+  const lblSubmitPublish = document.getElementById("lblSubmitPublish");
+  const socialModalThumb = document.getElementById("socialModalThumb");
+  const socialModalTitle = document.getElementById("socialModalTitle");
+  const socialModalHook = document.getElementById("socialModalHook");
+  const socialModalCaption = document.getElementById("socialModalCaption");
+  const modalChkYT = document.getElementById("modalChkYT");
+  const modalChkTikTok = document.getElementById("modalChkTikTok");
+  const modalSelectYTPrivacy = document.getElementById("modalSelectYTPrivacy");
+  const modalSelectTikTokPrivacy = document.getElementById("modalSelectTikTokPrivacy");
+  const socialUploadStatusBox = document.getElementById("socialUploadStatusBox");
+  const socialUploadStatusText = document.getElementById("socialUploadStatusText");
+
+  // Auto-Post on Render Settings in pageStyling
+  const chkAutoPost = document.getElementById("chkAutoPost");
+  const autoPostConfigSection = document.getElementById("autoPostConfigSection");
+  const chkPlatformYT = document.getElementById("chkPlatformYT");
+  const chkPlatformTikTok = document.getElementById("chkPlatformTikTok");
+  const selectYTPrivacy = document.getElementById("selectYTPrivacy");
+  const selectTikTokPrivacy = document.getElementById("selectTikTokPrivacy");
+
   const btnNewTask = document.getElementById("btnNewTask");
 
   const hwPill = document.getElementById("hwPill");
@@ -111,13 +136,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const liveTextOverlay = document.getElementById("liveTextOverlay");
   const liveTextContent = document.getElementById("liveTextContent");
   const textResizeHandle = document.getElementById("textResizeHandle");
-  const inputOverlayText = document.getElementById("inputOverlayText");
-  const selectOverlayFont = document.getElementById("selectOverlayFont");
-  const pickerOverlayTextColor = document.getElementById("pickerOverlayTextColor");
-  const lblOverlayTextColor = document.getElementById("lblOverlayTextColor");
-  const inputRangeTextSize = document.getElementById("inputRangeTextSize");
+  const inputOverlayText = document.getElementById("inputTextOverlay") || document.getElementById("inputOverlayText");
+  const selectOverlayFont = document.getElementById("selectFontName") || document.getElementById("selectOverlayFont");
+  const pickerOverlayTextColor = document.getElementById("inputTextColor") || document.getElementById("pickerOverlayTextColor");
+  const lblOverlayTextColor = document.getElementById("lblTextColor") || document.getElementById("lblOverlayTextColor");
+  const pickerOverlayBgColor = document.getElementById("inputBgColor");
+  const lblBgColor = document.getElementById("lblBgColor");
+  const inputRangeTextSize = document.getElementById("inputFontSize") || document.getElementById("inputRangeTextSize");
   const lblOverlayFontSize = document.getElementById("lblOverlayFontSize");
-  const selectOverlayBgStyle = document.getElementById("selectOverlayBgStyle");
+  const selectOverlayBgStyle = document.getElementById("selectBoxStyle") || document.getElementById("selectOverlayBgStyle");
+  const inputRangeBgAlpha = document.getElementById("inputRangeBgAlpha");
+  const lblBgAlpha = document.getElementById("lblBgAlpha");
   const btnApplyOverlay = document.getElementById("btnApplyOverlay");
   const lblApplyOverlay = document.getElementById("lblApplyOverlay");
   const btnRemoveOverlay = document.getElementById("btnRemoveOverlay");
@@ -159,6 +188,64 @@ document.addEventListener("DOMContentLoaded", () => {
   const badgeImageOverlayStatus = document.getElementById("badgeImageOverlayStatus");
 
   let currentImageOverlayServerPath = "";
+
+  // CapCut Workspace Elements (Gambar 2)
+  const btnStudioBackHome = document.getElementById("btnStudioBackHome");
+  const inputProjectTitle = document.getElementById("inputProjectTitle");
+
+  // Left Asset Bin Tabs
+  const tabBtnMediaClips = document.getElementById("tabBtnMediaClips");
+  const tabBtnTextOverlay = document.getElementById("tabBtnTextOverlay");
+  const tabBtnLogoOverlay = document.getElementById("tabBtnLogoOverlay");
+  const tabBtnSubtitles = document.getElementById("tabBtnSubtitles");
+  const panelMediaClips = document.getElementById("panelMediaClips");
+  const panelTextOverlay = document.getElementById("panelTextOverlay");
+  const panelLogoOverlay = document.getElementById("panelLogoOverlay");
+  const panelSubtitleSettings = document.getElementById("panelSubtitleSettings");
+
+  // Transport Extra Controls
+  const btnStepBack = document.getElementById("btnStepBack");
+  const btnStepForward = document.getElementById("btnStepForward");
+
+  // Inspector Trim Settings
+  const inputTrimStart = document.getElementById("inputTrimStart");
+  const inputTrimEnd = document.getElementById("inputTrimEnd");
+  const lblActiveClipDuration = document.getElementById("lblActiveClipDuration");
+
+  // Multitrack Timeline Elements
+  const btnTimelineSelect = document.getElementById("btnTimelineSelect");
+  const btnTimelineSplit = document.getElementById("btnTimelineSplit");
+  const btnTimelineDelete = document.getElementById("btnTimelineDelete");
+  const btnTimelineAddClip = document.getElementById("btnTimelineAddClip");
+  const btnTimelineReset = document.getElementById("btnTimelineReset");
+  const lblTimelineTimecode = document.getElementById("lblTimelineTimecode");
+  const rangeTimelineZoom = document.getElementById("rangeTimelineZoom");
+
+  const timelineScrollContainer = document.getElementById("timelineScrollContainer");
+  const timelineRuler = document.getElementById("timelineRuler");
+  const timelinePlayhead = document.getElementById("timelinePlayhead");
+  const timelinePlayheadHead = document.getElementById("timelinePlayheadHead");
+
+  const timelineVideoBlock = document.getElementById("timelineVideoBlock");
+  const trimHandleLeft = document.getElementById("trimHandleLeft");
+  const trimHandleRight = document.getElementById("trimHandleRight");
+  const lblTimelineBlockTitle = document.getElementById("lblTimelineBlockTitle");
+  const lblTimelineBlockDur = document.getElementById("lblTimelineBlockDur");
+
+  const timelineSubtitleBlock = document.getElementById("timelineSubtitleBlock");
+  const lblTimelineSubPreview = document.getElementById("lblTimelineSubPreview");
+  const timelineOverlayBlock = document.getElementById("timelineOverlayBlock");
+  const lblTimelineOverlayPreview = document.getElementById("lblTimelineOverlayPreview");
+
+  // CapCut Home Elements (Gambar 1)
+  const btnSideGoToMedia = document.getElementById("btnSideGoToMedia");
+  const btnSideGoToStyling = document.getElementById("btnSideGoToStyling");
+  const btnSideGoToStudio = document.getElementById("btnSideGoToStudio");
+  const cardQuickClipper = document.getElementById("cardQuickClipper");
+  const cardQuickMontage = document.getElementById("cardQuickMontage");
+  const cardQuickSubtitles = document.getElementById("cardQuickSubtitles");
+  const cardQuickAudio = document.getElementById("cardQuickAudio");
+  const inputSearchProjects = document.getElementById("inputSearchProjects");
 
   // Multi-Page Containers
   const pageHome = document.getElementById("pageHome");
@@ -234,7 +321,7 @@ document.addEventListener("DOMContentLoaded", () => {
     Object.keys(tabs).forEach(key => {
       if (tabs[key]) {
         if (key === targetPage) {
-          tabs[key].className = "flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-semibold transition text-white bg-[#1E2538] shadow-sm";
+          tabs[key].className = "flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-semibold transition text-white bg-[#1A281E] border border-emerald-500/40 shadow-sm";
         } else {
           tabs[key].className = "flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-medium transition text-gray-400 hover:text-gray-200";
         }
@@ -258,6 +345,34 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnEmptyStartProject) btnEmptyStartProject.addEventListener("click", () => showPage("media"));
   if (btnStandbyGoToMedia) btnStandbyGoToMedia.addEventListener("click", () => showPage("media"));
   if (btnCancelFromMedia) btnCancelFromMedia.addEventListener("click", () => showPage("home"));
+  if (btnStudioBackHome) btnStudioBackHome.addEventListener("click", () => showPage("home"));
+
+  // CapCut Home Sidebar & Quick Actions
+  if (btnSideGoToMedia) btnSideGoToMedia.addEventListener("click", () => showPage("media"));
+  if (btnSideGoToStyling) btnSideGoToStyling.addEventListener("click", () => showPage("styling"));
+  if (btnSideGoToStudio) btnSideGoToStudio.addEventListener("click", () => showPage("studio"));
+
+  if (cardQuickClipper) {
+    cardQuickClipper.addEventListener("click", () => {
+      if (selectClipMode) selectClipMode.value = "single";
+      showPage("media");
+    });
+  }
+  if (cardQuickMontage) {
+    cardQuickMontage.addEventListener("click", () => {
+      if (selectClipMode) selectClipMode.value = "montage";
+      showPage("media");
+    });
+  }
+  if (cardQuickSubtitles) {
+    cardQuickSubtitles.addEventListener("click", () => showPage("styling"));
+  }
+  if (cardQuickAudio) {
+    cardQuickAudio.addEventListener("click", () => {
+      showPage("media");
+      if (boxAudioTracks) boxAudioTracks.scrollIntoView({ behavior: "smooth" });
+    });
+  }
 
   if (btnNextToCuration) {
     btnNextToCuration.addEventListener("click", () => {
@@ -274,17 +389,19 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnNextToStyling) btnNextToStyling.addEventListener("click", () => showPage("styling"));
   if (btnBackToCuration) btnBackToCuration.addEventListener("click", () => showPage("curation"));
 
-  // --- Project History Logic ---
+  // --- Project History Logic (CapCut Grid Style) ---
+  let allLoadedProjects = [];
+
   async function loadProjectHistory() {
     try {
       const res = await fetch("/api/projects");
       if (!res.ok) return;
       const data = await res.json();
-      const projects = data.projects || [];
+      allLoadedProjects = data.projects || [];
 
-      if (totalProjectsCount) totalProjectsCount.textContent = projects.length;
+      if (totalProjectsCount) totalProjectsCount.textContent = allLoadedProjects.length;
 
-      if (projects.length === 0) {
+      if (allLoadedProjects.length === 0) {
         if (projectHistoryEmpty) projectHistoryEmpty.classList.remove("hidden");
         if (lastProjectSection) lastProjectSection.classList.add("hidden");
         if (projectHistoryList) projectHistoryList.innerHTML = "";
@@ -295,7 +412,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (lastProjectSection) lastProjectSection.classList.remove("hidden");
 
       // Last Project (First in list)
-      const last = projects[0];
+      const last = allLoadedProjects[0];
       if (lastProjectTitle) lastProjectTitle.textContent = last.title;
       if (lastProjectDate) lastProjectDate.textContent = last.created_at;
       if (lastProjectClipsCount) lastProjectClipsCount.textContent = `${last.clip_count} Klip Siap Di-review`;
@@ -317,55 +434,71 @@ document.addEventListener("DOMContentLoaded", () => {
         btnOpenLastProject.onclick = () => loadProject(last.project_id);
       }
 
-      // Render full list
-      if (projectHistoryList) {
-        projectHistoryList.innerHTML = "";
-        projects.forEach(p => {
-          const item = document.createElement("div");
-          item.className = "p-3.5 rounded-xl bg-[#131722] border border-[#222938] hover:border-[#374151] transition flex items-center space-x-3.5 shadow";
-          
-          const thumbUrl = p.cover_thumbnail ? `${p.cover_thumbnail}?t=${Date.now()}` : "";
-          const isMontage = p.clip_mode === "montage";
-
-          item.innerHTML = `
-            <div class="w-14 h-20 bg-black rounded-lg overflow-hidden shrink-0 border border-[#252E42] flex items-center justify-center">
-              ${thumbUrl ? `<img src="${thumbUrl}" class="w-full h-full object-cover">` : '<span class="text-[10px] text-gray-500 font-mono">9:16</span>'}
-            </div>
-            <div class="flex-1 min-w-0 space-y-1">
-              <div class="flex items-center space-x-2">
-                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold ${isMontage ? 'bg-purple-900/60 text-purple-300' : 'bg-indigo-950 text-indigo-300'}">
-                  ${isMontage ? 'Montage' : 'Single'}
-                </span>
-                <span class="text-[11px] text-gray-400 font-mono">${p.created_at}</span>
-              </div>
-              <h4 class="text-xs font-bold text-gray-200 truncate">${p.title}</h4>
-              <p class="text-[11px] text-gray-500 truncate">${p.input_source}</p>
-              <div class="text-[10px] text-emerald-400 font-medium">🎬 ${p.clip_count} Klip</div>
-            </div>
-            <div class="flex items-center space-x-2 shrink-0">
-              <button class="btn-load-proj px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition shadow">
-                Buka Proyek
-              </button>
-              <button class="btn-del-proj p-1.5 text-gray-500 hover:text-red-400 rounded-lg hover:bg-red-950/30 transition" title="Hapus Proyek">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              </button>
-            </div>
-          `;
-
-          item.querySelector(".btn-load-proj").addEventListener("click", () => loadProject(p.project_id));
-          item.querySelector(".btn-del-proj").addEventListener("click", async () => {
-            if (confirm(`Yakin ingin menghapus proyek "${p.title}"?`)) {
-              await fetch(`/api/projects/${p.project_id}`, { method: "DELETE" });
-              loadProjectHistory();
-            }
-          });
-
-          projectHistoryList.appendChild(item);
-        });
-      }
+      renderProjectsGrid(allLoadedProjects);
     } catch (e) {
       console.warn("Failed to load project history:", e);
     }
+  }
+
+  function renderProjectsGrid(projectsToRender) {
+    if (!projectHistoryList) return;
+    projectHistoryList.innerHTML = "";
+
+    const query = inputSearchProjects ? inputSearchProjects.value.trim().toLowerCase() : "";
+    const list = query 
+      ? projectsToRender.filter(p => (p.title && p.title.toLowerCase().includes(query)) || (p.created_at && p.created_at.toLowerCase().includes(query)))
+      : projectsToRender;
+
+    if (list.length === 0 && query) {
+      projectHistoryList.innerHTML = `<div class="col-span-full py-8 text-center text-xs text-gray-500 italic">Tidak ada proyek yang sesuai dengan pencarian "${query}".</div>`;
+      return;
+    }
+
+    list.forEach(p => {
+      const item = document.createElement("div");
+      item.className = "p-3 rounded-xl bg-[#131E16] border border-[#233527] hover:border-emerald-500/40 hover:bg-[#18271C] transition flex flex-col justify-between shadow space-y-2.5 group";
+      
+      const thumbUrl = p.cover_thumbnail ? `${p.cover_thumbnail}?t=${Date.now()}` : "";
+      const isMontage = p.clip_mode === "montage";
+
+      item.innerHTML = `
+        <div class="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-[#233527] flex items-center justify-center">
+          ${thumbUrl ? `<img src="${thumbUrl}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">` : '<span class="text-xs text-emerald-400 font-mono">9:16</span>'}
+          <div class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono text-yellow-300 font-bold">${p.clip_count} Klip</div>
+        </div>
+        <div class="space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[9px] px-1.5 py-0.2 rounded font-bold ${isMontage ? 'bg-yellow-950 text-yellow-300 border border-yellow-600/30' : 'bg-emerald-950 text-emerald-300 border border-emerald-600/30'}">
+              ${isMontage ? 'Montage' : 'Single Clip'}
+            </span>
+            <span class="text-[10px] text-gray-500 font-mono">${p.created_at || ''}</span>
+          </div>
+          <h4 class="text-xs font-bold text-gray-100 truncate" title="${p.title}">${p.title}</h4>
+        </div>
+        <div class="flex items-center space-x-1.5 pt-1 border-t border-[#1C2C20]">
+          <button class="btn-load-proj flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition flex items-center justify-center space-x-1">
+            <span>Buka di Editor</span>
+          </button>
+          <button class="btn-del-proj p-1.5 text-gray-400 hover:text-red-400 rounded hover:bg-red-950/30 transition" title="Hapus Proyek">
+            🗑️
+          </button>
+        </div>
+      `;
+
+      item.querySelector(".btn-load-proj").addEventListener("click", () => loadProject(p.project_id));
+      item.querySelector(".btn-del-proj").addEventListener("click", async () => {
+        if (confirm(`Yakin ingin menghapus proyek "${p.title}"?`)) {
+          await fetch(`/api/projects/${p.project_id}`, { method: "DELETE" });
+          loadProjectHistory();
+        }
+      });
+
+      projectHistoryList.appendChild(item);
+    });
+  }
+
+  if (inputSearchProjects) {
+    inputSearchProjects.addEventListener("input", () => renderProjectsGrid(allLoadedProjects));
   }
 
   async function loadProject(projectId) {
@@ -572,6 +705,22 @@ document.addEventListener("DOMContentLoaded", () => {
       if (inputFilenamePrefix && cfg.filename_prefix) inputFilenamePrefix.value = cfg.filename_prefix;
       if (inputFilenameSuffix && cfg.filename_suffix) inputFilenameSuffix.value = cfg.filename_suffix;
       updateFilenameSample();
+
+      if (chkAutoPost) {
+        chkAutoPost.checked = !!cfg.auto_post_enabled;
+        if (autoPostConfigSection) {
+          if (chkAutoPost.checked) {
+            autoPostConfigSection.classList.remove("hidden");
+          } else {
+            autoPostConfigSection.classList.add("hidden");
+          }
+        }
+      }
+      const plats = Array.isArray(cfg.auto_post_platforms) ? cfg.auto_post_platforms : [];
+      if (chkPlatformYT) chkPlatformYT.checked = plats.length === 0 || plats.includes("youtube");
+      if (chkPlatformTikTok) chkPlatformTikTok.checked = plats.length === 0 || plats.includes("tiktok");
+      if (selectYTPrivacy && cfg.youtube_privacy) selectYTPrivacy.value = cfg.youtube_privacy;
+      if (selectTikTokPrivacy && cfg.tiktok_privacy) selectTikTokPrivacy.value = cfg.tiktok_privacy;
 
       await refreshModels(cfg.selected_model);
     } catch (e) {
@@ -783,7 +932,14 @@ document.addEventListener("DOMContentLoaded", () => {
         subtitle_bottom_offset: rangeSubtitleOffset ? parseInt(rangeSubtitleOffset.value, 10) : 20,
         margin_backdrop: selectMarginBackdrop ? selectMarginBackdrop.value : "BLURRED_BG",
         filename_prefix: inputFilenamePrefix ? inputFilenamePrefix.value.trim() : "",
-        filename_suffix: inputFilenameSuffix ? inputFilenameSuffix.value.trim() : ""
+        filename_suffix: inputFilenameSuffix ? inputFilenameSuffix.value.trim() : "",
+        auto_post_enabled: chkAutoPost ? chkAutoPost.checked : false,
+        auto_post_platforms: [
+          ...(chkPlatformYT && chkPlatformYT.checked ? ["youtube"] : []),
+          ...(chkPlatformTikTok && chkPlatformTikTok.checked ? ["tiktok"] : [])
+        ],
+        youtube_privacy: selectYTPrivacy ? selectYTPrivacy.value : "private",
+        tiktok_privacy: selectTikTokPrivacy ? selectTikTokPrivacy.value : "everyone"
       })
     });
 
@@ -1070,7 +1226,286 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    if (inputProjectTitle) {
+      inputProjectTitle.value = clip.title || `Proyek_${clip.clip_id}`;
+    }
+    const trim = getClipTrim(clip);
+    renderTimelineRuler(trim.max_dur);
+    updateTimelineBlocks();
+    updatePlayhead(trim.trim_start);
+
     renderClipsGallery(getFilteredAndSortedClips());
+  }
+
+  // --- Left Asset Bin Tabs Switching ---
+  const binTabs = [
+    { btn: tabBtnMediaClips, panel: panelMediaClips },
+    { btn: tabBtnTextOverlay, panel: panelTextOverlay },
+    { btn: tabBtnLogoOverlay, panel: panelLogoOverlay },
+    { btn: tabBtnSubtitles, panel: panelSubtitleSettings }
+  ];
+
+  function switchBinTab(activeBtn) {
+    binTabs.forEach(t => {
+      if (t.btn && t.panel) {
+        if (t.btn === activeBtn) {
+          t.btn.className = "px-3 py-2 text-xs font-bold border-b-2 border-emerald-400 text-emerald-300 transition";
+          t.panel.classList.remove("hidden");
+        } else {
+          t.btn.className = "px-3 py-2 text-xs font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 transition";
+          t.panel.classList.add("hidden");
+        }
+      }
+    });
+  }
+
+  if (tabBtnMediaClips) tabBtnMediaClips.addEventListener("click", () => switchBinTab(tabBtnMediaClips));
+  if (tabBtnTextOverlay) tabBtnTextOverlay.addEventListener("click", () => switchBinTab(tabBtnTextOverlay));
+  if (tabBtnLogoOverlay) tabBtnLogoOverlay.addEventListener("click", () => switchBinTab(tabBtnLogoOverlay));
+  if (tabBtnSubtitles) tabBtnSubtitles.addEventListener("click", () => switchBinTab(tabBtnSubtitles));
+
+  // --- CapCut Multitrack Interactive Timeline & In/Out Trim System ---
+  const clipTrims = {}; // clip_id -> { trim_start: 0, trim_end: dur, max_dur: dur }
+  let timelineZoomLevel = 2;
+  let timelinePps = 15; // 15 px per second
+  let isDraggingPlayhead = false;
+  let isTrimmingLeft = false;
+  let isTrimmingRight = false;
+
+  function getClipTrim(clip) {
+    if (!clip) return { trim_start: 0.0, trim_end: 30.0, max_dur: 30.0 };
+    if (!clipTrims[clip.clip_id]) {
+      const d = Math.max(1.0, Math.round((clip.end_time || 30.0) - (clip.start_time || 0.0)));
+      clipTrims[clip.clip_id] = {
+        trim_start: 0.0,
+        trim_end: d,
+        max_dur: d
+      };
+    }
+    return clipTrims[clip.clip_id];
+  }
+
+  function formatTimecode(seconds) {
+    const s = Math.max(0, seconds || 0);
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    const ms = Math.floor((s % 1) * 100);
+    return `00:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}.${String(ms).padStart(2, "0")}`;
+  }
+
+  function renderTimelineRuler(totalSeconds) {
+    if (!timelineRuler) return;
+    timelineRuler.innerHTML = "";
+    const maxSec = Math.max(60, Math.ceil((totalSeconds || 30) + 20));
+    const totalWidth = maxSec * timelinePps + 120;
+    timelineRuler.style.width = `${totalWidth}px`;
+    if (timelineTracksContainer) timelineTracksContainer.style.width = `${totalWidth}px`;
+
+    for (let sec = 0; sec <= maxSec; sec += 1) {
+      const tick = document.createElement("div");
+      const x = sec * timelinePps + 60;
+      tick.className = "absolute bottom-0";
+      tick.style.left = `${x}px`;
+
+      if (sec % 5 === 0) {
+        tick.style.height = "12px";
+        tick.style.borderLeft = "1px solid #4B6350";
+        const lbl = document.createElement("span");
+        lbl.className = "absolute -top-3.5 -left-3 text-[9px] font-mono text-gray-400 select-none pointer-events-none";
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        lbl.textContent = `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        tick.appendChild(lbl);
+      } else {
+        tick.style.height = "6px";
+        tick.style.borderLeft = "1px solid #233527";
+      }
+      timelineRuler.appendChild(tick);
+    }
+  }
+
+  function updateTimelineBlocks() {
+    if (!selectedClip || !timelineVideoBlock) return;
+    const trim = getClipTrim(selectedClip);
+
+    const leftPx = trim.trim_start * timelinePps + 60;
+    const widthPx = Math.max(20, (trim.trim_end - trim.trim_start) * timelinePps);
+
+    timelineVideoBlock.style.left = `${leftPx}px`;
+    timelineVideoBlock.style.width = `${widthPx}px`;
+
+    if (lblTimelineBlockTitle) {
+      lblTimelineBlockTitle.textContent = `#${selectedClip.clip_id} ${selectedClip.title || 'Clip'}`;
+    }
+    const curDur = Math.max(0, trim.trim_end - trim.trim_start);
+    if (lblTimelineBlockDur) {
+      lblTimelineBlockDur.textContent = `${curDur.toFixed(1)}s`;
+    }
+    if (lblActiveClipDuration) {
+      lblActiveClipDuration.textContent = `${curDur.toFixed(1)}s`;
+    }
+
+    if (timelineSubtitleBlock) {
+      timelineSubtitleBlock.style.left = `${leftPx}px`;
+      timelineSubtitleBlock.style.width = `${widthPx}px`;
+    }
+    if (timelineOverlayBlock) {
+      timelineOverlayBlock.style.left = `${leftPx}px`;
+      timelineOverlayBlock.style.width = `${widthPx}px`;
+    }
+
+    if (inputTrimStart && document.activeElement !== inputTrimStart) {
+      inputTrimStart.value = trim.trim_start.toFixed(1);
+    }
+    if (inputTrimEnd && document.activeElement !== inputTrimEnd) {
+      inputTrimEnd.value = trim.trim_end.toFixed(1);
+    }
+  }
+
+  function updatePlayhead(currentTime) {
+    if (!timelinePlayhead) return;
+    const x = (currentTime || 0) * timelinePps + 60;
+    timelinePlayhead.style.left = `${x}px`;
+    if (lblTimelineTimecode) {
+      lblTimelineTimecode.textContent = formatTimecode(currentTime);
+    }
+  }
+
+  // Zoom control
+  if (rangeTimelineZoom) {
+    rangeTimelineZoom.addEventListener("input", () => {
+      timelineZoomLevel = parseInt(rangeTimelineZoom.value, 10) || 2;
+      timelinePps = timelineZoomLevel * 8;
+      const trim = selectedClip ? getClipTrim(selectedClip) : { max_dur: 60 };
+      renderTimelineRuler(trim.max_dur);
+      updateTimelineBlocks();
+      updatePlayhead(mainVideo ? mainVideo.currentTime : 0);
+    });
+  }
+
+  // Manual Inspector Trim Inputs
+  if (inputTrimStart) {
+    inputTrimStart.addEventListener("input", () => {
+      if (!selectedClip) return;
+      const trim = getClipTrim(selectedClip);
+      const val = parseFloat(inputTrimStart.value) || 0.0;
+      trim.trim_start = Math.max(0, Math.min(val, trim.trim_end - 0.5));
+      updateTimelineBlocks();
+    });
+  }
+
+  if (inputTrimEnd) {
+    inputTrimEnd.addEventListener("input", () => {
+      if (!selectedClip) return;
+      const trim = getClipTrim(selectedClip);
+      const val = parseFloat(inputTrimEnd.value) || trim.max_dur;
+      trim.trim_end = Math.min(trim.max_dur, Math.max(val, trim.trim_start + 0.5));
+      updateTimelineBlocks();
+    });
+  }
+
+  // Split & Reset Tools
+  if (btnTimelineReset) {
+    btnTimelineReset.addEventListener("click", () => {
+      if (!selectedClip) return;
+      const trim = getClipTrim(selectedClip);
+      trim.trim_start = 0.0;
+      trim.trim_end = trim.max_dur;
+      updateTimelineBlocks();
+      if (mainVideo) mainVideo.currentTime = 0;
+    });
+  }
+
+  if (btnTimelineSplit) {
+    btnTimelineSplit.addEventListener("click", () => {
+      if (!selectedClip || !mainVideo) return;
+      const trim = getClipTrim(selectedClip);
+      const ct = mainVideo.currentTime;
+      if (ct > trim.trim_start + 0.5 && ct < trim.trim_end - 0.5) {
+        trim.trim_end = parseFloat(ct.toFixed(1));
+        updateTimelineBlocks();
+        alert(`Klip dipotong pada detik ${ct.toFixed(1)}s. Titik keluar (out-point) disesuaikan!`);
+      } else {
+        alert("Posisikan jarum playhead di dalam rentang klip untuk memotong.");
+      }
+    });
+  }
+
+  // Timeline Ruler Scrubbing / Dragging
+  if (timelineRuler && timelineScrollContainer) {
+    const handleRulerScrub = (e) => {
+      const rect = timelineScrollContainer.getBoundingClientRect();
+      const clickX = e.clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
+      const clickedTime = Math.max(0, clickX / timelinePps);
+      if (mainVideo) {
+        mainVideo.currentTime = clickedTime;
+      }
+      updatePlayhead(clickedTime);
+    };
+
+    timelineRuler.addEventListener("mousedown", (e) => {
+      isDraggingPlayhead = true;
+      handleRulerScrub(e);
+    });
+
+    if (timelinePlayheadHead) {
+      timelinePlayheadHead.addEventListener("mousedown", (e) => {
+        isDraggingPlayhead = true;
+        e.stopPropagation();
+      });
+    }
+
+    window.addEventListener("mousemove", (e) => {
+      if (isDraggingPlayhead) {
+        handleRulerScrub(e);
+      } else if (isTrimmingLeft && selectedClip) {
+        const rect = timelineScrollContainer.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
+        const newTime = Math.max(0, mouseX / timelinePps);
+        const trim = getClipTrim(selectedClip);
+        trim.trim_start = Math.min(newTime, trim.trim_end - 0.5);
+        updateTimelineBlocks();
+      } else if (isTrimmingRight && selectedClip) {
+        const rect = timelineScrollContainer.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
+        const newTime = Math.max(0, mouseX / timelinePps);
+        const trim = getClipTrim(selectedClip);
+        trim.trim_end = Math.min(trim.max_dur, Math.max(newTime, trim.trim_start + 0.5));
+        updateTimelineBlocks();
+      }
+    });
+
+    window.addEventListener("mouseup", () => {
+      isDraggingPlayhead = false;
+      isTrimmingLeft = false;
+      isTrimmingRight = false;
+    });
+
+    if (trimHandleLeft) {
+      trimHandleLeft.addEventListener("mousedown", (e) => {
+        isTrimmingLeft = true;
+        e.stopPropagation();
+      });
+    }
+
+    if (trimHandleRight) {
+      trimHandleRight.addEventListener("mousedown", (e) => {
+        isTrimmingRight = true;
+        e.stopPropagation();
+      });
+    }
+  }
+
+  // Step Frame Buttons
+  if (btnStepBack) {
+    btnStepBack.addEventListener("click", () => {
+      if (mainVideo) mainVideo.currentTime = Math.max(0, mainVideo.currentTime - 1.0);
+    });
+  }
+  if (btnStepForward) {
+    btnStepForward.addEventListener("click", () => {
+      if (mainVideo) mainVideo.currentTime = Math.min(mainVideo.duration || 9999, mainVideo.currentTime + 1.0);
+    });
   }
 
   // 10. Video Player & Custom Controls
@@ -1105,10 +1540,24 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   mainVideo.addEventListener("timeupdate", () => {
+    if (selectedClip && clipTrims[selectedClip.clip_id]) {
+      const trim = clipTrims[selectedClip.clip_id];
+      if (mainVideo.currentTime < trim.trim_start) {
+        mainVideo.currentTime = trim.trim_start;
+      }
+      if (mainVideo.currentTime >= trim.trim_end) {
+        if (mainVideo.loop) {
+          mainVideo.currentTime = trim.trim_start;
+        } else {
+          mainVideo.pause();
+        }
+      }
+    }
     if (mainVideo.duration) {
       videoScrubber.value = (mainVideo.currentTime / mainVideo.duration) * 1000;
       updateTimeLabel(mainVideo.currentTime, mainVideo.duration);
     }
+    updatePlayhead(mainVideo.currentTime);
   });
 
   videoScrubber.addEventListener("input", () => {
@@ -2024,13 +2473,16 @@ document.addEventListener("DOMContentLoaded", () => {
   btnExportSingle.addEventListener("click", async () => {
     if (!selectedClip) return;
     const defName = getFormattedFilename(selectedClip);
+    const trim = getClipTrim(selectedClip);
+    const tStart = trim.trim_start;
+    const tEnd = trim.trim_end;
 
     if (window.pywebview && window.pywebview.api && window.pywebview.api.save_clip_dialog) {
       try {
-        let saved = await window.pywebview.api.save_clip_dialog(selectedClip.clip_id, defName);
+        let saved = await window.pywebview.api.save_clip_dialog(selectedClip.clip_id, defName, tStart, tEnd);
         if (Array.isArray(saved)) saved = saved[0];
         if (saved && typeof saved === "string" && saved.trim() !== "") {
-          alert(`Klip berhasil disimpan ke:\n${saved}`);
+          alert(`Klip berhasil dipotong dan diexport ke:\n${saved}`);
           return;
         }
       } catch (e) {
@@ -2039,7 +2491,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     // Fallback: direct browser download via /api/export/{clip_id}
     const a = document.createElement("a");
-    a.href = `/api/export/${selectedClip.clip_id}`;
+    a.href = `/api/export/${selectedClip.clip_id}?trim_start=${tStart}&trim_end=${tEnd}`;
     a.download = defName;
     document.body.appendChild(a);
     a.click();
@@ -2051,10 +2503,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (window.pywebview && window.pywebview.api && window.pywebview.api.export_all_dialog) {
       try {
-        let exportedDir = await window.pywebview.api.export_all_dialog();
+        let exportedDir = await window.pywebview.api.export_all_dialog(clipTrims);
         if (Array.isArray(exportedDir)) exportedDir = exportedDir[0];
         if (exportedDir && typeof exportedDir === "string" && exportedDir.trim() !== "") {
-          alert(`Seluruh klip (${currentClips.length}) berhasil diexport ke folder:\n${exportedDir}`);
+          alert(`Seluruh klip (${currentClips.length}) berhasil dipotong & diexport ke folder:\n${exportedDir}`);
           return;
         }
       } catch (e) {
@@ -2064,8 +2516,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Direct download trigger for each via /api/export/{clip_id}
     currentClips.forEach((c) => {
+      const trim = getClipTrim(c);
       const a = document.createElement("a");
-      a.href = `/api/export/${c.clip_id}`;
+      a.href = `/api/export/${c.clip_id}?trim_start=${trim.trim_start}&trim_end=${trim.trim_end}`;
       a.download = getFormattedFilename(c);
       document.body.appendChild(a);
       a.click();
@@ -2074,9 +2527,211 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   btnNewTask.addEventListener("click", () => {
-    mainVideo.pause();
-    showPage("media");
+  mainVideo.pause();
+  showPage("media");
   });
+
+  // Toggle Auto Post Configuration in Step 3
+  if (chkAutoPost && autoPostConfigSection) {
+  chkAutoPost.addEventListener("change", () => {
+    if (chkAutoPost.checked) {
+      autoPostConfigSection.classList.remove("hidden");
+    } else {
+      autoPostConfigSection.classList.add("hidden");
+    }
+  });
+  }
+
+  // Social Publishing Flow in Review Studio
+  if (btnPublishSocial && modalPublishSocial) {
+  btnPublishSocial.addEventListener("click", () => {
+    if (!selectedClip) {
+      alert("Pilih klip terlebih dahulu sebelum publish.");
+      return;
+    }
+    if (socialModalTitle) socialModalTitle.textContent = selectedClip.title;
+    if (socialModalHook) socialModalHook.textContent = `Hook: ${selectedClip.hook}`;
+    if (socialModalThumb) socialModalThumb.src = `/api/clips/${selectedClip.clip_id}/thumbnail`;
+    if (socialModalCaption) {
+      socialModalCaption.value = (activeClipCaption && activeClipCaption.value.trim()) 
+        ? activeClipCaption.value.trim() 
+        : (selectedClip.social_caption || `${selectedClip.title} - ${selectedClip.hook} #Shorts #TikTok`);
+    }
+    if (socialUploadStatusBox) socialUploadStatusBox.classList.add("hidden");
+    modalPublishSocial.classList.remove("hidden");
+
+    // Check auth status
+    fetch("/api/social/auth-status").then(r => r.json()).then(auth => {
+      const bYT = document.getElementById("badgeYTAuth");
+      const bTT = document.getElementById("badgeTikTokAuth");
+      if (bYT) {
+        if (auth.youtube_authenticated) {
+          bYT.textContent = "Terhubung";
+          bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/80 border border-emerald-500/40 text-emerald-300";
+        } else if (auth.youtube_secrets_present) {
+          bYT.textContent = "Login Google";
+          bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-indigo-900/80 hover:bg-indigo-700 border border-indigo-400 text-indigo-200 cursor-pointer";
+        } else {
+          bYT.textContent = "No Secrets";
+          bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-rose-950/80 border border-rose-500/40 text-rose-300";
+        }
+      }
+      if (bTT) {
+        if (auth.tiktok_authenticated) {
+          bTT.textContent = "Cookies OK";
+          bTT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/80 border border-emerald-500/40 text-emerald-300";
+        } else {
+          bTT.textContent = "No Cookies";
+          bTT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-amber-950/80 border border-amber-500/40 text-amber-300";
+        }
+      }
+    }).catch(err => console.warn("Failed checking auth status:", err));
+  });
+
+  const bYTAuthBtn = document.getElementById("badgeYTAuth");
+  if (bYTAuthBtn) {
+    bYTAuthBtn.addEventListener("click", async () => {
+      if (bYTAuthBtn.textContent.includes("Login")) {
+        bYTAuthBtn.textContent = "Menghubungkan...";
+        try {
+          const res = await fetch("/api/social/youtube/auth", { method: "POST" });
+          const resData = await res.json();
+          if (resData.success) {
+            bYTAuthBtn.textContent = "Terhubung";
+            bYTAuthBtn.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/80 border border-emerald-500/40 text-emerald-300";
+          } else {
+            alert("Gagal autentikasi YouTube: " + (resData.error || "Unknown error"));
+          }
+        } catch (e) {
+          alert("Gagal memanggil endpoint autentikasi: " + e.message);
+        }
+      }
+    });
+  }
+
+  const hidePublishModal = () => {
+    modalPublishSocial.classList.add("hidden");
+  };
+
+  if (btnClosePublishModal) btnClosePublishModal.addEventListener("click", hidePublishModal);
+  if (btnCancelPublish) btnCancelPublish.addEventListener("click", hidePublishModal);
+
+  modalPublishSocial.addEventListener("click", (e) => {
+    if (e.target === modalPublishSocial) hidePublishModal();
+  });
+
+  if (btnSubmitPublish) {
+    btnSubmitPublish.addEventListener("click", async () => {
+      if (!selectedClip) return;
+
+      const platforms = [];
+      if (modalChkYT && modalChkYT.checked) platforms.push("youtube");
+      if (modalChkTikTok && modalChkTikTok.checked) platforms.push("tiktok");
+
+      if (platforms.length === 0) {
+        alert("Pilih minimal satu platform target (YouTube Shorts atau TikTok).");
+        return;
+      }
+
+      const ytPriv = modalSelectYTPrivacy ? modalSelectYTPrivacy.value : "private";
+      const ttPriv = modalSelectTikTokPrivacy ? modalSelectTikTokPrivacy.value : "everyone";
+      const captionText = socialModalCaption ? socialModalCaption.value.trim() : "";
+
+      if (socialUploadStatusBox) socialUploadStatusBox.classList.remove("hidden");
+      if (socialUploadStatusText) {
+        socialUploadStatusText.innerHTML = `<span class="animate-spin mr-1.5">⏳</span> Mengunggah ke ${platforms.join(" & ")} di latar belakang...`;
+      }
+      btnSubmitPublish.disabled = true;
+      btnSubmitPublish.classList.add("opacity-60", "pointer-events-none");
+
+      try {
+        const res = await fetch("/api/social/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clip_id: selectedClip.clip_id,
+            platforms: platforms,
+            title: selectedClip.title,
+            caption: captionText,
+            youtube_privacy: ytPriv,
+            tiktok_privacy: ttPriv
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.detail || data.message || "Gagal memproses request");
+        }
+
+        const jobId = data.job_id;
+          
+        let pollCount = 0;
+        const pollInterval = setInterval(async () => {
+          pollCount++;
+          try {
+            const statusRes = await fetch(`/api/social/jobs/${jobId}`);
+            if (statusRes.ok) {
+              const job = await statusRes.json();
+              if (job.status === "COMPLETED" || job.status === "PARTIAL" || job.status === "FAILED") {
+                clearInterval(pollInterval);
+                btnSubmitPublish.disabled = false;
+                btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
+
+                let statusHtml = "";
+                if (job.status === "COMPLETED") {
+                  statusHtml += `<div class="text-emerald-400 font-bold mb-1">✅ Berhasil Diunggah!</div>`;
+                } else if (job.status === "PARTIAL") {
+                  statusHtml += `<div class="text-amber-400 font-bold mb-1">⚠️ Upload Sebagian Selesai</div>`;
+                } else {
+                  statusHtml += `<div class="text-rose-400 font-bold mb-1">❌ Gagal Mengunggah</div>`;
+                }
+
+                if (job.results && job.results.youtube) {
+                  if (job.results.youtube.success) {
+                    statusHtml += `<div>YouTube: <a href="${job.results.youtube.url}" target="_blank" class="text-cyan-400 underline font-mono">${job.results.youtube.url}</a></div>`;
+                  } else {
+                    statusHtml += `<div class="text-rose-300">YouTube Error: ${job.results.youtube.error}</div>`;
+                  }
+                }
+
+                if (job.results && job.results.tiktok) {
+                  if (job.results.tiktok.success) {
+                    statusHtml += `<div class="text-emerald-300">TikTok: ${job.results.tiktok.message}</div>`;
+                  } else {
+                    statusHtml += `<div class="text-rose-300">TikTok Error: ${job.results.tiktok.error}</div>`;
+                  }
+                }
+
+                if (job.errors && job.errors.length > 0 && !job.results?.youtube && !job.results?.tiktok) {
+                  statusHtml += `<div class="text-rose-400">${job.errors.join(", ")}</div>`;
+                }
+
+                socialUploadStatusText.innerHTML = statusHtml;
+                return;
+              }
+            }
+          } catch (err) {
+            console.warn("Polling error:", err);
+          }
+
+          if (pollCount > 120) {
+            clearInterval(pollInterval);
+            btnSubmitPublish.disabled = false;
+            btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
+            socialUploadStatusText.innerHTML = `<span class="text-amber-300">Proses masih berjalan di latar belakang (Job ID: ${jobId}). Cek log aplikasi.</span>`;
+          }
+        }, 2000);
+
+      } catch (e) {
+        btnSubmitPublish.disabled = false;
+        btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
+        if (socialUploadStatusText) {
+          socialUploadStatusText.innerHTML = `<span class="text-rose-400">Error: ${e.message}</span>`;
+        }
+      }
+    });
+  }
+  }
 
   // 12. Window Control Buttons
   btnMin.addEventListener("click", () => {

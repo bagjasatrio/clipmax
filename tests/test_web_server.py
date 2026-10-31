@@ -363,11 +363,67 @@ def test_api_export_features(tmp_path):
     res_exp = client.post("/api/clips/export-all", json={
         "dest_dir": str(out_dir),
         "filename_prefix": "Shorts",
-        "filename_suffix": "1080p"
+        "filename_suffix": "1080p",
+        "clip_trims": {
+            "5": {"trim_start": 2.0, "trim_end": 15.0}
+        }
     })
     assert res_exp.status_code == 200
     expected_file = out_dir / "Shorts_Epic Jump_1080p.mp4"
     assert expected_file.exists()
+
+    # Test Export Single with Trim parameters
+    out_single = tmp_path / "single_trimmed.mp4"
+    res_single = client.post("/api/clips/export-single", json={
+        "clip_id": 5,
+        "dest_path": str(out_single),
+        "trim_start": 1.5,
+        "trim_end": 10.0
+    })
+    assert res_single.status_code == 200
+    assert out_single.exists()
+
+    # Test Direct Download with Trim parameters
+    res_dl = client.get("/api/export/5?trim_start=1.0&trim_end=8.0")
+    assert res_dl.status_code == 200
+    assert len(res_dl.content) > 0
+
+def test_api_social_publish(tmp_path):
+    clip_file = tmp_path / "social_clip_1.mp4"
+    clip_file.write_text("dummy video")
+    clip = ClipResult(
+        clip_id=99,
+        title="Epic Move",
+        hook="Insane!",
+        virality_score=95,
+        reasoning="Good stuff",
+        start_time=0.0,
+        end_time=10.0,
+        staging_path=str(clip_file),
+        social_caption="Check this out! #viral #shorts"
+    )
+    state.clips = [clip]
+
+    with patch("clipmax.uploader.service.upload_manager.submit_upload_job") as mock_submit:
+        mock_submit.return_value = "job_test_1"
+
+        res = client.post("/api/social/publish", json={
+            "clip_id": 99,
+            "platforms": ["youtube", "tiktok"],
+            "title": "Custom Title",
+            "caption": "Custom Caption #epic"
+        })
+        assert res.status_code == 200
+        data = res.json()
+        assert data["status"] == "ok"
+        assert data["job_id"] == "job_test_1"
+        mock_submit.assert_called_once()
+
+    # List jobs endpoint
+    res_jobs = client.get("/api/social/jobs")
+    assert res_jobs.status_code == 200
+    assert isinstance(res_jobs.json(), list)
+
 
 
 

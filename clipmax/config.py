@@ -2,7 +2,7 @@ import os
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, List
 from pydantic import BaseModel, Field
 import torch
 
@@ -88,6 +88,15 @@ class AppConfig(BaseModel):
     margin_backdrop: str = "BLURRED_BG"
     filename_prefix: str = ""
     filename_suffix: str = ""
+    # Social Auto-Post settings
+    youtube_client_secrets: str = "client_secrets.json"
+    youtube_token_file: str = "youtube_token.json"
+    youtube_privacy: str = "private"
+    tiktok_cookie_file: Optional[str] = "cookies.txt"
+    tiktok_session_id: str = ""
+    tiktok_privacy: str = "everyone"
+    auto_post_enabled: bool = False
+    auto_post_platforms: List[str] = Field(default_factory=list)
 
     @classmethod
     def load(cls, path: str = "config.json") -> "AppConfig":

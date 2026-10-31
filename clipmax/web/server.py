@@ -4,6 +4,7 @@ import time
 import shutil
 import asyncio
 import threading
+import subprocess
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -12,7 +13,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Uplo
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from clipmax.config import AppConfig, is_cuda_available, clear_temp_cache
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
@@ -25,6 +26,7 @@ from clipmax.subtitle import (
     SUBTITLE_PRESETS
 )
 from clipmax.renderer import apply_ass_overlay, apply_clip_overlays
+from clipmax.uploader import upload_manager
 
 class PipelineStartRequest(BaseModel):
     input_source: str
@@ -61,6 +63,22 @@ class ConfigUpdateRequest(BaseModel):
     filename_prefix: Optional[str] = None
     filename_suffix: Optional[str] = None
     cookie_file: Optional[str] = None
+    youtube_client_secrets: Optional[str] = None
+    youtube_token_file: Optional[str] = None
+    youtube_privacy: Optional[str] = None
+    tiktok_cookie_file: Optional[str] = None
+    tiktok_session_id: Optional[str] = None
+    tiktok_privacy: Optional[str] = None
+    auto_post_enabled: Optional[bool] = None
+    auto_post_platforms: Optional[List[str]] = None
+
+class SocialPublishRequest(BaseModel):
+    clip_id: int
+    platforms: List[str] = Field(default_factory=lambda: ["youtube", "tiktok"])
+    title: Optional[str] = None
+    caption: Optional[str] = None
+    youtube_privacy: Optional[str] = None
+    tiktok_privacy: Optional[str] = None
 
 class ExportSingleRequest(BaseModel):
     clip_id: int
@@ -68,11 +86,14 @@ class ExportSingleRequest(BaseModel):
     dest_dir: Optional[str] = None
     filename_prefix: Optional[str] = None
     filename_suffix: Optional[str] = None
+    trim_start: Optional[float] = None
+    trim_end: Optional[float] = None
 
 class ExportAllRequest(BaseModel):
     dest_dir: str
     filename_prefix: Optional[str] = None
     filename_suffix: Optional[str] = None
+    clip_trims: Optional[Dict[str, Dict[str, float]]] = None
 
 class ClipOverlayRequest(BaseModel):
     clip_id: int
@@ -194,6 +215,14 @@ def get_config():
         "margin_backdrop": getattr(state.config, "margin_backdrop", "BLURRED_BG"),
         "filename_prefix": getattr(state.config, "filename_prefix", ""),
         "filename_suffix": getattr(state.config, "filename_suffix", ""),
+        "youtube_client_secrets": getattr(state.config, "youtube_client_secrets", "client_secrets.json"),
+        "youtube_token_file": getattr(state.config, "youtube_token_file", "youtube_token.json"),
+        "youtube_privacy": getattr(state.config, "youtube_privacy", "private"),
+        "tiktok_cookie_file": getattr(state.config, "tiktok_cookie_file", "cookies.txt"),
+        "tiktok_session_id": getattr(state.config, "tiktok_session_id", ""),
+        "tiktok_privacy": getattr(state.config, "tiktok_privacy", "everyone"),
+        "auto_post_enabled": getattr(state.config, "auto_post_enabled", False),
+        "auto_post_platforms": getattr(state.config, "auto_post_platforms", []),
         "engine": "invidious_api"
     }
 
@@ -235,6 +264,22 @@ def update_config(req: ConfigUpdateRequest):
         state.config.filename_prefix = req.filename_prefix
     if req.filename_suffix is not None:
         state.config.filename_suffix = req.filename_suffix
+    if req.youtube_client_secrets is not None:
+        state.config.youtube_client_secrets = req.youtube_client_secrets
+    if req.youtube_token_file is not None:
+        state.config.youtube_token_file = req.youtube_token_file
+    if req.youtube_privacy is not None:
+        state.config.youtube_privacy = req.youtube_privacy
+    if req.tiktok_cookie_file is not None:
+        state.config.tiktok_cookie_file = req.tiktok_cookie_file
+    if req.tiktok_session_id is not None:
+        state.config.tiktok_session_id = req.tiktok_session_id
+    if req.tiktok_privacy is not None:
+        state.config.tiktok_privacy = req.tiktok_privacy
+    if req.auto_post_enabled is not None:
+        state.config.auto_post_enabled = req.auto_post_enabled
+    if req.auto_post_platforms is not None:
+        state.config.auto_post_platforms = req.auto_post_platforms
 
     state.config.save()
     state.orchestrator = PipelineOrchestrator(state.config)
@@ -311,6 +356,20 @@ def start_pipeline(req: PipelineStartRequest):
                     )
                 except Exception as ex:
                     print(f"[ProjectManager Error] Gagal simpan project otomatis: {ex}")
+
+                if getattr(state.config, "auto_post_enabled", False) and getattr(state.config, "auto_post_platforms", None) and results:
+                    try:
+                        top_clip = results[0]
+                        upload_manager.submit_upload_job(
+                            clip_id=top_clip.clip_id,
+                            video_path=top_clip.staging_path,
+                            title=top_clip.title,
+                            caption=top_clip.social_caption or f"{top_clip.title} #Shorts #TikTok",
+                            platforms=state.config.auto_post_platforms,
+                            config=state.config,
+                        )
+                    except Exception as post_ex:
+                        print(f"[AutoPost Error]: {post_ex}")
 
                 state.broadcast_sync({
                     "type": "complete",
@@ -500,9 +559,56 @@ def download_clip_srt(clip_id: str):
 
     raise HTTPException(status_code=404, detail="SRT subtitle file not found for this clip")
 
+def execute_video_export(src_path: str, dest_path: str, trim_start: Optional[float] = None, trim_end: Optional[float] = None):
+    """Exports video file, trimming accurately using FFmpeg NVENC if trim parameters are provided."""
+    has_trim = (trim_start is not None and trim_start > 0.05) or (trim_end is not None and trim_end > 0.05)
+    if not has_trim:
+        shutil.copy2(src_path, dest_path)
+        return
+
+    cmd = ["ffmpeg", "-y"]
+    if trim_start is not None and trim_start > 0:
+        cmd.extend(["-ss", f"{trim_start:.2f}"])
+    if trim_end is not None and trim_end > (trim_start or 0):
+        if trim_start is not None and trim_start > 0:
+            dur = max(0.5, trim_end - trim_start)
+            cmd.extend(["-t", f"{dur:.2f}"])
+        else:
+            cmd.extend(["-to", f"{trim_end:.2f}"])
+
+    cmd.extend(["-i", src_path])
+    if getattr(state.config, "hw_accel", True):
+        cmd.extend([
+            "-c:v", "h264_nvenc",
+            "-preset", getattr(state.config, "nvenc_preset", "p6"),
+            "-tune", "hq",
+            "-rc", "vbr",
+            "-cq", str(getattr(state.config, "nvenc_cq", 19)),
+            "-b:v", "6M",
+            "-maxrate", "10M",
+            "-bufsize", "12M",
+            "-c:a", "aac",
+            "-b:a", "192k"
+        ])
+    else:
+        cmd.extend([
+            "-c:v", "libx264",
+            "-preset", "veryfast",
+            "-crf", "18",
+            "-c:a", "aac",
+            "-b:a", "192k"
+        ])
+
+    cmd.append(str(dest_path))
+    try:
+        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+    except Exception as e:
+        print(f"[Export Trim Warning] FFmpeg trim failed: {e}. Falling back to copy.")
+        shutil.copy2(src_path, dest_path)
+
 @app.get("/api/export/{clip_id}")
-def download_clip_direct(clip_id: str):
-    """Direct file download response for browser export fallback."""
+def download_clip_direct(clip_id: str, trim_start: Optional[float] = None, trim_end: Optional[float] = None):
+    """Direct file download response for browser export fallback with manual trim support."""
     target_clip = None
     try:
         cid_int = int(clip_id)
@@ -522,6 +628,17 @@ def download_clip_direct(clip_id: str):
         raise HTTPException(status_code=404, detail="Clip not found in staging")
 
     clean_filename = build_clip_export_filename(target_clip)
+    has_trim = (trim_start is not None and trim_start > 0.05) or (trim_end is not None and trim_end > 0.05)
+    if has_trim:
+        staging_dir = Path(state.config.temp_dir) / "staging"
+        trimmed_file = staging_dir / f"trimmed_{target_clip.clip_id}_{clean_filename}"
+        execute_video_export(target_clip.staging_path, str(trimmed_file), trim_start, trim_end)
+        return FileResponse(
+            path=str(trimmed_file),
+            filename=clean_filename,
+            media_type="video/mp4"
+        )
+
     return FileResponse(
         path=target_clip.staging_path,
         filename=clean_filename,
@@ -551,7 +668,7 @@ def export_single_clip(req: ExportSingleRequest):
     else:
         return {"status": "cancelled"}
 
-    shutil.copy2(clip.staging_path, str(dest))
+    execute_video_export(clip.staging_path, str(dest), req.trim_start, req.trim_end)
     return {"status": "ok", "path": str(dest)}
 
 @app.post("/api/clips/export-all")
@@ -566,14 +683,84 @@ def export_all_clips(req: ExportAllRequest):
     dest_dir = Path(dest_dir_str)
     dest_dir.mkdir(parents=True, exist_ok=True)
     exported = []
+    trims_dict = req.clip_trims or {}
     for c in state.clips:
         if os.path.exists(c.staging_path):
             fname = build_clip_export_filename(c, req.filename_prefix, req.filename_suffix)
             target = dest_dir / fname
-            shutil.copy2(c.staging_path, str(target))
+            c_trim = trims_dict.get(str(c.clip_id), {})
+            t_start = c_trim.get("trim_start")
+            t_end = c_trim.get("trim_end")
+            execute_video_export(c.staging_path, str(target), t_start, t_end)
             exported.append(str(target))
 
     return {"status": "ok", "exported_count": len(exported), "directory": str(dest_dir)}
+
+@app.post("/api/social/publish")
+def publish_clip_social(req: SocialPublishRequest):
+    clip = next((c for c in state.clips if c.clip_id == req.clip_id), None)
+    if not clip or not os.path.exists(clip.staging_path):
+        raise HTTPException(status_code=404, detail="Klip tidak ditemukan di staging")
+
+    title = req.title.strip() if req.title and req.title.strip() else clip.title
+    caption = req.caption.strip() if req.caption and req.caption.strip() else (clip.social_caption or f"{title} #Shorts #TikTok")
+
+    if req.youtube_privacy:
+        state.config.youtube_privacy = req.youtube_privacy
+    if req.tiktok_privacy:
+        state.config.tiktok_privacy = req.tiktok_privacy
+
+    job_id = upload_manager.submit_upload_job(
+        clip_id=clip.clip_id,
+        video_path=clip.staging_path,
+        title=title,
+        caption=caption,
+        platforms=req.platforms,
+        config=state.config,
+    )
+    return {
+        "status": "ok",
+        "job_id": job_id,
+        "message": f"Upload job {job_id} dimulai di latar belakang",
+    }
+
+@app.get("/api/social/jobs/{job_id}")
+def get_social_job_status(job_id: str):
+    job = upload_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job tidak ditemukan")
+    return job.model_dump()
+
+@app.get("/api/social/jobs")
+def list_social_jobs():
+    return [j.model_dump() for j in upload_manager.list_jobs()]
+
+@app.get("/api/social/auth-status")
+def get_social_auth_status():
+    from clipmax.uploader import is_youtube_authenticated, is_tiktok_authenticated
+    yt_token = getattr(state.config, "youtube_token_file", "youtube_token.json")
+    yt_secrets = getattr(state.config, "youtube_client_secrets", "client_secrets.json")
+    yt_ok = is_youtube_authenticated(token_path=yt_token)
+    secrets_exist = Path(yt_secrets).resolve().exists()
+
+    tt_cookie = getattr(state.config, "tiktok_cookie_file", None) or getattr(state.config, "cookie_file", None)
+    tt_session = getattr(state.config, "tiktok_session_id", None)
+    tt_ok = is_tiktok_authenticated(cookies_path=tt_cookie, session_id=tt_session)
+
+    return {
+        "youtube_authenticated": yt_ok,
+        "youtube_secrets_present": secrets_exist,
+        "tiktok_authenticated": tt_ok,
+    }
+
+@app.post("/api/social/youtube/auth")
+def run_youtube_auth():
+    from clipmax.uploader import authenticate_youtube
+    res = authenticate_youtube(
+        client_secrets_path=getattr(state.config, "youtube_client_secrets", "client_secrets.json"),
+        token_path=getattr(state.config, "youtube_token_file", "youtube_token.json"),
+    )
+    return res
 
 def rebuild_clip_overlays(clip_id: int) -> Path:
     clip = next((c for c in state.clips if c.clip_id == clip_id), None)

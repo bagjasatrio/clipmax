@@ -183,6 +183,15 @@ def evaluate_viral_clips(
         api_key=api_key or "no-key-required"
     )
 
+    active_model = model or "default"
+    if active_model == "default":
+        try:
+            available = discover_models(endpoint_url, api_key)
+            if available and available[0] != "default":
+                active_model = available[0]
+        except Exception:
+            pass
+
     lang_section = ""
     if detected_language:
         if detected_language.lower().startswith("en"):
@@ -246,7 +255,7 @@ Wajib patuhi ATURAN BAHASA: Jika transkrip berbahasa Inggris, tulis title/hook/r
 Patuhi CRITICAL CAMPAIGN RULES dan ATURAN UTAMA di atas jika ada syarat kemenangan/ending wajib."""
 
     response = client.chat.completions.create(
-        model=model,
+        model=active_model,
         messages=[
             {"role": "system", "content": system_content},
             {"role": "user", "content": prompt}

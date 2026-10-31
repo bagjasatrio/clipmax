@@ -25,6 +25,11 @@ dependencies = [
     "websockets>=17.1",
     "python-multipart>=0.0.32",
     "yt-dlp-youtube-oauth2>=1.0.10",
+    "google-api-python-client>=2.100.0",
+    "google-auth-oauthlib>=1.2.0",
+    "google-auth-httplib2>=0.2.0",
+    "playwright>=1.40.0",
+    "tiktok-uploader>=1.2.0",
 ]
 
 [tool.pytest.ini_options]

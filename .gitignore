@@ -12,4 +12,7 @@ config.json
 .pytest_cache/
 cookies.txt
 *.cookies.txt
+*cookies*.txt
+client_secrets*.json
+youtube_token*.json
 projects/

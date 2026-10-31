@@ -80,7 +80,7 @@ class DesktopJsApi:
         import webbrowser
         webbrowser.open(url)
 
-    def save_clip_dialog(self, clip_id: int, default_filename: str) -> Optional[str]:
+    def save_clip_dialog(self, clip_id: int, default_filename: str, trim_start: Optional[float] = None, trim_end: Optional[float] = None) -> Optional[str]:
         w = self.window_holder.get("window")
         if w:
             try:
@@ -95,16 +95,16 @@ class DesktopJsApi:
                         return None
                     clip = next((c for c in state.clips if c.clip_id == clip_id), None)
                     if clip and os.path.exists(clip.staging_path):
-                        import shutil
+                        from clipmax.web.server import execute_video_export
                         dest = Path(save_path)
                         dest.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(clip.staging_path, str(dest))
+                        execute_video_export(clip.staging_path, str(dest), trim_start, trim_end)
                         return str(dest)
             except Exception as e:
                 print(f"[Desktop Dialog Error]: {e}")
         return None
 
-    def export_all_dialog(self) -> Optional[str]:
+    def export_all_dialog(self, clip_trims: Optional[dict] = None) -> Optional[str]:
         w = self.window_holder.get("window")
         if w:
             try:
@@ -113,17 +113,20 @@ class DesktopJsApi:
                     dest_dir_str = res[0] if isinstance(res, (tuple, list)) else res
                     if not dest_dir_str or not isinstance(dest_dir_str, str) or not dest_dir_str.strip():
                         return None
-                    import shutil
-                    from clipmax.web.server import build_clip_export_filename
+                    from clipmax.web.server import execute_video_export, build_clip_export_filename
                     dest_dir = Path(dest_dir_str)
                     dest_dir.mkdir(parents=True, exist_ok=True)
+                    trims = clip_trims or {}
                     for c in state.clips:
                         if os.path.exists(c.staging_path):
-                            target = dest_dir / build_clip_export_filename(c)
-                            shutil.copy2(c.staging_path, str(target))
+                            fname = build_clip_export_filename(c)
+                            t_info = trims.get(str(c.clip_id), {})
+                            t_start = t_info.get("trim_start")
+                            t_end = t_info.get("trim_end")
+                            execute_video_export(c.staging_path, str(dest_dir / fname), t_start, t_end)
                     return str(dest_dir)
             except Exception as e:
-                print(f"[Desktop Dialog Error]: {e}")
+                print(f"[Desktop Export All Dialog Error]: {e}")
         return None
 
 def start_server(port: int):
