@@ -697,6 +697,37 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  let hasShownAutoToast = false;
+  function showHardwareAutoToast(sys) {
+    if (hasShownAutoToast || !sys) return;
+    hasShownAutoToast = true;
+    const toast = document.getElementById("hwAutoToast");
+    const tBadge = document.getElementById("hwToastBadge");
+    const tText = document.getElementById("hwToastText");
+    if (!toast) return;
+
+    if (tBadge) {
+      const tierName = sys.tier_title || (sys.active_tier || "Auto").toUpperCase();
+      tBadge.textContent = tierName;
+      if (sys.active_tier === "potato") {
+        tBadge.className = "text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-yellow-950 text-yellow-300 border border-yellow-500/40";
+      } else if (sys.active_tier === "mid") {
+        tBadge.className = "text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-amber-950 text-amber-300 border border-amber-500/40";
+      } else {
+        tBadge.className = "text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40";
+      }
+    }
+
+    if (tText) {
+      tText.textContent = `${sys.device_name || 'Hardware'} (${sys.cpu_cores} Cores, ${sys.ram_gb} GB RAM) otomatis disetel optimal. Siap dipakai langsung!`;
+    }
+
+    toast.classList.remove("translate-y-12", "opacity-0", "pointer-events-none");
+    setTimeout(() => {
+      toast.classList.add("translate-y-12", "opacity-0", "pointer-events-none");
+    }, 4500);
+  }
+
   function updateHardwarePillDisplay(sys) {
     if (!sys) return;
     if (hwPillText) {
@@ -723,6 +754,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (hwPillDot) hwPillDot.className = "w-2 h-2 rounded-full bg-yellow-400";
       }
     }
+    showHardwareAutoToast(sys);
   }
 
   async function openHardwareModal() {

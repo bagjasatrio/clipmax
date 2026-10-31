@@ -113,9 +113,18 @@ class AppConfig(BaseModel):
         if p.exists():
             with open(p, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            return cls(**data)
-        cfg = cls()
-        cfg.save(path)
+            cfg = cls(**data)
+        else:
+            cfg = cls()
+            cfg.save(path)
+
+        # Zero-Config: Selaraskan parameter hardware otomatis saat aplikasi dimulai
+        if getattr(cfg, "hardware_profile", "auto") == "auto":
+            try:
+                from clipmax.hardware import tune_config_for_hardware
+                tune_config_for_hardware(cfg, "auto")
+            except Exception:
+                pass
         return cfg
 
     def save(self, path: str = "config.json") -> None:
