@@ -270,7 +270,13 @@ class PipelineOrchestrator:
                         part_files.append(part_file)
                         self.temp_files.append(part_file)
 
-                        cut_scenes = segment_clip_scenes(video_path, cut.start, cut.end)
+                        cut_scenes = segment_clip_scenes(
+                            video_path,
+                            cut.start,
+                            cut.end,
+                            sample_step=getattr(self.config, "reframe_sample_step", 15),
+                            detect_width=getattr(self.config, "reframe_detect_width", 640)
+                        )
                         default_cx = cut_scenes[0].crop_x if cut_scenes else "0"
                         cut_mode = cut_scenes[0].mode if cut_scenes else "CROP_TRACKING"
 
@@ -452,7 +458,13 @@ class PipelineOrchestrator:
                     if progress_callback:
                         progress_callback(self.status, base_pct, f"Segmentasi visual scene dinamis klip {clip_num}/{total_clips}...")
 
-                    scenes = segment_clip_scenes(video_path, clip.start_time, clip.end_time)
+                    scenes = segment_clip_scenes(
+                        video_path,
+                        clip.start_time,
+                        clip.end_time,
+                        sample_step=getattr(self.config, "reframe_sample_step", 15),
+                        detect_width=getattr(self.config, "reframe_detect_width", 640)
+                    )
 
                     has_crop = any(sc.mode == "CROP_TRACKING" for sc in scenes)
                     has_blur = any(sc.mode == "BLURRED_BACKGROUND" for sc in scenes)

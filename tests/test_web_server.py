@@ -462,6 +462,23 @@ def test_api_social_publish(tmp_path):
     assert res_tt_disc.status_code == 200
     assert res_tt_disc.json()["success"] is True
 
+    # Test hardware system info and profile switcher
+    res_hw = client.get("/api/system/hardware")
+    assert res_hw.status_code == 200
+    hw_data = res_hw.json()
+    assert "specs" in hw_data
+    assert "profiles" in hw_data
+    assert "potato" in hw_data["profiles"]
+
+    res_set_hw = client.post("/api/system/hardware/profile", json={"profile": "potato"})
+    assert res_set_hw.status_code == 200
+    assert res_set_hw.json()["status"] == "ok"
+    assert state.config.hardware_profile == "potato"
+    assert state.config.whisper_model == "tiny"
+
+    # Reset back to auto
+    client.post("/api/system/hardware/profile", json={"profile": "auto"})
+
 
 
 

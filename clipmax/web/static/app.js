@@ -125,6 +125,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const hwPill = document.getElementById("hwPill");
   const hwPillText = document.getElementById("hwPillText");
+  const hwPillDot = document.getElementById("hwPillDot");
+  const hwTierBadge = document.getElementById("hwTierBadge");
+
+  const modalHardwareProfile = document.getElementById("modalHardwareProfile");
+  const btnCloseHwModal = document.getElementById("btnCloseHwModal");
+  const btnCancelHwProfile = document.getElementById("btnCancelHwProfile");
+  const btnSaveHwProfile = document.getElementById("btnSaveHwProfile");
+  const lblSaveHwProfile = document.getElementById("lblSaveHwProfile");
+  const hwModalCurrentBadge = document.getElementById("hwModalCurrentBadge");
+  const hwSpecOs = document.getElementById("hwSpecOs");
+  const hwSpecCpu = document.getElementById("hwSpecCpu");
+  const hwSpecRam = document.getElementById("hwSpecRam");
+  const hwSpecGpu = document.getElementById("hwSpecGpu");
+  const lblAutoRecommendation = document.getElementById("lblAutoRecommendation");
   const btnResetClear = document.getElementById("btnResetClear");
   const btnMin = document.getElementById("btnMin");
   const btnClose = document.getElementById("btnClose");
@@ -683,17 +697,116 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function updateHardwarePillDisplay(sys) {
+    if (!sys) return;
+    if (hwPillText) {
+      hwPillText.textContent = `${sys.device_name || 'Hardware Terdeteksi'}`;
+    }
+    if (hwTierBadge) {
+      const activeProf = sys.active_profile || "auto";
+      const isAuto = activeProf === "auto";
+      const displayTier = sys.active_tier || sys.detected_tier || "mid";
+      let label = isAuto ? `Auto (${displayTier.toUpperCase()})` : activeProf.toUpperCase();
+      if (activeProf === "potato") label = "POTATO 🥔";
+      else if (activeProf === "high") label = "HIGH-END ⚡";
+      else if (activeProf === "mid") label = "MID-RANGE ⚖️";
+      hwTierBadge.textContent = label;
+
+      if (displayTier === "high") {
+        hwTierBadge.className = "text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40";
+        if (hwPillDot) hwPillDot.className = "w-2 h-2 rounded-full bg-emerald-400 pulsing-dot";
+      } else if (displayTier === "mid") {
+        hwTierBadge.className = "text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-amber-950 text-amber-300 border border-amber-500/40";
+        if (hwPillDot) hwPillDot.className = "w-2 h-2 rounded-full bg-amber-400";
+      } else {
+        hwTierBadge.className = "text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-yellow-950 text-yellow-300 border border-yellow-500/40";
+        if (hwPillDot) hwPillDot.className = "w-2 h-2 rounded-full bg-yellow-400";
+      }
+    }
+  }
+
+  async function openHardwareModal() {
+    if (!modalHardwareProfile) return;
+    modalHardwareProfile.classList.remove("hidden");
+    try {
+      const res = await fetch("/api/system/hardware");
+      if (res.ok) {
+        const data = await res.json();
+        const specs = data.specs || {};
+        if (hwSpecOs) hwSpecOs.textContent = specs.os || "OS";
+        if (hwSpecCpu) hwSpecCpu.textContent = `${specs.cpu_cores || 4} Cores`;
+        if (hwSpecRam) hwSpecRam.textContent = `${specs.ram_gb || 8} GB`;
+        if (hwSpecGpu) hwSpecGpu.textContent = specs.gpu_label || "CPU";
+        if (lblAutoRecommendation) lblAutoRecommendation.textContent = `Tuned for ${specs.tier_title || 'Detected Hardware'}`;
+
+        const activeProf = data.active_profile || "auto";
+        if (hwModalCurrentBadge) {
+          hwModalCurrentBadge.textContent = activeProf.toUpperCase();
+        }
+        const rad = document.querySelector(`input[name="radioHwProfile"][value="${activeProf}"]`);
+        if (rad) rad.checked = true;
+      }
+    } catch (e) {
+      console.warn("Gagal memuat detail hardware:", e);
+    }
+  }
+
+  if (hwPill) {
+    hwPill.addEventListener("click", openHardwareModal);
+  }
+  const hideHwModal = () => {
+    if (modalHardwareProfile) modalHardwareProfile.classList.add("hidden");
+  };
+  if (btnCloseHwModal) btnCloseHwModal.addEventListener("click", hideHwModal);
+  if (btnCancelHwProfile) btnCancelHwProfile.addEventListener("click", hideHwModal);
+  if (modalHardwareProfile) {
+    modalHardwareProfile.addEventListener("click", (e) => {
+      if (e.target === modalHardwareProfile) hideHwModal();
+    });
+  }
+
+  if (btnSaveHwProfile) {
+    btnSaveHwProfile.addEventListener("click", async () => {
+      const selectedRadio = document.querySelector('input[name="radioHwProfile"]:checked');
+      const chosenProfile = selectedRadio ? selectedRadio.value : "auto";
+
+      btnSaveHwProfile.disabled = true;
+      const origHtml = btnSaveHwProfile.innerHTML;
+      btnSaveHwProfile.innerHTML = `<span class="animate-spin mr-1">⏳</span> Menerapkan...`;
+
+      try {
+        const res = await fetch("/api/system/hardware/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profile: chosenProfile })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert(`Profil hardware berhasil disetel ke: ${chosenProfile.toUpperCase()}\n\nPengaturan rendering, Whisper, dan reframe telah diselaraskan dengan spesifikasi perangkat.`);
+          hideHwModal();
+          const sysRes = await fetch("/api/system");
+          if (sysRes.ok) {
+            const sys = await sysRes.json();
+            updateHardwarePillDisplay(sys);
+          }
+        } else {
+          alert("Gagal mengubah profil hardware: " + (data.detail || data.message || "Unknown error"));
+        }
+      } catch (err) {
+        alert("Koneksi gagal: " + err.message);
+      } finally {
+        btnSaveHwProfile.disabled = false;
+        btnSaveHwProfile.innerHTML = origHtml;
+      }
+    });
+  }
+
   // 4. Initial System & Config Loading
   async function loadInitialData() {
     try {
       const sysRes = await fetch("/api/system");
       const sysData = await sysRes.json();
-      if (sysData.cuda_available) {
-        hwPillText.textContent = "NVIDIA RTX 3050 | CUDA Active";
-      } else {
-        hwPillText.textContent = "CPU Only (CUDA Inactive)";
-        hwPill.querySelector("span").className = "w-2 h-2 rounded-full bg-amber-500 mr-2";
-      }
+      updateHardwarePillDisplay(sysData);
 
       const cfgRes = await fetch("/api/config");
       const cfg = await cfgRes.json();

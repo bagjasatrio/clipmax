@@ -88,9 +88,10 @@
 
     <!-- Right: Hardware Status Pill & Window Controls -->
     <div class="flex items-center space-x-2.5 shrink-0">
-      <div id="hwPill" class="flex items-center space-x-2 px-2.5 py-1 rounded-full bg-[#131E16] border border-[#233527] text-[11px] font-medium text-gray-300 shadow-inner">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 pulsing-dot"></span>
-        <span id="hwPillText">NVIDIA RTX 3050 | CUDA Active</span>
+      <div id="hwPill" class="flex items-center space-x-2 px-2.5 py-1 rounded-full bg-[#131E16] border border-[#233527] hover:border-emerald-500/50 text-[11px] font-medium text-gray-300 shadow-inner cursor-pointer transition select-none" title="Klik untuk membuka Pengaturan Profil Hardware (Potato / Mid / High)">
+        <span id="hwPillDot" class="w-2 h-2 rounded-full bg-emerald-400 pulsing-dot"></span>
+        <span id="hwPillText">Memeriksa hardware...</span>
+        <span id="hwTierBadge" class="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">Auto</span>
       </div>
 
       <!-- Reset Form & Clear Cache Button -->
@@ -1506,6 +1507,121 @@
           <span id="lblSubmitPublish">Mulai Upload</span>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: HARDWARE PERFORMANCE PROFILE ================= -->
+  <div id="modalHardwareProfile" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md hidden transition-opacity">
+    <div class="w-full max-w-xl bg-[#0F1612] border border-[#233527] rounded-2xl shadow-2xl p-5 space-y-4 text-gray-200">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-[#233527] pb-3">
+        <div class="flex items-center space-x-2.5">
+          <span class="text-xl">⚙️</span>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 class="text-sm font-bold text-white">Profil Hardware & Optimasi Kinerja</h3>
+              <span id="hwModalCurrentBadge" class="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-emerald-950 border border-emerald-500/50 text-emerald-300">Auto</span>
+            </div>
+            <p class="text-[11px] text-gray-400">Adaptasi cerdas untuk device spek rendah (kentang), menengah, hingga workstation</p>
+          </div>
+        </div>
+        <button id="btnCloseHwModal" type="button" class="text-gray-400 hover:text-white p-1 rounded-lg transition">✕</button>
+      </div>
+
+      <!-- Live Specs Summary Card -->
+      <div class="p-3 bg-[#0A0E0B] rounded-xl border border-[#233527] space-y-2">
+        <div class="text-[11px] font-semibold text-emerald-400 flex items-center justify-between">
+          <span>🔍 Spesifikasi Terdeteksi:</span>
+          <span id="hwSpecOs" class="text-gray-400 font-mono text-[10px]">Windows 11</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <div class="p-2 rounded-lg bg-[#121A14] border border-[#233527]/60">
+            <span class="text-[10px] text-gray-400 block">Prosesor (CPU)</span>
+            <span id="hwSpecCpu" class="font-bold text-gray-200 font-mono">16 Cores</span>
+          </div>
+          <div class="p-2 rounded-lg bg-[#121A14] border border-[#233527]/60">
+            <span class="text-[10px] text-gray-400 block">Memori (RAM)</span>
+            <span id="hwSpecRam" class="font-bold text-gray-200 font-mono">23.4 GB</span>
+          </div>
+          <div class="p-2 rounded-lg bg-[#121A14] border border-[#233527]/60">
+            <span class="text-[10px] text-gray-400 block">Akselerasi Grafis</span>
+            <span id="hwSpecGpu" class="font-bold text-emerald-300 font-mono truncate block" title="NVIDIA NVENC">NVENC Active</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile Selection Cards -->
+      <div class="space-y-2">
+        <label class="text-[11px] font-semibold text-gray-300 block">Pilih Mode Operasi:</label>
+        
+        <!-- Profile Auto -->
+        <label class="hw-profile-card flex items-start space-x-3 p-3 rounded-xl bg-[#0D1510] border border-[#233527] hover:border-emerald-500/50 cursor-pointer transition select-none">
+          <input type="radio" name="radioHwProfile" value="auto" class="mt-1 accent-emerald-500" checked>
+          <div class="flex-1 min-w-0 space-y-0.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white flex items-center space-x-1.5">
+                <span>🤖 Auto-Tune Cerdas</span>
+                <span class="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold font-mono">Rekomendasi</span>
+              </span>
+              <span id="lblAutoRecommendation" class="text-[10px] font-mono text-emerald-400 font-semibold">Tuned for High-End</span>
+            </div>
+            <p class="text-[11px] text-gray-400">Secara otomatis mendeteksi core CPU, RAM, dan encoder perangkat saat startup untuk performa optimal.</p>
+          </div>
+        </label>
+
+        <!-- Profile Potato -->
+        <label class="hw-profile-card flex items-start space-x-3 p-3 rounded-xl bg-[#0D1510] border border-[#233527] hover:border-yellow-500/50 cursor-pointer transition select-none">
+          <input type="radio" name="radioHwProfile" value="potato" class="mt-1 accent-yellow-400">
+          <div class="flex-1 min-w-0 space-y-0.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white flex items-center space-x-1.5">
+                <span>🥔 Potato Mode (Ultra Ringan & Hemat Daya)</span>
+              </span>
+              <span class="text-[10px] font-mono text-yellow-300">CPU-Safe</span>
+            </div>
+            <p class="text-[11px] text-gray-400">Whisper Tiny int8, reframe downscale 360p (interval 1.5s), encoder libx264 ultrafast, dan pembatasan thread agar laptop/smartphone tidak overheat atau freeze.</p>
+          </div>
+        </label>
+
+        <!-- Profile Mid-Range -->
+        <label class="hw-profile-card flex items-start space-x-3 p-3 rounded-xl bg-[#0D1510] border border-[#233527] hover:border-amber-500/50 cursor-pointer transition select-none">
+          <input type="radio" name="radioHwProfile" value="mid" class="mt-1 accent-amber-400">
+          <div class="flex-1 min-w-0 space-y-0.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white flex items-center space-x-1.5">
+                <span>⚖️ Mid-Range (Seimbang & Efisien)</span>
+              </span>
+              <span class="text-[10px] font-mono text-amber-300">Balanced</span>
+            </div>
+            <p class="text-[11px] text-gray-400">Whisper Base int8, deteksi reframe 480p (interval 0.6s), akselerasi hardware Intel QSV / AMD AMF / libx264 fast. Cocok untuk laptop kantor dan PC Core i5/Ryzen 5.</p>
+          </div>
+        </label>
+
+        <!-- Profile High-End -->
+        <label class="hw-profile-card flex items-start space-x-3 p-3 rounded-xl bg-[#0D1510] border border-[#233527] hover:border-emerald-500/50 cursor-pointer transition select-none">
+          <input type="radio" name="radioHwProfile" value="high" class="mt-1 accent-emerald-500">
+          <div class="flex-1 min-w-0 space-y-0.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white flex items-center space-x-1.5">
+                <span>⚡ High-End Studio (Maksimal Grafis & NVENC)</span>
+              </span>
+              <span class="text-[10px] font-mono text-emerald-300">RTX / CUDA</span>
+            </div>
+            <p class="text-[11px] text-gray-400">Whisper Small/Medium CUDA float16, render hardware NVIDIA NVENC p6 HQ CQ 19 6Mbps, reframe presisi tinggi 640p. Performa studio instan.</p>
+          </div>
+        </label>
+
+      </div>
+
+      <!-- Action Footer -->
+      <div class="flex items-center justify-end space-x-2 pt-3 border-t border-[#233527]">
+        <button id="btnCancelHwProfile" type="button" class="px-4 py-2 rounded-xl text-xs font-medium text-gray-400 hover:text-white bg-[#1A202C] hover:bg-[#252D3D] transition">Batal</button>
+        <button id="btnSaveHwProfile" type="button" class="px-5 py-2 rounded-xl text-xs font-bold text-black bg-gradient-to-r from-yellow-400 to-emerald-400 hover:from-yellow-300 hover:to-emerald-300 shadow-md shadow-emerald-900/30 flex items-center space-x-1.5 transition">
+          <span id="lblSaveHwProfile">Terapkan Profil</span>
+        </button>
+      </div>
+
     </div>
   </div>
 

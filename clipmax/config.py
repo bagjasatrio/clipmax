@@ -92,6 +92,11 @@ class AppConfig(BaseModel):
     margin_backdrop: str = "BLURRED_BG"
     filename_prefix: str = ""
     filename_suffix: str = ""
+    # Hardware Adaptation Profiles
+    hardware_profile: str = "auto"
+    reframe_sample_step: int = 15
+    reframe_detect_width: int = 640
+    cpu_thread_limit: int = 0
     # Social Auto-Post settings
     youtube_client_secrets: str = "client_secrets.json"
     youtube_token_file: str = "youtube_token.json"

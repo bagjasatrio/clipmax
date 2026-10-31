@@ -72,6 +72,16 @@ class ConfigUpdateRequest(BaseModel):
     tiktok_privacy: Optional[str] = None
     auto_post_enabled: Optional[bool] = None
     auto_post_platforms: Optional[List[str]] = None
+    hardware_profile: Optional[str] = None
+    whisper_model: Optional[str] = None
+    nvenc_preset: Optional[str] = None
+    video_bitrate: Optional[str] = None
+    reframe_sample_step: Optional[int] = None
+    reframe_detect_width: Optional[int] = None
+    cpu_thread_limit: Optional[int] = None
+
+class HardwareProfileRequest(BaseModel):
+    profile: str = "auto"
 
 class SocialPublishRequest(BaseModel):
     clip_id: int
@@ -172,6 +182,11 @@ app = FastAPI(title="ClipMax Studio Pro Backend", version=__version__, lifespan=
 @app.on_event("startup")
 def on_startup():
     clear_temp_cache(state.config.temp_dir, purge_staging=False)
+    try:
+        from clipmax.hardware import tune_config_for_hardware
+        tune_config_for_hardware(state.config, getattr(state.config, "hardware_profile", "auto"))
+    except Exception as e:
+        logger.warning(f"Gagal melakukan auto-tuning hardware saat startup: {e}")
 
 @app.on_event("shutdown")
 def on_shutdown():
@@ -193,14 +208,65 @@ app.add_middleware(
 
 @app.get("/api/system")
 def get_system_status():
-    cuda = is_cuda_available()
-    device_label = "NVIDIA RTX 3050 | CUDA Active" if cuda else "CPU Only (CUDA Unavailable)"
+    from clipmax.hardware import detect_hardware_specs
+    specs = detect_hardware_specs()
+    active_profile = getattr(state.config, "hardware_profile", "auto")
+    active_tier = specs["detected_tier"] if active_profile == "auto" else active_profile
     return {
-        "cuda_available": cuda,
-        "device_name": device_label,
+        "cuda_available": specs["cuda_available"],
+        "device_name": specs["gpu_label"],
+        "cpu_cores": specs["cpu_cores"],
+        "ram_gb": specs["ram_gb"],
+        "detected_tier": specs["detected_tier"],
+        "active_profile": active_profile,
+        "active_tier": active_tier,
+        "tier_title": specs["tier_title"],
+        "badge_color": specs["badge_color"],
         "whisper_model": state.config.whisper_model,
         "nvenc_preset": state.config.nvenc_preset,
+        "primary_encoder": specs["primary_encoder"],
+        "available_encoders": specs["available_encoders"],
     }
+
+@app.get("/api/system/hardware")
+def get_hardware_details():
+    from clipmax.hardware import (
+        detect_hardware_specs,
+        get_profile_tuning,
+        PROFILE_POTATO,
+        PROFILE_MIDRANGE,
+        PROFILE_HIGHEND,
+        PROFILE_AUTO,
+    )
+    specs = detect_hardware_specs()
+    active_profile = getattr(state.config, "hardware_profile", "auto")
+    active_tier = specs["detected_tier"] if active_profile == "auto" else active_profile
+    return {
+        "specs": specs,
+        "active_profile": active_profile,
+        "active_tier": active_tier,
+        "profiles": {
+            PROFILE_AUTO: {
+                "tier": PROFILE_AUTO,
+                "tier_title": f"Auto-Tune (Rekomendasi: {specs['tier_title']})",
+                "badge": "auto",
+                "description": "Deteksi dan adaptasi hardware otomatis setiap kali aplikasi dimulai.",
+            },
+            PROFILE_HIGHEND: get_profile_tuning(PROFILE_HIGHEND, specs),
+            PROFILE_MIDRANGE: get_profile_tuning(PROFILE_MIDRANGE, specs),
+            PROFILE_POTATO: get_profile_tuning(PROFILE_POTATO, specs),
+        },
+    }
+
+@app.post("/api/system/hardware/profile")
+def set_hardware_profile(req: HardwareProfileRequest):
+    from clipmax.hardware import tune_config_for_hardware
+    res = tune_config_for_hardware(state.config, req.profile)
+    try:
+        state.config.save()
+    except Exception as e:
+        logger.warning(f"Gagal menyimpan config.json: {e}")
+    return {"status": "ok", "message": f"Profil hardware disetel ke {req.profile}", "data": res}
 
 @app.get("/api/config")
 def get_config():
@@ -223,6 +289,10 @@ def get_config():
         "margin_backdrop": getattr(state.config, "margin_backdrop", "BLURRED_BG"),
         "filename_prefix": getattr(state.config, "filename_prefix", ""),
         "filename_suffix": getattr(state.config, "filename_suffix", ""),
+        "hardware_profile": getattr(state.config, "hardware_profile", "auto"),
+        "reframe_sample_step": getattr(state.config, "reframe_sample_step", 15),
+        "reframe_detect_width": getattr(state.config, "reframe_detect_width", 640),
+        "cpu_thread_limit": getattr(state.config, "cpu_thread_limit", 0),
         "youtube_client_secrets": getattr(state.config, "youtube_client_secrets", "client_secrets.json"),
         "youtube_token_file": getattr(state.config, "youtube_token_file", "youtube_token.json"),
         "youtube_privacy": getattr(state.config, "youtube_privacy", "private"),
@@ -236,6 +306,20 @@ def get_config():
 
 @app.post("/api/config")
 def update_config(req: ConfigUpdateRequest):
+    if req.hardware_profile is not None:
+        state.config.hardware_profile = req.hardware_profile
+    if req.whisper_model is not None:
+        state.config.whisper_model = req.whisper_model
+    if req.nvenc_preset is not None:
+        state.config.nvenc_preset = req.nvenc_preset
+    if req.video_bitrate is not None:
+        state.config.video_bitrate = req.video_bitrate
+    if req.reframe_sample_step is not None:
+        state.config.reframe_sample_step = req.reframe_sample_step
+    if req.reframe_detect_width is not None:
+        state.config.reframe_detect_width = req.reframe_detect_width
+    if req.cpu_thread_limit is not None:
+        state.config.cpu_thread_limit = req.cpu_thread_limit
     if req.endpoint_url is not None:
         state.config.endpoint_url = req.endpoint_url
     if req.api_key is not None:
