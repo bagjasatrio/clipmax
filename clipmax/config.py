@@ -3,8 +3,12 @@ import json
 import shutil
 from pathlib import Path
 from typing import Any, Optional, List
+import sys
+import subprocess
 from pydantic import BaseModel, Field
 import torch
+
+SUBPROCESS_FLAGS = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 def is_cuda_available() -> bool:
     if torch.cuda.is_available():

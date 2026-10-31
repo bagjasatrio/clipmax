@@ -44,6 +44,11 @@ def get_youtube_service(
                     tf.write(creds.to_json())
             except Exception as e:
                 logger.warning(f"Gagal me-refresh token YouTube: {e}")
+                try:
+                    if token_p.exists():
+                        token_p.unlink()
+                except Exception:
+                    pass
                 creds = None
 
         if not creds or not creds.valid:
@@ -54,7 +59,7 @@ def get_youtube_service(
                 )
 
             if not interactive:
-                raise PermissionError("YouTube belum terotentikasi dan mode interaktif dinonaktifkan.")
+                raise PermissionError("Sesi otentikasi YouTube telah kadaluarsa atau belum terhubung. Silakan klik tombol 'Login Google' untuk menghubungkan ulang akun YouTube Anda.")
 
             flow = InstalledAppFlow.from_client_secrets_file(str(secrets_p), SCOPES)
             creds = flow.run_local_server(port=0)
@@ -66,13 +71,30 @@ def get_youtube_service(
 
 
 def is_youtube_authenticated(token_path: str = "youtube_token.json") -> bool:
-    """Memeriksa apakah token YouTube sudah ada dan valid atau dapat di-refresh."""
+    """Memeriksa apakah token YouTube sudah ada dan benar-benar valid atau berhasil di-refresh."""
     token_p = Path(token_path).resolve()
     if not token_p.exists():
         return False
     try:
         creds = Credentials.from_authorized_user_file(str(token_p), SCOPES)
-        return bool(creds and (creds.valid or creds.refresh_token))
+        if not creds:
+            return False
+        if creds.valid:
+            return True
+        if creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+                with open(token_p, "w", encoding="utf-8") as tf:
+                    tf.write(creds.to_json())
+                return bool(creds.valid)
+            except Exception as e:
+                logger.warning(f"Token YouTube kadaluarsa/tidak valid: {e}")
+                try:
+                    token_p.unlink()
+                except Exception:
+                    pass
+                return False
+        return False
     except Exception:
         return False
 
@@ -82,13 +104,21 @@ def authenticate_youtube(
     token_path: str = "youtube_token.json",
 ) -> Dict[str, Any]:
     """Menjalankan OAuth interaktif sekali untuk membuat youtube_token.json."""
+    token_p = Path(token_path).resolve()
     try:
+        # Hapus token lama jika ada agar meminta prompt izin bersih
+        if token_p.exists():
+            try:
+                token_p.unlink()
+            except Exception:
+                pass
+
         get_youtube_service(
             client_secrets_path=client_secrets_path,
-            token_path=token_path,
+            token_path=str(token_p),
             interactive=True,
         )
-        return {"success": True, "message": "Otentikasi YouTube berhasil. Token tersimpan."}
+        return {"success": True, "message": "Otentikasi YouTube berhasil. Akun terhubung."}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

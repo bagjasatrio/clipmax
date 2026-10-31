@@ -6,7 +6,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, Optional, List
 from pydantic import BaseModel
-from clipmax.config import AppConfig, get_ffmpeg_bin, sanitize_ffmpeg_path
+from clipmax.config import AppConfig, get_ffmpeg_bin, sanitize_ffmpeg_path, SUBPROCESS_FLAGS
 from clipmax.audio import extract_audio
 from clipmax.transcriber import transcribe_audio, cleanup_vram, WordSegment
 from clipmax.ai_gateway import evaluate_viral_clips, ViralClipCandidate
@@ -55,7 +55,7 @@ class ClipResult(BaseModel):
 def kill_process_tree(pid: int) -> None:
     try:
         if os.name == "nt":
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True)
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True, creationflags=SUBPROCESS_FLAGS)
         else:
             os.kill(pid, 9)
     except Exception:
@@ -75,11 +75,11 @@ def generate_thumbnail(video_path: str, output_thumb_path: str, time_offset: flo
         "-q:v", "2",
         str(out_p.resolve())
     ]
-    res = subprocess.run(cmd, capture_output=True)
+    res = subprocess.run(cmd, capture_output=True, creationflags=SUBPROCESS_FLAGS)
     if res.returncode != 0 and not out_p.exists():
         # Fallback without time offset if video shorter than time_offset
         cmd[2] = "0.0"
-        subprocess.run(cmd, capture_output=True)
+        subprocess.run(cmd, capture_output=True, creationflags=SUBPROCESS_FLAGS)
     return str(out_p.resolve())
 
 class PipelineOrchestrator:
@@ -320,7 +320,7 @@ class PipelineOrchestrator:
                         "-c", "copy",
                         uncaptioned_montage
                     ]
-                    c_res = subprocess.run(concat_cmd, capture_output=True)
+                    c_res = subprocess.run(concat_cmd, capture_output=True, creationflags=SUBPROCESS_FLAGS)
                     if c_res.returncode != 0:
                         concat_cmd_fb = [
                             get_ffmpeg_bin(),
@@ -340,7 +340,7 @@ class PipelineOrchestrator:
                             "-b:a", "192k",
                             uncaptioned_montage
                         ]
-                        subprocess.run(concat_cmd_fb, capture_output=True)
+                        subprocess.run(concat_cmd_fb, capture_output=True, creationflags=SUBPROCESS_FLAGS)
 
                     # Subtitle generation for montage with auto-polisher
                     temp_ass = str((temp_dir / f"clip_{clip_num}.ass").resolve())
@@ -391,10 +391,10 @@ class PipelineOrchestrator:
                             "-c:a", "copy",
                             staging_clip_path
                         ]
-                        b_proc = subprocess.run(burn_cmd, capture_output=True)
+                        b_proc = subprocess.run(burn_cmd, capture_output=True, creationflags=SUBPROCESS_FLAGS)
                         if b_proc.returncode != 0:
                             burn_cmd[burn_cmd.index("h264_nvenc")] = "libx264"
-                            subprocess.run(burn_cmd, capture_output=True)
+                            subprocess.run(burn_cmd, capture_output=True, creationflags=SUBPROCESS_FLAGS)
                     else:
                         shutil.copy2(uncaptioned_montage, staging_clip_path)
 

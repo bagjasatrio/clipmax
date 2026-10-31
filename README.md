@@ -194,4 +194,5 @@ clipmax/
 
 ## 📄 Lisensi
 
-Proyek ini dilisensikan di bawah [MIT License](LICENSE).
+© 2026 ClipMax Studio Pro. All rights reserved.
+Perangkat lunak berbayar dan berhak cipta (**Proprietary & Commercial Software**). Dilarang keras mendistribusikan ulang, mereproduksi, atau memodifikasi kode sumber tanpa izin tertulis.

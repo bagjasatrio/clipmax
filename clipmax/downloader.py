@@ -5,7 +5,7 @@ import threading
 import requests
 from pathlib import Path
 from typing import Optional, Callable, Dict, Any, List
-from clipmax.config import get_ffmpeg_bin
+from clipmax.config import get_ffmpeg_bin, SUBPROCESS_FLAGS
 
 def clean_error_message(text: str) -> str:
     """Removes raw terminal ANSI escape sequences, color codes, and bracketed escapes."""
@@ -24,7 +24,8 @@ def auto_update_ytdlp() -> bool:
             ["uv", "pip", "install", "-U", "yt-dlp"],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
+            creationflags=SUBPROCESS_FLAGS
         )
         return res.returncode == 0
     except Exception:
@@ -155,7 +156,7 @@ def download_via_invidious(
                             "-c", "copy",
                             str(Path(output_path).resolve())
                         ]
-                        subprocess.run(mux_cmd, capture_output=True)
+                        subprocess.run(mux_cmd, capture_output=True, creationflags=SUBPROCESS_FLAGS)
                         if os.path.exists(output_path) and os.path.getsize(output_path) > 1024:
                             return True
                 finally:

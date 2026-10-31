@@ -83,6 +83,8 @@ def test_api_export_direct_download(tmp_path):
         end_time=30.0,
         staging_path=str(clip_file)
     )
+    state.config.filename_prefix = ""
+    state.config.filename_suffix = ""
     state.clips = [dummy_clip]
 
     res = client.get("/api/export/1")
@@ -423,6 +425,27 @@ def test_api_social_publish(tmp_path):
     res_jobs = client.get("/api/social/jobs")
     assert res_jobs.status_code == 200
     assert isinstance(res_jobs.json(), list)
+
+    # Test publish-all endpoint
+    with patch("clipmax.uploader.service.upload_manager.submit_upload_job") as mock_submit_all:
+        mock_submit_all.return_value = "job_all_1"
+        res_all = client.post("/api/social/publish-all", json={
+            "platforms": ["youtube"],
+            "clip_ids": [99]
+        })
+        assert res_all.status_code == 200
+        data_all = res_all.json()
+        assert data_all["status"] == "ok"
+        assert data_all["submitted_count"] == 1
+        assert len(data_all["jobs"]) == 1
+
+    # Test system version & changelog endpoint
+    res_ver = client.get("/api/system/version")
+    assert res_ver.status_code == 200
+    data_ver = res_ver.json()
+    assert data_ver["version"] == "2.6.0"
+    assert "changelog" in data_ver
+    assert len(data_ver["changelog"]) > 0
 
 
 

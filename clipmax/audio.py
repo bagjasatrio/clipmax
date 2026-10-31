@@ -3,7 +3,7 @@ import subprocess
 import threading
 from pathlib import Path
 from typing import Optional, Callable
-from clipmax.config import get_ffmpeg_bin
+from clipmax.config import get_ffmpeg_bin, SUBPROCESS_FLAGS
 
 def extract_audio(
     video_path: str,
@@ -33,7 +33,8 @@ def extract_audio(
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.PIPE,
+        creationflags=SUBPROCESS_FLAGS
     )
 
     if pid_callback:

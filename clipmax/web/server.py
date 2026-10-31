@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from clipmax.config import AppConfig, is_cuda_available, clear_temp_cache
+from clipmax.config import AppConfig, is_cuda_available, clear_temp_cache, SUBPROCESS_FLAGS
 from clipmax.pipeline import PipelineOrchestrator, PipelineStatus, ClipResult
 from clipmax.ai_gateway import discover_models
 from clipmax.downloader import is_valid_video_url, clean_error_message, extract_video_id, download_via_invidious
@@ -27,6 +27,7 @@ from clipmax.subtitle import (
 )
 from clipmax.renderer import apply_ass_overlay, apply_clip_overlays
 from clipmax.uploader import upload_manager
+from clipmax.version import __version__, APP_NAME, EDITION, CHANGELOG
 
 class PipelineStartRequest(BaseModel):
     input_source: str
@@ -79,6 +80,13 @@ class SocialPublishRequest(BaseModel):
     caption: Optional[str] = None
     youtube_privacy: Optional[str] = None
     tiktok_privacy: Optional[str] = None
+
+class SocialPublishAllRequest(BaseModel):
+    platforms: List[str] = Field(default_factory=lambda: ["youtube", "tiktok"])
+    youtube_privacy: Optional[str] = "private"
+    tiktok_privacy: Optional[str] = "everyone"
+    clip_ids: Optional[List[int]] = None
+    custom_captions: Optional[Dict[str, str]] = None
 
 class ExportSingleRequest(BaseModel):
     clip_id: int
@@ -159,7 +167,7 @@ async def lifespan(app: FastAPI):
     # Auto-clean cache on shutdown (intermediate temp files only, keep staging videos safe)
     clear_temp_cache(state.config.temp_dir, purge_staging=False)
 
-app = FastAPI(title="ClipMax Studio Backend", version="2.4.0", lifespan=lifespan)
+app = FastAPI(title="ClipMax Studio Pro Backend", version=__version__, lifespan=lifespan)
 
 @app.on_event("startup")
 def on_startup():
@@ -601,7 +609,7 @@ def execute_video_export(src_path: str, dest_path: str, trim_start: Optional[flo
 
     cmd.append(str(dest_path))
     try:
-        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True, creationflags=SUBPROCESS_FLAGS)
     except Exception as e:
         print(f"[Export Trim Warning] FFmpeg trim failed: {e}. Falling back to copy.")
         shutil.copy2(src_path, dest_path)
@@ -722,6 +730,59 @@ def publish_clip_social(req: SocialPublishRequest):
         "status": "ok",
         "job_id": job_id,
         "message": f"Upload job {job_id} dimulai di latar belakang",
+    }
+
+@app.post("/api/social/publish-all")
+def publish_all_social(req: SocialPublishAllRequest):
+    if not state.clips:
+        raise HTTPException(status_code=400, detail="Tidak ada klip untuk dipublikasikan")
+
+    if req.youtube_privacy:
+        state.config.youtube_privacy = req.youtube_privacy
+    if req.tiktok_privacy:
+        state.config.tiktok_privacy = req.tiktok_privacy
+
+    selected_ids = set(req.clip_ids) if req.clip_ids else {c.clip_id for c in state.clips}
+    captions = req.custom_captions or {}
+    jobs = []
+
+    for clip in state.clips:
+        if clip.clip_id not in selected_ids:
+            continue
+        if not os.path.exists(clip.staging_path):
+            continue
+
+        title = clip.title
+        caption = captions.get(str(clip.clip_id)) or captions.get(clip.clip_id) or clip.social_caption or f"{title} #Shorts #TikTok"
+
+        job_id = upload_manager.submit_upload_job(
+            clip_id=clip.clip_id,
+            video_path=clip.staging_path,
+            title=title,
+            caption=caption,
+            platforms=req.platforms,
+            config=state.config,
+        )
+        jobs.append({
+            "job_id": job_id,
+            "clip_id": clip.clip_id,
+            "title": title
+        })
+
+    return {
+        "status": "ok",
+        "submitted_count": len(jobs),
+        "jobs": jobs,
+        "message": f"{len(jobs)} klip berhasil dimasukkan ke antrean publikasi sosial."
+    }
+
+@app.get("/api/system/version")
+def get_system_version():
+    return {
+        "version": __version__,
+        "app_name": APP_NAME,
+        "edition": EDITION,
+        "changelog": CHANGELOG
     }
 
 @app.get("/api/social/jobs/{job_id}")

@@ -275,10 +275,10 @@ input[type=range]::-webkit-slider-thumb:hover {
   position: absolute;
   height: 36px;
   top: 4px;
-  background: linear-gradient(180deg, #184226 0%, #112F1C 100%);
-  border: 1px solid #34D399;
+  background: linear-gradient(180deg, #132417 0%, #0F1B12 100%);
+  border: 1px solid #233527;
   border-radius: 5px;
-  color: #EDF5EF;
+  color: #C8D8CC;
   font-size: 11px;
   display: flex;
   align-items: center;
@@ -287,37 +287,47 @@ input[type=range]::-webkit-slider-thumb:hover {
   cursor: pointer;
   overflow: hidden;
   user-select: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: all 0.15s ease;
+}
+
+.timeline-clip-block:hover {
+  border-color: #34D399;
+  color: #EDF5EF;
 }
 
 .timeline-clip-block.selected {
+  background: linear-gradient(180deg, #184226 0%, #112F1C 100%);
   border: 1.5px solid #FACC15;
-  box-shadow: 0 0 10px rgba(250, 204, 21, 0.35);
+  color: #FFFFFF;
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.35);
 }
 
 .timeline-clip-block .trim-handle {
-  width: 8px;
+  width: 9px;
   height: 100%;
-  background: rgba(52, 211, 153, 0.4);
+  background: rgba(250, 204, 21, 0.4);
   cursor: ew-resize;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
+  font-weight: bold;
+  font-size: 10px;
+  color: #000;
   transition: background 0.1s ease;
 }
 .timeline-clip-block .trim-handle:hover {
-  background: #34D399;
+  background: #FACC15;
 }
 
 .timeline-subtitle-block {
   position: absolute;
   height: 26px;
   top: 4px;
-  background: linear-gradient(180deg, #382F12 0%, #251F0B 100%);
-  border: 1px solid #FACC15;
+  background: linear-gradient(180deg, #2A2209 0%, #1B1605 100%);
+  border: 1px solid #71580E;
   border-radius: 4px;
-  color: #FEF08A;
+  color: #FDE047;
   font-size: 10px;
   display: flex;
   align-items: center;
@@ -325,4 +335,41 @@ input[type=range]::-webkit-slider-thumb:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: all 0.15s ease;
+}
+
+.timeline-subtitle-block.selected {
+  border: 1px solid #FACC15;
+  background: linear-gradient(180deg, #3D320C 0%, #251E06 100%);
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.3);
+}
+
+.timeline-audio-block {
+  position: absolute;
+  height: 26px;
+  top: 4px;
+  background: linear-gradient(180deg, #0E2218 0%, #08150F 100%);
+  border: 1px solid #1E3A29;
+  border-radius: 4px;
+  color: #6EE7B7;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: all 0.15s ease;
+}
+
+.timeline-audio-block.selected {
+  border: 1px solid #34D399;
+  background: linear-gradient(180deg, #153826 0%, #0C2117 100%);
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.3);
 }

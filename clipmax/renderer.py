@@ -5,7 +5,7 @@ import subprocess
 import threading
 from pathlib import Path
 from typing import Optional, Callable, List, Any, Union
-from clipmax.config import get_ffmpeg_bin, sanitize_ffmpeg_path, is_cuda_available
+from clipmax.config import get_ffmpeg_bin, sanitize_ffmpeg_path, is_cuda_available, SUBPROCESS_FLAGS
 
 def is_nvenc_supported() -> bool:
     if not is_cuda_available():
@@ -16,7 +16,8 @@ def is_nvenc_supported() -> bool:
             [ffmpeg_bin, "-encoders"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
+            creationflags=SUBPROCESS_FLAGS
         )
         return "h264_nvenc" in res.stdout
     except Exception:
@@ -196,7 +197,8 @@ def render_clip(
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.PIPE,
+        creationflags=SUBPROCESS_FLAGS
     )
 
     if pid_callback:
@@ -296,7 +298,7 @@ def apply_clip_overlays(
 
     cmd.extend([*encoder_args, str(out_p.resolve())])
 
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, creationflags=SUBPROCESS_FLAGS)
     if proc.returncode != 0:
         print(f"[Overlay Render ERROR] FFmpeg failed: {proc.stderr}", file=sys.stderr)
         raise RuntimeError(f"FFmpeg overlay rendering failed: {proc.stderr}")

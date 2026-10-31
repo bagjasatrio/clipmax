@@ -226,16 +226,26 @@ document.addEventListener("DOMContentLoaded", () => {
   const timelinePlayhead = document.getElementById("timelinePlayhead");
   const timelinePlayheadHead = document.getElementById("timelinePlayheadHead");
 
-  const timelineVideoBlock = document.getElementById("timelineVideoBlock");
-  const trimHandleLeft = document.getElementById("trimHandleLeft");
-  const trimHandleRight = document.getElementById("trimHandleRight");
-  const lblTimelineBlockTitle = document.getElementById("lblTimelineBlockTitle");
-  const lblTimelineBlockDur = document.getElementById("lblTimelineBlockDur");
+  const timelineVideoTrack = document.getElementById("timelineVideoTrack");
+  const timelineSubtitleTrack = document.getElementById("timelineSubtitleTrack");
+  const timelineAudioTrack = document.getElementById("timelineAudioTrack");
+  const timelineOverlayTrack = document.getElementById("timelineOverlayTrack");
 
-  const timelineSubtitleBlock = document.getElementById("timelineSubtitleBlock");
-  const lblTimelineSubPreview = document.getElementById("lblTimelineSubPreview");
-  const timelineOverlayBlock = document.getElementById("timelineOverlayBlock");
-  const lblTimelineOverlayPreview = document.getElementById("lblTimelineOverlayPreview");
+  const btnPublishAllClips = document.getElementById("btnPublishAllClips");
+  const btnOpenChangelog = document.getElementById("btnOpenChangelog");
+  const modalChangelog = document.getElementById("modalChangelog");
+  const btnCloseChangelog = document.getElementById("btnCloseChangelog");
+  const btnDismissChangelog = document.getElementById("btnDismissChangelog");
+  const changelogListContainer = document.getElementById("changelogListContainer");
+
+  const btnTabPublishSingle = document.getElementById("btnTabPublishSingle");
+  const btnTabPublishAll = document.getElementById("btnTabPublishAll");
+  const lblPublishAllCount = document.getElementById("lblPublishAllCount");
+  const sectionPublishSingle = document.getElementById("sectionPublishSingle");
+  const sectionPublishAll = document.getElementById("sectionPublishAll");
+  const publishAllClipsList = document.getElementById("publishAllClipsList");
+  const socialReAuthContainer = document.getElementById("socialReAuthContainer");
+  const btnRetryYTAuth = document.getElementById("btnRetryYTAuth");
 
   // CapCut Home Elements (Gambar 1)
   const btnSideGoToMedia = document.getElementById("btnSideGoToMedia");
@@ -1312,6 +1322,17 @@ document.addEventListener("DOMContentLoaded", () => {
     return `00:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}.${String(ms).padStart(2, "0")}`;
   }
 
+  function getClipTimelineOffset(targetClip) {
+    if (!currentClips || !targetClip) return 0;
+    let offset = 0;
+    for (const c of currentClips) {
+      if (c.clip_id === targetClip.clip_id) break;
+      const t = getClipTrim(c);
+      offset += Math.max(0.5, t.trim_end - t.trim_start);
+    }
+    return offset;
+  }
+
   function renderTimelineRuler(totalSeconds) {
     if (!timelineRuler) return;
     timelineRuler.innerHTML = "";
@@ -1344,40 +1365,155 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateTimelineBlocks() {
-    if (!selectedClip || !timelineVideoBlock) return;
-    const trim = getClipTrim(selectedClip);
+    if (!timelineVideoTrack) return;
+    const clipsToRender = (currentClips && currentClips.length > 0) ? currentClips : (selectedClip ? [selectedClip] : []);
+    if (clipsToRender.length === 0) return;
 
-    const leftPx = trim.trim_start * timelinePps + 60;
-    const widthPx = Math.max(20, (trim.trim_end - trim.trim_start) * timelinePps);
+    let cumulativeSec = 0;
+    const clipPositions = [];
 
-    timelineVideoBlock.style.left = `${leftPx}px`;
-    timelineVideoBlock.style.width = `${widthPx}px`;
+    clipsToRender.forEach((c) => {
+      const trim = getClipTrim(c);
+      const activeDur = Math.max(0.5, trim.trim_end - trim.trim_start);
+      clipPositions.push({
+        clip: c,
+        trim: trim,
+        offsetSec: cumulativeSec,
+        activeDur: activeDur
+      });
+      cumulativeSec += activeDur;
+    });
 
-    if (lblTimelineBlockTitle) {
-      lblTimelineBlockTitle.textContent = `#${selectedClip.clip_id} ${selectedClip.title || 'Clip'}`;
-    }
-    const curDur = Math.max(0, trim.trim_end - trim.trim_start);
-    if (lblTimelineBlockDur) {
-      lblTimelineBlockDur.textContent = `${curDur.toFixed(1)}s`;
-    }
-    if (lblActiveClipDuration) {
-      lblActiveClipDuration.textContent = `${curDur.toFixed(1)}s`;
+    const totalSec = Math.max(30, cumulativeSec);
+    renderTimelineRuler(totalSec);
+
+    // Track 1: Video Blocks
+    timelineVideoTrack.innerHTML = "";
+    clipPositions.forEach((pos) => {
+      const c = pos.clip;
+      const isSel = selectedClip && selectedClip.clip_id === c.clip_id;
+      const leftPx = pos.offsetSec * timelinePps + 60;
+      const widthPx = Math.max(28, pos.activeDur * timelinePps);
+
+      const block = document.createElement("div");
+      block.className = `timeline-clip-block ${isSel ? "selected" : ""}`;
+      block.style.left = `${leftPx}px`;
+      block.style.width = `${widthPx}px`;
+      block.setAttribute("data-clip-id", c.clip_id);
+      block.title = `#${c.clip_id} ${c.title || 'Clip'} (${pos.activeDur.toFixed(1)}s)`;
+
+      if (isSel) {
+        const hLeft = document.createElement("div");
+        hLeft.className = "trim-handle trim-handle-left";
+        hLeft.textContent = "[";
+        hLeft.title = "Tarik untuk memangkas titik awal (In-Point)";
+        hLeft.addEventListener("mousedown", (e) => {
+          isTrimmingLeft = true;
+          e.stopPropagation();
+        });
+
+        const info = document.createElement("div");
+        info.className = "flex-1 px-1.5 truncate flex items-center justify-between text-white font-semibold text-[11px]";
+        info.innerHTML = `<span class="truncate">#${c.clip_id} ${c.title || 'Clip'}</span><span class="text-[10px] font-mono text-yellow-300 ml-1 shrink-0">${pos.activeDur.toFixed(1)}s</span>`;
+
+        const hRight = document.createElement("div");
+        hRight.className = "trim-handle trim-handle-right";
+        hRight.textContent = "]";
+        hRight.title = "Tarik untuk memangkas titik akhir (Out-Point)";
+        hRight.addEventListener("mousedown", (e) => {
+          isTrimmingRight = true;
+          e.stopPropagation();
+        });
+
+        block.appendChild(hLeft);
+        block.appendChild(info);
+        block.appendChild(hRight);
+      } else {
+        const info = document.createElement("div");
+        info.className = "flex-1 px-2 truncate flex items-center justify-between text-[#C8D8CC] text-[11px]";
+        info.innerHTML = `<span class="truncate">#${c.clip_id} ${c.title || 'Clip'}</span><span class="text-[10px] font-mono text-gray-400 ml-1 shrink-0">${pos.activeDur.toFixed(1)}s</span>`;
+        block.appendChild(info);
+      }
+
+      block.addEventListener("click", (e) => {
+        if (e.target.classList.contains("trim-handle")) return;
+        selectClip(c);
+      });
+
+      timelineVideoTrack.appendChild(block);
+    });
+
+    // Track 2: Subtitle Blocks
+    if (timelineSubtitleTrack) {
+      timelineSubtitleTrack.innerHTML = "";
+      clipPositions.forEach((pos) => {
+        const c = pos.clip;
+        const isSel = selectedClip && selectedClip.clip_id === c.clip_id;
+        const leftPx = pos.offsetSec * timelinePps + 60;
+        const widthPx = Math.max(28, pos.activeDur * timelinePps);
+
+        const subBlock = document.createElement("div");
+        subBlock.className = `timeline-subtitle-block ${isSel ? "selected" : ""}`;
+        subBlock.style.left = `${leftPx}px`;
+        subBlock.style.width = `${widthPx}px`;
+        subBlock.innerHTML = `<span class="truncate">💬 #${c.clip_id} Subtitle</span>`;
+        subBlock.addEventListener("click", () => selectClip(c));
+        timelineSubtitleTrack.appendChild(subBlock);
+      });
     }
 
-    if (timelineSubtitleBlock) {
-      timelineSubtitleBlock.style.left = `${leftPx}px`;
-      timelineSubtitleBlock.style.width = `${widthPx}px`;
-    }
-    if (timelineOverlayBlock) {
-      timelineOverlayBlock.style.left = `${leftPx}px`;
-      timelineOverlayBlock.style.width = `${widthPx}px`;
+    // Track 3: Audio Blocks
+    if (timelineAudioTrack) {
+      timelineAudioTrack.innerHTML = "";
+      clipPositions.forEach((pos) => {
+        const c = pos.clip;
+        const isSel = selectedClip && selectedClip.clip_id === c.clip_id;
+        const leftPx = pos.offsetSec * timelinePps + 60;
+        const widthPx = Math.max(28, pos.activeDur * timelinePps);
+
+        const audBlock = document.createElement("div");
+        audBlock.className = `timeline-audio-block ${isSel ? "selected" : ""}`;
+        audBlock.style.left = `${leftPx}px`;
+        audBlock.style.width = `${widthPx}px`;
+        audBlock.innerHTML = `<span class="truncate">🎵 #${c.clip_id} AAC [${pos.activeDur.toFixed(1)}s]</span>`;
+        audBlock.addEventListener("click", () => selectClip(c));
+        timelineAudioTrack.appendChild(audBlock);
+      });
     }
 
-    if (inputTrimStart && document.activeElement !== inputTrimStart) {
-      inputTrimStart.value = trim.trim_start.toFixed(1);
+    // Track 4: Overlay Blocks
+    if (timelineOverlayTrack) {
+      timelineOverlayTrack.innerHTML = "";
+      clipPositions.forEach((pos) => {
+        const c = pos.clip;
+        const isSel = selectedClip && selectedClip.clip_id === c.clip_id;
+        const leftPx = pos.offsetSec * timelinePps + 60;
+        const widthPx = Math.max(28, pos.activeDur * timelinePps);
+
+        const ovBlock = document.createElement("div");
+        ovBlock.className = `timeline-subtitle-block opacity-75 ${isSel ? "selected" : ""}`;
+        ovBlock.style.left = `${leftPx}px`;
+        ovBlock.style.width = `${widthPx}px`;
+        ovBlock.style.borderColor = "#34D399";
+        ovBlock.style.background = "#132417";
+        ovBlock.style.color = "#A7F3D0";
+        ovBlock.innerHTML = `<span class="truncate">✨ #${c.clip_id} Overlay</span>`;
+        ovBlock.addEventListener("click", () => selectClip(c));
+        timelineOverlayTrack.appendChild(ovBlock);
+      });
     }
-    if (inputTrimEnd && document.activeElement !== inputTrimEnd) {
-      inputTrimEnd.value = trim.trim_end.toFixed(1);
+
+    // Update inspector labels for selected clip
+    if (selectedClip) {
+      const curTrim = getClipTrim(selectedClip);
+      const curDur = Math.max(0, curTrim.trim_end - curTrim.trim_start);
+      if (lblActiveClipDuration) lblActiveClipDuration.textContent = `${curDur.toFixed(1)}s`;
+      if (inputTrimStart && document.activeElement !== inputTrimStart) {
+        inputTrimStart.value = curTrim.trim_start.toFixed(1);
+      }
+      if (inputTrimEnd && document.activeElement !== inputTrimEnd) {
+        inputTrimEnd.value = curTrim.trim_end.toFixed(1);
+      }
     }
   }
 
@@ -1395,10 +1531,13 @@ document.addEventListener("DOMContentLoaded", () => {
     rangeTimelineZoom.addEventListener("input", () => {
       timelineZoomLevel = parseInt(rangeTimelineZoom.value, 10) || 2;
       timelinePps = timelineZoomLevel * 8;
-      const trim = selectedClip ? getClipTrim(selectedClip) : { max_dur: 60 };
-      renderTimelineRuler(trim.max_dur);
       updateTimelineBlocks();
-      updatePlayhead(mainVideo ? mainVideo.currentTime : 0);
+      if (selectedClip && mainVideo) {
+        const selOffset = getClipTimelineOffset(selectedClip);
+        const trim = getClipTrim(selectedClip);
+        const relTime = Math.max(0, mainVideo.currentTime - trim.trim_start);
+        updatePlayhead(selOffset + relTime);
+      }
     });
   }
 
@@ -1443,7 +1582,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (ct > trim.trim_start + 0.5 && ct < trim.trim_end - 0.5) {
         trim.trim_end = parseFloat(ct.toFixed(1));
         updateTimelineBlocks();
-        alert(`Klip dipotong pada detik ${ct.toFixed(1)}s. Titik keluar (out-point) disesuaikan!`);
+        alert(`Klip #${selectedClip.clip_id} dipotong pada detik ${ct.toFixed(1)}s.`);
       } else {
         alert("Posisikan jarum playhead di dalam rentang klip untuk memotong.");
       }
@@ -1456,8 +1595,32 @@ document.addEventListener("DOMContentLoaded", () => {
       const rect = timelineScrollContainer.getBoundingClientRect();
       const clickX = e.clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
       const clickedTime = Math.max(0, clickX / timelinePps);
-      if (mainVideo) {
-        mainVideo.currentTime = clickedTime;
+
+      const clipsList = (currentClips && currentClips.length > 0) ? currentClips : (selectedClip ? [selectedClip] : []);
+      let accumulated = 0;
+      let targetClip = null;
+      let targetClipOffset = 0;
+
+      for (const c of clipsList) {
+        const trim = getClipTrim(c);
+        const dur = Math.max(0.5, trim.trim_end - trim.trim_start);
+        if (clickedTime >= accumulated && clickedTime <= accumulated + dur) {
+          targetClip = c;
+          targetClipOffset = accumulated;
+          break;
+        }
+        accumulated += dur;
+      }
+
+      if (targetClip) {
+        if (!selectedClip || selectedClip.clip_id !== targetClip.clip_id) {
+          selectClip(targetClip);
+        }
+        const targetTrim = getClipTrim(targetClip);
+        const internalTime = targetTrim.trim_start + (clickedTime - targetClipOffset);
+        if (mainVideo) {
+          mainVideo.currentTime = Math.max(targetTrim.trim_start, Math.min(internalTime, targetTrim.trim_end));
+        }
       }
       updatePlayhead(clickedTime);
     };
@@ -1480,16 +1643,18 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if (isTrimmingLeft && selectedClip) {
         const rect = timelineScrollContainer.getBoundingClientRect();
         const mouseX = e.clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
-        const newTime = Math.max(0, mouseX / timelinePps);
+        const selOffset = getClipTimelineOffset(selectedClip);
+        const relativeSec = Math.max(0, (mouseX / timelinePps) - selOffset);
         const trim = getClipTrim(selectedClip);
-        trim.trim_start = Math.min(newTime, trim.trim_end - 0.5);
+        trim.trim_start = Math.max(0, Math.min(relativeSec, trim.trim_end - 0.5));
         updateTimelineBlocks();
       } else if (isTrimmingRight && selectedClip) {
         const rect = timelineScrollContainer.getBoundingClientRect();
         const mouseX = e.clientX - rect.left + timelineScrollContainer.scrollLeft - 60;
-        const newTime = Math.max(0, mouseX / timelinePps);
+        const selOffset = getClipTimelineOffset(selectedClip);
+        const relativeSec = (mouseX / timelinePps) - selOffset;
         const trim = getClipTrim(selectedClip);
-        trim.trim_end = Math.min(trim.max_dur, Math.max(newTime, trim.trim_start + 0.5));
+        trim.trim_end = Math.min(trim.max_dur, Math.max(relativeSec, trim.trim_start + 0.5));
         updateTimelineBlocks();
       }
     });
@@ -1499,20 +1664,6 @@ document.addEventListener("DOMContentLoaded", () => {
       isTrimmingLeft = false;
       isTrimmingRight = false;
     });
-
-    if (trimHandleLeft) {
-      trimHandleLeft.addEventListener("mousedown", (e) => {
-        isTrimmingLeft = true;
-        e.stopPropagation();
-      });
-    }
-
-    if (trimHandleRight) {
-      trimHandleRight.addEventListener("mousedown", (e) => {
-        isTrimmingRight = true;
-        e.stopPropagation();
-      });
-    }
   }
 
   // Step Frame Buttons
@@ -1576,7 +1727,12 @@ document.addEventListener("DOMContentLoaded", () => {
       videoScrubber.value = (mainVideo.currentTime / mainVideo.duration) * 1000;
       updateTimeLabel(mainVideo.currentTime, mainVideo.duration);
     }
-    updatePlayhead(mainVideo.currentTime);
+    if (selectedClip) {
+      const selOffset = getClipTimelineOffset(selectedClip);
+      const trim = getClipTrim(selectedClip);
+      const relTime = Math.max(0, mainVideo.currentTime - trim.trim_start);
+      updatePlayhead(selOffset + relTime);
+    }
   });
 
   videoScrubber.addEventListener("input", () => {
@@ -2561,88 +2717,198 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   }
 
-  // Social Publishing Flow in Review Studio
-  if (btnPublishSocial && modalPublishSocial) {
-  btnPublishSocial.addEventListener("click", () => {
-    if (!selectedClip) {
-      alert("Pilih klip terlebih dahulu sebelum publish.");
-      return;
-    }
-    if (socialModalTitle) socialModalTitle.textContent = selectedClip.title;
-    if (socialModalHook) socialModalHook.textContent = `Hook: ${selectedClip.hook}`;
-    if (socialModalThumb) socialModalThumb.src = `/api/clips/${selectedClip.clip_id}/thumbnail`;
-    if (socialModalCaption) {
-      socialModalCaption.value = (activeClipCaption && activeClipCaption.value.trim()) 
-        ? activeClipCaption.value.trim() 
-        : (selectedClip.social_caption || `${selectedClip.title} - ${selectedClip.hook} #Shorts #TikTok`);
-    }
-    if (socialUploadStatusBox) socialUploadStatusBox.classList.add("hidden");
-    modalPublishSocial.classList.remove("hidden");
+  // --- Social Media Publishing (Single & Batch Mode) ---
+  let activePublishMode = "single"; // "single" | "all"
 
-    // Check auth status
-    fetch("/api/social/auth-status").then(r => r.json()).then(auth => {
-      const bYT = document.getElementById("badgeYTAuth");
-      const bTT = document.getElementById("badgeTikTokAuth");
-      if (bYT) {
-        if (auth.youtube_authenticated) {
-          bYT.textContent = "Terhubung";
-          bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/80 border border-emerald-500/40 text-emerald-300";
-        } else if (auth.youtube_secrets_present) {
-          bYT.textContent = "Login Google";
-          bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/80 hover:bg-emerald-800 border border-emerald-600/50 text-emerald-300 cursor-pointer";
-        } else {
-          bYT.textContent = "No Secrets";
-          bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-rose-950/80 border border-rose-500/40 text-rose-300";
-        }
+  function updateSocialAuthBadges(auth) {
+    const bYT = document.getElementById("badgeYTAuth");
+    const bTT = document.getElementById("badgeTikTokAuth");
+    if (bYT) {
+      if (auth.youtube_authenticated) {
+        bYT.textContent = "Terhubung ✓";
+        bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 hover:border-emerald-400 cursor-pointer";
+        bYT.title = "Akun terhubung. Klik jika ingin mengganti akun.";
+        if (socialReAuthContainer) socialReAuthContainer.classList.add("hidden");
+      } else if (auth.youtube_secrets_present) {
+        bYT.textContent = "🔑 Login Google";
+        bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-yellow-950/80 hover:bg-yellow-850 border border-yellow-500/50 text-yellow-300 cursor-pointer animate-pulse";
+        bYT.title = "Klik untuk menghubungkan akun Google YouTube Shorts Anda.";
+      } else {
+        bYT.textContent = "No Secrets";
+        bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-rose-950/80 border border-rose-500/40 text-rose-300";
       }
-      if (bTT) {
-        if (auth.tiktok_authenticated) {
-          bTT.textContent = "Cookies OK";
-          bTT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/80 border border-emerald-500/40 text-emerald-300";
-        } else {
-          bTT.textContent = "No Cookies";
-          bTT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-amber-950/80 border border-amber-500/40 text-amber-300";
-        }
+    }
+    if (bTT) {
+      if (auth.tiktok_authenticated) {
+        bTT.textContent = "Cookies OK ✓";
+        bTT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/80 border border-emerald-500/40 text-emerald-300";
+      } else {
+        bTT.textContent = "No Cookies";
+        bTT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-amber-950/80 border border-amber-500/40 text-amber-300";
       }
-    }).catch(err => console.warn("Failed checking auth status:", err));
-  });
+    }
+  }
+
+  async function checkSocialAuth() {
+    try {
+      const res = await fetch("/api/social/auth-status");
+      if (res.ok) {
+        const auth = await res.json();
+        updateSocialAuthBadges(auth);
+        return auth;
+      }
+    } catch (err) {
+      console.warn("Failed checking auth status:", err);
+    }
+    return null;
+  }
+
+  async function executeYouTubeOAuth() {
+    const bYT = document.getElementById("badgeYTAuth");
+    if (bYT) {
+      bYT.textContent = "Menghubungkan...";
+      bYT.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-yellow-950/80 border border-yellow-500/40 text-yellow-300";
+    }
+    try {
+      const res = await fetch("/api/social/youtube/auth", { method: "POST" });
+      const resData = await res.json();
+      if (resData.success) {
+        alert("Otentikasi YouTube berhasil! Akun Anda siap digunakan untuk upload.");
+        await checkSocialAuth();
+      } else {
+        alert("Gagal autentikasi YouTube: " + (resData.error || "Unknown error"));
+        await checkSocialAuth();
+      }
+    } catch (e) {
+      alert("Gagal memanggil endpoint autentikasi: " + e.message);
+      await checkSocialAuth();
+    }
+  }
 
   const bYTAuthBtn = document.getElementById("badgeYTAuth");
   if (bYTAuthBtn) {
-    bYTAuthBtn.addEventListener("click", async () => {
-      if (bYTAuthBtn.textContent.includes("Login")) {
-        bYTAuthBtn.textContent = "Menghubungkan...";
-        try {
-          const res = await fetch("/api/social/youtube/auth", { method: "POST" });
-          const resData = await res.json();
-          if (resData.success) {
-            bYTAuthBtn.textContent = "Terhubung";
-            bYTAuthBtn.className = "text-[9px] px-1.5 py-0.5 rounded font-mono bg-emerald-950/80 border border-emerald-500/40 text-emerald-300";
-          } else {
-            alert("Gagal autentikasi YouTube: " + (resData.error || "Unknown error"));
-          }
-        } catch (e) {
-          alert("Gagal memanggil endpoint autentikasi: " + e.message);
-        }
+    bYTAuthBtn.addEventListener("click", () => executeYouTubeOAuth());
+  }
+  if (btnRetryYTAuth) {
+    btnRetryYTAuth.addEventListener("click", () => executeYouTubeOAuth());
+  }
+
+  function setPublishMode(mode) {
+    activePublishMode = mode;
+    if (mode === "single") {
+      if (btnTabPublishSingle) {
+        btnTabPublishSingle.className = "flex-1 py-1.5 rounded-lg text-xs font-semibold bg-[#1A281E] text-white border border-emerald-500/40 shadow-sm transition";
       }
+      if (btnTabPublishAll) {
+        btnTabPublishAll.className = "flex-1 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white transition";
+      }
+      if (sectionPublishSingle) sectionPublishSingle.classList.remove("hidden");
+      if (sectionPublishAll) sectionPublishAll.classList.add("hidden");
+      if (lblSubmitPublish) lblSubmitPublish.textContent = "Mulai Upload Klip";
+    } else {
+      if (btnTabPublishSingle) {
+        btnTabPublishSingle.className = "flex-1 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-white transition";
+      }
+      if (btnTabPublishAll) {
+        btnTabPublishAll.className = "flex-1 py-1.5 rounded-lg text-xs font-semibold bg-[#1A281E] text-white border border-emerald-500/40 shadow-sm transition";
+      }
+      if (sectionPublishSingle) sectionPublishSingle.classList.add("hidden");
+      if (sectionPublishAll) sectionPublishAll.classList.remove("hidden");
+      renderPublishAllList();
+      if (lblSubmitPublish) lblSubmitPublish.textContent = `Mulai Upload Semua (${currentClips ? currentClips.length : 0} Klip)`;
+    }
+  }
+
+  function renderPublishAllList() {
+    if (!publishAllClipsList || !currentClips) return;
+    publishAllClipsList.innerHTML = "";
+    if (lblPublishAllCount) lblPublishAllCount.textContent = currentClips.length;
+
+    currentClips.forEach((c) => {
+      const item = document.createElement("div");
+      item.className = "p-2 rounded-lg bg-[#0E1611] border border-[#233527] flex items-center space-x-2.5 text-xs";
+      
+      const chk = document.createElement("input");
+      chk.type = "checkbox";
+      chk.className = "bulk-clip-chk accent-emerald-500 rounded";
+      chk.checked = true;
+      chk.value = c.clip_id;
+
+      const img = document.createElement("img");
+      img.src = `/api/clips/${c.clip_id}/thumbnail`;
+      img.className = "w-8 h-12 object-cover rounded bg-black border border-white/5 shrink-0";
+
+      const info = document.createElement("div");
+      info.className = "flex-1 min-w-0 space-y-1";
+      info.innerHTML = `
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-gray-200 truncate">#${c.clip_id} ${c.title || 'Clip'}</span>
+          <span class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-yellow-500/20 text-yellow-300 font-bold shrink-0">${c.virality_score}% Viral</span>
+        </div>
+        <input type="text" class="bulk-clip-caption w-full px-2 py-0.5 text-[11px] bg-[#131E16] border border-[#233527] focus:border-emerald-500 rounded text-gray-300 focus:outline-none" data-clip-id="${c.clip_id}" value="${c.social_caption || (c.title + ' ' + (c.hook || '') + ' #Shorts #TikTok')}" placeholder="Caption klip ini..." />
+      `;
+
+      item.appendChild(chk);
+      item.appendChild(img);
+      item.appendChild(info);
+      publishAllClipsList.appendChild(item);
     });
   }
 
+  function openPublishModal(mode = "single") {
+    if (!currentClips || currentClips.length === 0) {
+      alert("Belum ada klip yang tersedia untuk dipublikasikan.");
+      return;
+    }
+    if (mode === "single" && !selectedClip) {
+      selectedClip = currentClips[0];
+    }
+
+    if (selectedClip) {
+      if (socialModalTitle) socialModalTitle.textContent = selectedClip.title;
+      if (socialModalHook) socialModalHook.textContent = `Hook: ${selectedClip.hook}`;
+      if (socialModalThumb) socialModalThumb.src = `/api/clips/${selectedClip.clip_id}/thumbnail`;
+      if (socialModalCaption) {
+        socialModalCaption.value = (activeClipCaption && activeClipCaption.value.trim()) 
+          ? activeClipCaption.value.trim() 
+          : (selectedClip.social_caption || `${selectedClip.title} - ${selectedClip.hook} #Shorts #TikTok`);
+      }
+    }
+
+    if (socialUploadStatusBox) socialUploadStatusBox.classList.add("hidden");
+    if (socialReAuthContainer) socialReAuthContainer.classList.add("hidden");
+    setPublishMode(mode);
+    if (modalPublishSocial) modalPublishSocial.classList.remove("hidden");
+    checkSocialAuth();
+  }
+
+  if (btnPublishSocial) {
+    btnPublishSocial.addEventListener("click", () => openPublishModal("single"));
+  }
+  if (btnPublishAllClips) {
+    btnPublishAllClips.addEventListener("click", () => openPublishModal("all"));
+  }
+  if (btnTabPublishSingle) {
+    btnTabPublishSingle.addEventListener("click", () => setPublishMode("single"));
+  }
+  if (btnTabPublishAll) {
+    btnTabPublishAll.addEventListener("click", () => setPublishMode("all"));
+  }
+
   const hidePublishModal = () => {
-    modalPublishSocial.classList.add("hidden");
+    if (modalPublishSocial) modalPublishSocial.classList.add("hidden");
   };
 
   if (btnClosePublishModal) btnClosePublishModal.addEventListener("click", hidePublishModal);
   if (btnCancelPublish) btnCancelPublish.addEventListener("click", hidePublishModal);
-
-  modalPublishSocial.addEventListener("click", (e) => {
-    if (e.target === modalPublishSocial) hidePublishModal();
-  });
+  if (modalPublishSocial) {
+    modalPublishSocial.addEventListener("click", (e) => {
+      if (e.target === modalPublishSocial) hidePublishModal();
+    });
+  }
 
   if (btnSubmitPublish) {
     btnSubmitPublish.addEventListener("click", async () => {
-      if (!selectedClip) return;
-
       const platforms = [];
       if (modalChkYT && modalChkYT.checked) platforms.push("youtube");
       if (modalChkTikTok && modalChkTikTok.checked) platforms.push("tiktok");
@@ -2654,118 +2920,276 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const ytPriv = modalSelectYTPrivacy ? modalSelectYTPrivacy.value : "private";
       const ttPriv = modalSelectTikTokPrivacy ? modalSelectTikTokPrivacy.value : "everyone";
-      const captionText = socialModalCaption ? socialModalCaption.value.trim() : "";
 
       if (socialUploadStatusBox) socialUploadStatusBox.classList.remove("hidden");
-      if (socialUploadStatusText) {
-        socialUploadStatusText.innerHTML = `<span class="animate-spin mr-1.5">⏳</span> Mengunggah ke ${platforms.join(" & ")} di latar belakang...`;
-      }
+      if (socialReAuthContainer) socialReAuthContainer.classList.add("hidden");
       btnSubmitPublish.disabled = true;
       btnSubmitPublish.classList.add("opacity-60", "pointer-events-none");
 
-      try {
-        const res = await fetch("/api/social/publish", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            clip_id: selectedClip.clip_id,
-            platforms: platforms,
-            title: selectedClip.title,
-            caption: captionText,
-            youtube_privacy: ytPriv,
-            tiktok_privacy: ttPriv
-          })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.detail || data.message || "Gagal memproses request");
+      if (activePublishMode === "single") {
+        if (!selectedClip) return;
+        const captionText = socialModalCaption ? socialModalCaption.value.trim() : "";
+        if (socialUploadStatusText) {
+          socialUploadStatusText.innerHTML = `<span class="animate-spin mr-1.5">⏳</span> Mengunggah klip #${selectedClip.clip_id} ke ${platforms.join(" & ")} di latar belakang...`;
         }
 
-        const jobId = data.job_id;
-          
-        let pollCount = 0;
-        const pollInterval = setInterval(async () => {
-          pollCount++;
-          try {
-            const statusRes = await fetch(`/api/social/jobs/${jobId}`);
-            if (statusRes.ok) {
-              const job = await statusRes.json();
-              if (job.status === "COMPLETED" || job.status === "PARTIAL" || job.status === "FAILED") {
-                clearInterval(pollInterval);
-                btnSubmitPublish.disabled = false;
-                btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
+        try {
+          const res = await fetch("/api/social/publish", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              clip_id: selectedClip.clip_id,
+              platforms: platforms,
+              title: selectedClip.title,
+              caption: captionText,
+              youtube_privacy: ytPriv,
+              tiktok_privacy: ttPriv
+            })
+          });
 
-                let statusHtml = "";
-                if (job.status === "COMPLETED") {
-                  statusHtml += `<div class="text-emerald-400 font-bold mb-1">✅ Berhasil Diunggah!</div>`;
-                } else if (job.status === "PARTIAL") {
-                  statusHtml += `<div class="text-amber-400 font-bold mb-1">⚠️ Upload Sebagian Selesai</div>`;
-                } else {
-                  statusHtml += `<div class="text-rose-400 font-bold mb-1">❌ Gagal Mengunggah</div>`;
-                }
-
-                if (job.results && job.results.youtube) {
-                  if (job.results.youtube.success) {
-                    statusHtml += `<div>YouTube: <a href="${job.results.youtube.url}" target="_blank" class="text-cyan-400 underline font-mono">${job.results.youtube.url}</a></div>`;
-                  } else {
-                    statusHtml += `<div class="text-rose-300">YouTube Error: ${job.results.youtube.error}</div>`;
-                  }
-                }
-
-                if (job.results && job.results.tiktok) {
-                  if (job.results.tiktok.success) {
-                    statusHtml += `<div class="text-emerald-300">TikTok: ${job.results.tiktok.message}</div>`;
-                  } else {
-                    statusHtml += `<div class="text-rose-300">TikTok Error: ${job.results.tiktok.error}</div>`;
-                  }
-                }
-
-                if (job.errors && job.errors.length > 0 && !job.results?.youtube && !job.results?.tiktok) {
-                  statusHtml += `<div class="text-rose-400">${job.errors.join(", ")}</div>`;
-                }
-
-                socialUploadStatusText.innerHTML = statusHtml;
-                return;
-              }
-            }
-          } catch (err) {
-            console.warn("Polling error:", err);
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || data.message || "Gagal memproses request");
+          pollJobProgress(data.job_id);
+        } catch (e) {
+          btnSubmitPublish.disabled = false;
+          btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
+          if (socialUploadStatusText) {
+            socialUploadStatusText.innerHTML = `<span class="text-rose-400">Error: ${e.message}</span>`;
           }
+        }
+      } else {
+        // Batch Upload Mode
+        const chks = document.querySelectorAll(".bulk-clip-chk:checked");
+        const selectedIds = Array.from(chks).map(c => parseInt(c.value, 10));
+        if (selectedIds.length === 0) {
+          alert("Pilih minimal satu klip untuk dipublikasikan.");
+          btnSubmitPublish.disabled = false;
+          btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
+          return;
+        }
 
-          if (pollCount > 120) {
-            clearInterval(pollInterval);
-            btnSubmitPublish.disabled = false;
-            btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
-            socialUploadStatusText.innerHTML = `<span class="text-amber-300">Proses masih berjalan di latar belakang (Job ID: ${jobId}). Cek log aplikasi.</span>`;
-          }
-        }, 2000);
+        const customCaptions = {};
+        document.querySelectorAll(".bulk-clip-caption").forEach(inp => {
+          const cid = inp.getAttribute("data-clip-id");
+          if (cid) customCaptions[cid] = inp.value.trim();
+        });
 
-      } catch (e) {
-        btnSubmitPublish.disabled = false;
-        btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
         if (socialUploadStatusText) {
-          socialUploadStatusText.innerHTML = `<span class="text-rose-400">Error: ${e.message}</span>`;
+          socialUploadStatusText.innerHTML = `<span class="animate-spin mr-1.5">⏳</span> Memasukkan ${selectedIds.length} klip ke antrean upload ${platforms.join(" & ")}...`;
+        }
+
+        try {
+          const res = await fetch("/api/social/publish-all", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              platforms: platforms,
+              youtube_privacy: ytPriv,
+              tiktok_privacy: ttPriv,
+              clip_ids: selectedIds,
+              custom_captions: customCaptions
+            })
+          });
+
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.detail || data.message || "Gagal memproses request");
+
+          const jobIds = (data.jobs || []).map(j => j.job_id);
+          pollMultipleJobs(jobIds, selectedIds.length);
+        } catch (e) {
+          btnSubmitPublish.disabled = false;
+          btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
+          if (socialUploadStatusText) {
+            socialUploadStatusText.innerHTML = `<span class="text-rose-400">Error: ${e.message}</span>`;
+          }
         }
       }
     });
   }
+
+  function pollJobProgress(jobId) {
+    let pollCount = 0;
+    const pollInterval = setInterval(async () => {
+      pollCount++;
+      try {
+        const statusRes = await fetch(`/api/social/jobs/${jobId}`);
+        if (statusRes.ok) {
+          const job = await statusRes.json();
+          if (job.status === "COMPLETED" || job.status === "PARTIAL" || job.status === "FAILED") {
+            clearInterval(pollInterval);
+            btnSubmitPublish.disabled = false;
+            btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
+
+            let statusHtml = "";
+            let hasAuthError = false;
+            if (job.status === "COMPLETED") {
+              statusHtml += `<div class="text-emerald-400 font-bold mb-1">✅ Berhasil Diunggah!</div>`;
+            } else if (job.status === "PARTIAL") {
+              statusHtml += `<div class="text-amber-400 font-bold mb-1">⚠️ Upload Sebagian Selesai</div>`;
+            } else {
+              statusHtml += `<div class="text-rose-400 font-bold mb-1">❌ Gagal Mengunggah</div>`;
+            }
+
+            if (job.results && job.results.youtube) {
+              if (job.results.youtube.success) {
+                statusHtml += `<div>YouTube: <a href="${job.results.youtube.url}" target="_blank" class="text-cyan-400 underline font-mono">${job.results.youtube.url}</a></div>`;
+              } else {
+                statusHtml += `<div class="text-rose-300">YouTube Error: ${job.results.youtube.error}</div>`;
+                if (String(job.results.youtube.error).includes("terotentikasi") || String(job.results.youtube.error).includes("kadaluarsa") || String(job.results.youtube.error).includes("invalid_grant")) {
+                  hasAuthError = true;
+                }
+              }
+            }
+
+            if (job.results && job.results.tiktok) {
+              if (job.results.tiktok.success) {
+                statusHtml += `<div class="text-emerald-300">TikTok: ${job.results.tiktok.message}</div>`;
+              } else {
+                statusHtml += `<div class="text-rose-300">TikTok Error: ${job.results.tiktok.error}</div>`;
+              }
+            }
+
+            if (job.errors && job.errors.length > 0 && !job.results?.youtube && !job.results?.tiktok) {
+              statusHtml += `<div class="text-rose-400">${job.errors.join(", ")}</div>`;
+            }
+
+            socialUploadStatusText.innerHTML = statusHtml;
+            if (hasAuthError && socialReAuthContainer) {
+              socialReAuthContainer.classList.remove("hidden");
+            }
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Polling error:", err);
+      }
+
+      if (pollCount > 120) {
+        clearInterval(pollInterval);
+        btnSubmitPublish.disabled = false;
+        btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
+        socialUploadStatusText.innerHTML = `<span class="text-amber-300">Proses masih berjalan di latar belakang (Job ID: ${jobId}). Cek log aplikasi.</span>`;
+      }
+    }, 2000);
   }
 
-  // 12. Window Control Buttons
-  btnMin.addEventListener("click", () => {
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.minimize_window) {
-      window.pywebview.api.minimize_window();
-    }
-  });
+  function pollMultipleJobs(jobIds, total) {
+    let pollCount = 0;
+    const pollInterval = setInterval(async () => {
+      pollCount++;
+      try {
+        const res = await fetch("/api/social/jobs");
+        if (res.ok) {
+          const allJobs = await res.json();
+          const targetJobs = allJobs.filter(j => jobIds.includes(j.job_id));
+          const finished = targetJobs.filter(j => j.status === "COMPLETED" || j.status === "PARTIAL" || j.status === "FAILED");
 
-  btnClose.addEventListener("click", () => {
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.close_window) {
-      window.pywebview.api.close_window();
-    } else {
-      window.close();
+          if (socialUploadStatusText) {
+            socialUploadStatusText.innerHTML = `
+              <div class="space-y-1">
+                <div class="flex justify-between font-bold text-gray-200">
+                  <span>Proses Upload Massal:</span>
+                  <span class="text-emerald-400 font-mono">${finished.length} / ${total} Klip Selesai</span>
+                </div>
+                <div class="w-full bg-[#1A281E] h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-gradient-to-r from-emerald-500 to-yellow-400 h-full transition-all duration-300" style="width: ${(finished.length / total) * 100}%"></div>
+                </div>
+              </div>
+            `;
+          }
+
+          if (finished.length === total) {
+            clearInterval(pollInterval);
+            btnSubmitPublish.disabled = false;
+            btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
+
+            const successCount = finished.filter(j => j.status === "COMPLETED").length;
+            const partialCount = finished.filter(j => j.status === "PARTIAL").length;
+            const failedCount = finished.filter(j => j.status === "FAILED").length;
+
+            let finalHtml = `
+              <div class="space-y-1 mt-1">
+                <div class="font-bold text-emerald-400">🎉 Publikasi Massal Selesai!</div>
+                <div class="text-[10px] text-gray-300">Sukses: <b class="text-emerald-300">${successCount}</b> | Parsial: <b class="text-yellow-300">${partialCount}</b> | Gagal: <b class="text-rose-400">${failedCount}</b></div>
+              </div>
+            `;
+            socialUploadStatusText.innerHTML = finalHtml;
+          }
+        }
+      } catch (err) {
+        console.warn("Poll multiple jobs error:", err);
+      }
+
+      if (pollCount > 150) {
+        clearInterval(pollInterval);
+        btnSubmitPublish.disabled = false;
+        btnSubmitPublish.classList.remove("opacity-60", "pointer-events-none");
+      }
+    }, 2500);
+  }
+
+  // --- Changelog & Version Dialog ---
+  async function showChangelogModal() {
+    if (!modalChangelog) return;
+    modalChangelog.classList.remove("hidden");
+    if (changelogListContainer) {
+      changelogListContainer.innerHTML = `<div class="p-4 text-center text-gray-400"><span class="animate-spin mr-2">⏳</span>Memuat catatan pembaruan...</div>`;
+      try {
+        const res = await fetch("/api/system/version");
+        if (!res.ok) throw new Error("Gagal memuat info versi");
+        const data = await res.json();
+        
+        let html = "";
+        (data.changelog || []).forEach((c) => {
+          html += `
+            <div class="p-3.5 rounded-xl bg-[#0D1510] border border-[#233527] space-y-2">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <span class="font-mono font-bold text-sm text-white">v${c.version}</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-950 border border-emerald-500/40 text-emerald-300">${c.badge}</span>
+                </div>
+                <span class="text-[10px] font-mono text-gray-500">${c.date}</span>
+              </div>
+              <h4 class="text-xs font-semibold text-emerald-200">${c.title}</h4>
+              <ul class="space-y-1 text-gray-300 text-[11px] list-disc list-inside">
+                ${(c.changes || []).map(ch => `<li>${ch}</li>`).join("")}
+              </ul>
+            </div>
+          `;
+        });
+        changelogListContainer.innerHTML = html;
+      } catch (e) {
+        changelogListContainer.innerHTML = `<div class="p-3 text-rose-400 text-xs">Gagal memuat catatan: ${e.message}</div>`;
+      }
     }
-  });
+  }
+
+  if (btnOpenChangelog) {
+    btnOpenChangelog.addEventListener("click", showChangelogModal);
+  }
+  if (btnCloseChangelog) {
+    btnCloseChangelog.addEventListener("click", () => modalChangelog && modalChangelog.classList.add("hidden"));
+  }
+  if (btnDismissChangelog) {
+    btnDismissChangelog.addEventListener("click", () => modalChangelog && modalChangelog.classList.add("hidden"));
+  }
+  if (modalChangelog) {
+    modalChangelog.addEventListener("click", (e) => {
+      if (e.target === modalChangelog) modalChangelog.classList.add("hidden");
+    });
+  }
+
+  // Window close handler
+  const btnCloseApp = document.getElementById("btnCloseApp");
+  if (btnCloseApp) {
+    btnCloseApp.addEventListener("click", () => {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.close_window) {
+        window.pywebview.api.close_window();
+      } else {
+        window.close();
+      }
+    });
+  }
 
   // 13. Reset Form & Clear Cache
   if (btnResetClear) {
