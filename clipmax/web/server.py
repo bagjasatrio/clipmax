@@ -173,24 +173,16 @@ async def lifespan(app: FastAPI):
     state.loop = asyncio.get_running_loop()
     # Auto-clean cache on startup (intermediate temp files only, keep staging videos safe)
     clear_temp_cache(state.config.temp_dir, purge_staging=False)
-    yield
-    # Auto-clean cache on shutdown (intermediate temp files only, keep staging videos safe)
-    clear_temp_cache(state.config.temp_dir, purge_staging=False)
-
-app = FastAPI(title="ClipMax Studio Pro Backend", version=__version__, lifespan=lifespan)
-
-@app.on_event("startup")
-def on_startup():
-    clear_temp_cache(state.config.temp_dir, purge_staging=False)
     try:
         from clipmax.hardware import tune_config_for_hardware
         tune_config_for_hardware(state.config, getattr(state.config, "hardware_profile", "auto"))
     except Exception as e:
         logger.warning(f"Gagal melakukan auto-tuning hardware saat startup: {e}")
-
-@app.on_event("shutdown")
-def on_shutdown():
+    yield
+    # Auto-clean cache on shutdown (intermediate temp files only, keep staging videos safe)
     clear_temp_cache(state.config.temp_dir, purge_staging=False)
+
+app = FastAPI(title="ClipMax Studio Pro Backend", version=__version__, lifespan=lifespan)
 
 @app.post("/api/cache/clear")
 def api_clear_cache():

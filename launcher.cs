@@ -55,6 +55,7 @@ namespace ClipMaxLauncher
                 psi.WorkingDirectory = baseDir;
                 psi.UseShellExecute = false;
                 psi.CreateNoWindow = true;
+                psi.EnvironmentVariables["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--disable-gpu-compositing --disable-direct-composition";
 
                 Process.Start(psi);
             }

@@ -14,11 +14,18 @@ PROFILE_MIDRANGE = "mid"
 PROFILE_HIGHEND = "high"
 PROFILE_AUTO = "auto"
 
-def detect_hardware_specs() -> Dict[str, Any]:
+_cached_specs: Optional[Dict[str, Any]] = None
+
+def detect_hardware_specs(force_refresh: bool = False) -> Dict[str, Any]:
     """
     Mendeteksi spesifikasi hardware lokal (CPU, RAM, GPU/Akselerasi, OS)
     secara presisi dan aman tanpa dependensi eksternal berat.
+    Hasil di-cache di memori agar cepat (sub-millisecond).
     """
+    global _cached_specs
+    if _cached_specs is not None and not force_refresh:
+        return _cached_specs
+
     os_name = platform.system()
     os_release = platform.release()
     cpu_cores = os.cpu_count() or 4
@@ -126,7 +133,7 @@ def detect_hardware_specs() -> Dict[str, Any]:
         tier_title = "Potato Mode (Hemat Daya & Ringan)"
         badge_color = "yellow"
 
-    return {
+    _cached_specs = {
         "os": f"{os_name} {os_release}",
         "cpu_cores": cpu_cores,
         "ram_gb": ram_gb,
@@ -143,6 +150,7 @@ def detect_hardware_specs() -> Dict[str, Any]:
         "tier_title": tier_title,
         "badge_color": badge_color,
     }
+    return _cached_specs
 
 def get_profile_tuning(tier: str, specs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """

@@ -1,5 +1,10 @@
 import os
 import sys
+
+# Workaround for Microsoft WebView2 DirectComposition / GPU compositing black screen bug on Windows
+if "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS" not in os.environ:
+    os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--disable-gpu-compositing --disable-direct-composition"
+
 import socket
 import time
 import threading
@@ -137,12 +142,13 @@ def main():
     server_thread = threading.Thread(target=start_server, args=(port,), daemon=True)
     server_thread.start()
 
-    # Wait for server readiness
+    # Wait for server readiness (max 15 seconds)
     url = f"http://127.0.0.1:{port}"
     ready = False
-    for _ in range(30):
+    for _ in range(150):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.2)
                 if s.connect_ex(("127.0.0.1", port)) == 0:
                     ready = True
                     break
@@ -151,19 +157,27 @@ def main():
         time.sleep(0.1)
 
     if not ready:
-        print("[ClipMax Error] Failed to start local web server.", file=sys.stderr)
+        err_msg = f"Gagal memulai server lokal ClipMax di port {port} setelah 15 detik.\nSilakan periksa log di: %LOCALAPPDATA%\\clipmax_desktop.log"
+        print(f"[ClipMax Error] {err_msg}", file=sys.stderr)
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(0, err_msg, "ClipMax Launch Error", 0x10)
+            except Exception:
+                pass
         sys.exit(1)
 
     window_holder = state.window_holder
     api = DesktopJsApi(window_holder)
 
     window = webview.create_window(
-        title="ClipMax Studio",
+        title="ClipMax Studio Pro",
         url=url,
         width=1280,
         height=820,
         min_size=(1024, 680),
         resizable=True,
+        background_color="#0C120E",
         js_api=api
     )
     window_holder["window"] = window
